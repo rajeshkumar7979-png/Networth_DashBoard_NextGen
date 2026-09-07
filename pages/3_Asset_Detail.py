@@ -1,0 +1,23 @@
+import streamlit as st
+
+params = st.query_params
+symbol = (params.get("symbol") or "").strip()
+asset_type = (params.get("type") or "auto").strip().lower()
+
+st.markdown("## Asset Detail")
+st.page_link("pages/1_Command_Center.py", label="← Command Center", icon="📊")
+
+if not symbol:
+    symbol = st.text_input("Symbol / fund / product", value="")
+    asset_type = st.selectbox("Type", ["auto", "stock", "mf", "fd", "gold"])
+
+if not symbol:
+    st.warning("Enter a symbol or open this page from a holdings link.")
+    st.stop()
+
+st.markdown(f"### {symbol}")
+st.caption(f"Type: **{asset_type}**")
+st.info(
+    "Stub page. Next: load Excel via lib.portfolio and show the matching row, "
+    "P&L, and related news."
+)
