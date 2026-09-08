@@ -22,3 +22,10 @@ def test_command_center_renders_without_exception():
     assert not any("✗ FAIL" in r for r in rendered), "reconciliation FAILED on live run:\n" + "\n".join(
         r for r in rendered if "✗ FAIL" in r
     )
+    # Phase 1B gate: P&L drivers section, three recon entries, cashflow label.
+    assert any("Register class P&L sums to Total P&L" in r for r in rendered), "driver recon missing"
+    assert any("FD drivers reconcile to FD class P&L" in r for r in rendered), "FD driver recon missing"
+    assert any("Total drivers reconcile to Total P&L" in r for r in rendered), "total driver recon missing"
+    assert any("NOT a cash-flow measurement" in r for r in rendered), "cashflow label missing"
+    # Phase 1B delta block present.
+    assert any("Snapshot delta" in r or "snapshot delta" in r for r in rendered), "delta section missing"

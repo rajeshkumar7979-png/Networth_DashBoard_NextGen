@@ -552,3 +552,23 @@ FROZEN_BOOKS = {
 
 # Expected register row counts by book.
 FROZEN_ROWS = {'mf': 21, 'stocks': 33, 'gold': 5, 'fd': 23, 'register_total': 82}
+
+# Phase 1B — P&L driver golden values (class-level pnl from register, full-precision).
+# Sum(cls PnL) == total_pnl within ₹0.01 (scratch-validated 2026-09-08).
+CLASS_PNL_GOLDEN = {
+    'Equity': 973344.39,
+    'Liquid': 25856.2,
+    'FCNR (USD)': 633644.0,
+    'INR FD': 513775.0,
+    'Gold': 835038.0,
+}
+
+# NOTE (Phase 1B): the genuine full-precision FCNR/INR-FD driver split (per-FD
+# `interest_at_current_fx` / `fx_on_principal`, pre-display-rounding) is NOT
+# recoverable from FROZEN_BOOKS, which carry only the display-rounded
+# `Current Value (INR)` and `Principal (INR, at deposit FX)` columns and no
+# per-FD accrued/fx breakdown. No individual FCNR/INR-FD driver golden is
+# frozen here; an independent production dump would be required to pin them.
+# The deterministic suite instead pins: (a) the register-derived class P&L
+# (CLASS_PNL_GOLDEN above), and (b) the structurally-justified rounding bound
+# via constructed worst-case inputs (see tests/test_drivers.py).

@@ -30,6 +30,7 @@ from lib.scoring import (
     score_performance,
 )
 from lib.register import (
+    ASSET_CLASSES,
     aggregate_by_class,
     aggregate_by_member,
     build_asset_register,
@@ -37,6 +38,14 @@ from lib.register import (
     NonUniqueKeyError,
 )
 from lib.ledger import net_worth as compute_net_worth
+from lib.drivers import (
+    DRIVER_KEYS,
+    NOT_A_CASHFLOW_LABEL,
+    class_pnl_from_register,
+    decompose_current,
+    snapshot_delta,
+)
+from lib import snapshot as snapshot_io
 st.set_page_config(page_title="Family Net Worth", page_icon="💰", layout="wide", initial_sidebar_state="expanded")
 
 IST = pytz.timezone("Asia/Kolkata")
@@ -781,6 +790,7 @@ if not gold.empty and {"Owner", "Symbol", "Quantity", "Invested", "Current Value
 fd_rows = []
 seen_accounts = set()
 seen_fingerprints = set()  # catches exact clones when Account Number is blank/missing
+fd_attrib = {"fcnr_interest": 0.0, "fcnr_fx_principal": 0.0, "fcnr_fx_interest": 0.0, "inr_fd_interest": 0.0}
 for _, row in fd_raw.iterrows():
     try:
         holder = str(row.get("Holder Name", "") or "").strip()
@@ -867,6 +877,8 @@ for _, row in fd_raw.iterrows():
         elif currency == "USD":
             fx_deposit = usd_inr or 1.0
 
+        product = "FCNR" if currency == "USD" else "INR FD"
+
         # ----- Phase-1 FCNR attribution (full reconciliation) -----
         if currency == "USD" and fx_today is not None and fx_deposit is not None:
             attr = compute_fcnr_attribution(principal_native, accrued_native, fx_deposit, fx_today)
@@ -886,6 +898,13 @@ for _, row in fd_raw.iterrows():
                 # (we also expose FX on interest separately).
                 fx_gain_inr = attr["fx_on_principal"]
                 fx_on_interest_inr = attr["fx_on_interest"]
+                # Phase 1B: full-precision, pre-round accumulators for driver recon.
+                if product == "FCNR":
+                    fd_attrib["fcnr_interest"] += attr["interest_at_current_fx"]
+                    fd_attrib["fcnr_fx_principal"] += attr["fx_on_principal"]
+                    fd_attrib["fcnr_fx_interest"] += attr["fx_on_interest"]
+                else:
+                    fd_attrib["inr_fd_interest"] += attr["interest_at_current_fx"]
                 if not attr["reconciled"]:
                     integrity_issues.append((
                         "HIGH",
@@ -899,8 +918,8 @@ for _, row in fd_raw.iterrows():
             interest_return_inr = accrued_native
             fx_gain_inr = 0.0
             fx_on_interest_inr = 0.0
+            fd_attrib["inr_fd_interest"] += interest_return_inr
 
-        product = "FCNR" if currency == "USD" else "INR FD"
         fd_rows.append({
             "Holder Name": holder,
             "Account Number": account,
@@ -1005,6 +1024,20 @@ st.session_state["cc_fcnr_pct"] = float(fcnr_pct)
 st.session_state["cc_gold_pct"] = float(gold_pct)
 st.session_state["cc_net_worth"] = float(total_networth)
 
+# PHASE 1B — current P&L drivers (pure decomposition over the canonical register +
+# full-precision FD attribution). Additive; no financial value is changed.
+cc_drivers = None
+if register is not None:
+    _fd_comp = dict(fd_attrib)
+    _fd_comp["n_fd"] = int(len(fd_valid)) if fd_valid is not None and not fd_valid.empty else 0
+    cc_drivers = decompose_current(
+        class_pnl_from_register(family_sum),
+        _fd_comp,
+        n_fd=_fd_comp["n_fd"],
+        missing_fx=(usd_inr is None),
+    )
+    st.session_state["cc_drivers"] = cc_drivers
+
 # Phase 2A — family-level concentration (same fund/stock across members counted once)
 if not mf_valid.empty and total_mf > 0 and "ISIN" in mf_valid.columns:
     _mf_by_isin = (
@@ -1100,6 +1133,29 @@ if register is not None:
             f"Asset register {_cls.lower()} = Command Center {_cls.lower()} total",
             abs(_reg_val - _page_total) < 1,
             f"{format_inr(_reg_val)} vs {format_inr(_page_total)}",
+        ))
+    # PHASE 1B — driver-level reconciliation entries.
+    if cc_drivers is not None:
+        _drv_sum = float(sum(cc_drivers["drivers"].values()))
+        _fd_drv = float(cc_drivers["drivers"]["fcnr_interest"]
+                        + cc_drivers["drivers"]["fcnr_fx_principal"]
+                        + cc_drivers["drivers"]["inr_fd_interest"])
+        _fd_cls = float(total_fd - total_fd_invested)
+        _bound = cc_drivers["residual_bound"] or 0.0
+        recon_tests.append((
+            "Register class P&L sums to Total P&L",
+            abs(cc_drivers["attributed"] - total_pnl) <= _bound,
+            f"{format_inr(cc_drivers['attributed'])} vs {format_inr(total_pnl)} (bound \u20B9{_bound:.1f})",
+        ))
+        recon_tests.append((
+            "FD drivers reconcile to FD class P&L (rounding-bound)",
+            abs(_fd_drv - _fd_cls) <= _bound,
+            f"{format_inr(_fd_drv)} vs {format_inr(_fd_cls)} (bound \u20B9{_bound:.1f})",
+        ))
+        recon_tests.append((
+            "Total drivers reconcile to Total P&L (rounding-bound)",
+            abs(_drv_sum - total_pnl) <= _bound and cc_drivers["residual_ok"],
+            f"{format_inr(_drv_sum)} vs {format_inr(total_pnl)} (bound \u20B9{_bound:.1f})",
         ))
 
 # -------------------------------------------------
@@ -1218,33 +1274,43 @@ def fetch_news_for(names, max_items=10):
 # HISTORY — FIXED: full precision kept in the CSV/download, rounded only
 # for on-screen display (Phase 7)
 # -------------------------------------------------
+def _build_history_row():
+    """Build an enriched snapshot row for today (Phase 1B)."""
+    _family = family_sum if family_sum is not None else {"by_class": {}, "by_member": {}}
+    _class_cur = {_cls: (_family["by_class"].get(_cls) or {}).get("current", 0.0)
+                  for _cls in ASSET_CLASSES}
+    _class_inv = {_cls: (_family["by_class"].get(_cls) or {}).get("invested", 0.0)
+                  for _cls in ASSET_CLASSES}
+    _mem_cur = {m: v["current"] for m, v in (_family.get("by_member") or {}).items()}
+    _mem_inv = {m: v["invested"] for m, v in (_family.get("by_member") or {}).items()}
+    return snapshot_io.build_snapshot_row(
+        date=now_ist.strftime("%Y-%m-%d"),
+        net_worth=total_networth,
+        equity_pct=float(equity_pct),
+        fd_pct=float(fd_pct),
+        pnl=total_pnl,
+        health_score=health_score,
+        total_invested=total_invested,
+        usd_inr=usd_inr,
+        amfi_cache_date=str(amfi_cache_date) if amfi_cache_date else None,
+        snapshot_ts=now_ist.strftime("%Y-%m-%d %H:%M:%S"),
+        fcnr_interest_total=(cc_drivers or {}).get("drivers", {}).get("fcnr_interest"),
+        fcnr_fx_principal_total=(cc_drivers or {}).get("drivers", {}).get("fcnr_fx_principal"),
+        inr_fd_interest_total=(cc_drivers or {}).get("drivers", {}).get("inr_fd_interest"),
+        drivers_recon_ok=bool(cc_drivers and cc_drivers["residual_ok"]),
+        class_current=_class_cur,
+        class_invested=_class_inv,
+        member_current=_mem_cur,
+        member_invested=_mem_inv,
+    )
+
+
 def log_history_snapshot():
-    os.makedirs("data", exist_ok=True)
-    row = {"date": now_ist.strftime("%Y-%m-%d"), "net_worth": total_networth, "equity_pct": equity_pct,
-           "fd_pct": fd_pct, "pnl": total_pnl, "health_score": round(health_score, 1)}
-    if os.path.exists(HISTORY_PATH):
-        hist_df = pd.read_csv(HISTORY_PATH)
-        hist_df = hist_df[hist_df["date"] != row["date"]]
-        hist_df = pd.concat([hist_df, pd.DataFrame([row])], ignore_index=True)
-    else:
-        hist_df = pd.DataFrame([row])
-    hist_df.to_csv(HISTORY_PATH, index=False)
-    return hist_df
+    return snapshot_io.upsert_snapshot(_build_history_row(), HISTORY_PATH)
 
-def _clean_history(df):
-    if df is None or df.empty or "date" not in df.columns:
-        return pd.DataFrame(columns=["date", "net_worth", "equity_pct", "fd_pct", "pnl", "health_score"])
-    df = df.copy()
-    df["date"] = df["date"].astype(str)
-    df = df[df["date"].str.match(r"^\d{4}-\d{2}-\d{2}$", na=False)]
-    for col in ["net_worth", "equity_pct", "fd_pct", "pnl", "health_score"]:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors="coerce")
-    df = df.dropna(subset=["net_worth"])
-    return df.reset_index(drop=True)
 
-history_df = log_history_snapshot() if log_snapshot else (pd.read_csv(HISTORY_PATH) if os.path.exists(HISTORY_PATH) else pd.DataFrame())
-history_df = _clean_history(history_df)
+history_df = log_history_snapshot() if log_snapshot else snapshot_io.load_history(HISTORY_PATH)
+history_df = snapshot_io.clean(history_df)
 # rewrite cleaned history so bad rows don't keep coming back
 if log_snapshot and not history_df.empty:
     try:
@@ -1459,6 +1525,49 @@ if register_classes is not None and not register_classes.empty:
         )
         st.caption("No-data classes (Retirement / Real Estate / Savings/Cash / Liabilities) have no workbook source and are never summed.")
 
+# PHASE 1B — P&L drivers (valuation attribution only; no cash-flow interpretation).
+if cc_drivers is not None:
+    _drv_rows = []
+    _fcnr_drivers = {"fcnr_interest", "fcnr_fx_principal"}
+    for _k in DRIVER_KEYS:
+        # When USD/INR is unavailable, FCNR interest / FX-on-principal slices are
+        # genuinely not measurable this run -> show n/a, never a fabricated 0.00.
+        if cc_drivers["missing_fx"] and _k in _fcnr_drivers:
+            _drv_rows.append({
+                "Driver": cc_drivers["driver_labels"].get(_k, _k),
+                "Amount (INR)": "n/a",
+                "% of P&L": "n/a",
+            })
+            continue
+        _dv = float(cc_drivers["drivers"].get(_k, 0.0))
+        _pct = (_dv / cc_drivers["total_pnl"] * 100) if cc_drivers["total_pnl"] else None
+        _drv_rows.append({
+            "Driver": cc_drivers["driver_labels"].get(_k, _k),
+            "Amount (INR)": round(_dv, 2),
+            "% of P&L": round(_pct, 2) if _pct is not None else None,
+        })
+    if cc_drivers["residual_bound"]:
+        _drv_rows.append({
+            "Driver": f"Rounded residual (documented bound \u20B9{cc_drivers['residual_bound']:.1f})",
+            "Amount (INR)": round(cc_drivers["residual"], 2),
+            "% of P&L": None,
+        })
+    with st.expander("P&L drivers \u00b7 Phase 1B"):
+        st.dataframe(pd.DataFrame(_drv_rows), hide_index=True, use_container_width=True)
+        _dnote = (
+            f"Attributed {format_inr(cc_drivers['attributed'])} of "
+            f"Total P&L {format_inr(cc_drivers['total_pnl'])}. "
+        )
+        if cc_drivers["missing_fx"]:
+            _dnote += "USD/INR unavailable this run \u2014 FCNR interest/FX slices are n/a (never guessed). "
+        if not cc_drivers["residual_ok"]:
+            _dnote += "Residual exceeds the documented rounding bound \u2014 review source data. "
+        _dnote += "Valuation attribution only, not cash-flow events."
+        st.markdown(
+            f'<p class="caveat">{_dnote} {NOT_A_CASHFLOW_LABEL}</p>',
+            unsafe_allow_html=True,
+        )
+
 # ==================================================
 # HEALTH BREAKDOWN + ALLOCATION
 # ==================================================
@@ -1566,6 +1675,45 @@ else:
     st.plotly_chart(fig_hist, use_container_width=True, key="chart_hist")
     st.dataframe(history_df.round(2), hide_index=True, use_container_width=True)
     st.download_button("Download history.csv (full precision)", history_df.to_csv(index=False), "networth_history.csv", "text/csv")
+
+# PHASE 1B — delta decomposition between the two most recent snapshots.
+# Shows per-class Invested-Basis Change vs Market/Valuation Change. A legacy
+# (pre-Phase 1B) prior snapshot cannot be decomposed and is flagged.
+st.markdown('<div class="section-header">Snapshot delta \u00b7 change since prior snapshot</div>', unsafe_allow_html=True)
+if len(history_df) >= 2:
+    _hist_sorted = history_df.sort_values("date").reset_index(drop=True)
+    _delta = snapshot_delta(_hist_sorted.iloc[-2], _hist_sorted.iloc[-1])
+    if _delta["available"]:
+        _delta_rows = []
+        for _cls in ASSET_CLASSES:
+            _d = _delta["by_class"].get(_cls)
+            if _d is None:
+                _delta_rows.append({"Asset Class": _cls, "\u0394 Current Value": None,
+                                    "Invested-Basis Change (not cash flow)": None, "Market/Valuation Change": None})
+            else:
+                _delta_rows.append({"Asset Class": _cls,
+                                    "\u0394 Current Value": round(_d["delta_current"], 2),
+                                    "Invested-Basis Change (not cash flow)": round(_d["invested_basis_change"], 2),
+                                    "Market/Valuation Change": round(_d["market_valuation_change"], 2)})
+        _dt = _delta["totals"]
+        _delta_rows.append({"Asset Class": "TOTAL",
+                            "\u0394 Current Value": round(_dt["delta_current"], 2),
+                            "Invested-Basis Change (not cash flow)": round(_dt["invested_basis_change"], 2),
+                            "Market/Valuation Change": round(_dt["market_valuation_change"], 2)})
+        st.dataframe(pd.DataFrame(_delta_rows), hide_index=True, use_container_width=True)
+        _dcap = [NOT_A_CASHFLOW_LABEL]
+        if _delta["unattributed_abs"] > 1e-6:
+            _dcap.append(f"Unattributed / unavailable: \u20B9{_delta['unattributed_abs']:.2f}")
+        if _delta["fcnr"] is not None:
+            _dcap.append(
+                f"FCNR \u0394 interest {format_inr(_delta['fcnr']['delta_interest'])} \u00b7 "
+                f"\u0394 FX on principal {format_inr(_delta['fcnr']['delta_fx'])}"
+            )
+        st.caption(" \u00b7 ".join(_dcap))
+    else:
+        st.caption(f"{_delta['reason']} (|\u0394| \u2248 \u20B9{_delta['unattributed_abs']:,.0f})")
+else:
+    st.caption("Add a second snapshot (next day\u2019s run) to see the \u0394 Current Value decomposition.")
 
 # ==================================================
 # NEWS
