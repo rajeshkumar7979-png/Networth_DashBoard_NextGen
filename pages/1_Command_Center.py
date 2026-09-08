@@ -14,6 +14,21 @@ import re
 import time
 from lib.formatters import safe_float, format_inr_indian, format_inr, format_inr_compact
 from lib.portfolio import load_excel as load_data
+from lib.valuation import _safe_maturity_amount, compute_fd_current_native, compute_fcnr_attribution
+from lib.gold import (
+    DEBT_LIKE,
+    SGB_TICKER_PATTERN,
+    is_gold_symbol,
+    is_gold_fund,
+    infer_category,
+)
+from lib.scoring import (
+    score_allocation,
+    score_concentration,
+    score_liquidity_nri,
+    score_diversification,
+    score_performance,
+)
 st.set_page_config(page_title="Family Net Worth", page_icon="💰", layout="wide", initial_sidebar_state="expanded")
 
 IST = pytz.timezone("Asia/Kolkata")
@@ -453,137 +468,6 @@ def get_historical_usd_inr(date_str: str):
         return rates.get("INR")
     except Exception:
         return None
-        # -------------------------------------------------
-# Phase 1 — FD valuation + FCNR attribution helpers
-# -------------------------------------------------
-def _safe_maturity_amount(row):
-    """
-    Robust lookup for bank-supplied maturity / current accrued amount.
-    Handles trailing spaces, case differences, and common alternate names.
-    Also falls back to Available Balance when it looks like a real accrued value.
-    """
-    # Build a normalised map of the row's columns once
-    col_map = {}
-    for c in row.index if hasattr(row, "index") else row.keys():
-        key = str(c).strip().lower().replace("_", " ")
-        col_map[key] = c
-
-    # Preferred names (highest priority first)
-    candidates = [
-        "maturity amount",
-        "maturity value",
-        "maturity amt",
-        "maturityamount",
-        "current accrued amount",
-        "accrued amount",
-        "current value",
-    ]
-
-    for name in candidates:
-        if name in col_map:
-            v = safe_float(row.get(col_map[name]))
-            if v is not None and v > 0:
-                return v
-
-    # Secondary: Available Balance (only if it is meaningfully different from principal
-    # or equal to principal — still better than pure simple-interest guess)
-    for name in ("available balance", "available balanc", "available amount"):
-        if name in col_map:
-            v = safe_float(row.get(col_map[name]))
-            if v is not None and v > 0:
-                return v
-
-    return None
-
-
-def compute_fd_current_native(principal, roi, dep_date, mat_date, today,
-                              maturity_amt=None, available_balance=None):
-    """
-    Returns (current_value_native, accrued_native, method, notes)
-
-    Priority for this workbook:
-    1. Maturity Amount → linear interpolation (best)
-    2. Available Balance only if it is meaningfully > principal (real accrued value)
-    3. Simple interest from deposit date
-    """
-    notes = []
-    if principal is None or principal <= 0:
-        return None, None, "invalid", ["principal missing/zero"]
-
-    days_elapsed = max((today - dep_date).days, 0) if dep_date is not None else 0
-    total_tenor_days = None
-    if dep_date is not None and mat_date is not None and mat_date > dep_date:
-        total_tenor_days = (mat_date - dep_date).days
-
-    # --- 1. Maturity Amount interpolation (preferred) ---
-    if maturity_amt is not None and maturity_amt > 0 and total_tenor_days and total_tenor_days > 0:
-        frac = min(max(days_elapsed / total_tenor_days, 0.0), 1.0)
-        current = principal + (maturity_amt - principal) * frac
-        accrued = current - principal
-        method = "maturity_interp"
-        notes.append(f"interpolated using maturity amount (frac={frac:.3f})")
-        if days_elapsed < total_tenor_days:
-            current = min(current, maturity_amt)
-            accrued = current - principal
-        return current, accrued, method, notes
-
-    # --- 2. Available Balance only if it looks like real accrued value ---
-    # (skip when it is essentially equal to principal — common in this Excel)
-    if available_balance is not None and available_balance > 0:
-        if available_balance > principal * 1.001:  # at least 0.1% above principal
-            current = float(available_balance)
-            accrued = current - principal
-            method = "available_balance"
-            notes.append("using Available Balance from bank (above principal)")
-            return current, accrued, method, notes
-        else:
-            notes.append("Available Balance ≈ principal — ignored")
-
-    # --- 3. Simple interest fallback ---
-    accrued = principal * (roi / 100.0) * (days_elapsed / 365.0)
-    current = principal + accrued
-    method = "simple_interest"
-    notes.append("fallback simple interest from deposit date")
-    if total_tenor_days and total_tenor_days > 400 and days_elapsed > 400:
-        notes.append("WARNING: long tenor – simple interest may overstate value")
-    return current, accrued, method, notess
-
-
-def compute_fcnr_attribution(principal_native, accrued_native, fx_deposit, fx_today):
-    """
-    Full FCNR attribution that reconciles exactly.
-
-    Model:
-      - Interest is valued at *current* FX
-      - FX gain/loss is calculated only on the original principal
-
-    Identity (must hold within ₹1):
-      interest_at_current_fx + fx_on_principal
-      == current_value_inr - cost_basis_inr
-    """
-    if fx_today is None or fx_deposit is None or fx_today <= 0 or fx_deposit <= 0:
-        return None
-
-    cost_basis_inr     = principal_native * fx_deposit
-    current_value_inr  = (principal_native + accrued_native) * fx_today
-
-    interest_at_current_fx = accrued_native * fx_today
-    fx_on_principal        = principal_native * (fx_today - fx_deposit)
-
-    total_attribution = interest_at_current_fx + fx_on_principal
-    pnl               = current_value_inr - cost_basis_inr
-    reconciled        = abs(total_attribution - pnl) < 1.0
-
-    return {
-        "cost_basis_inr":          cost_basis_inr,
-        "current_value_inr":       current_value_inr,
-        "interest_at_current_fx":  interest_at_current_fx,
-        "fx_on_principal":         fx_on_principal,
-        "fx_on_interest":          0.0,   # kept for column compatibility; always 0 in this model
-        "total_attribution":       total_attribution,
-        "pnl":                     pnl,
-        "reconciled":              reconciled,
-    }
 
 @st.cache_data(ttl=300, show_spinner=False)
 def get_groww_ltp(nse_symbol: str):
@@ -640,77 +524,6 @@ def get_sgb_price(raw_ticker: str):
         pass
     return None
 
-
-
-CATEGORY_RULES = [
-    ("Overnight", r"overnight"),
-    ("Liquid", r"\bliquid\b"),
-    ("Money Market", r"money\s*market"),
-    ("Ultra Short", r"ultra\s*short"),
-    ("Low Duration", r"low\s*duration"),
-    ("Short Duration", r"short\s*(duration|term)\b"),
-    ("Corporate Bond", r"corporate\s*bond"),
-    ("Banking PSU", r"banking\s*(?:&|and)?\s*psu|psu\s*debt"),
-    ("Gilt", r"\bgilt\b|g-?sec"),
-    ("Arbitrage", r"arbitrage"),
-    ("Conservative Hybrid", r"conservative\s*hybrid|hybrid\s*conservative"),
-    ("Aggressive Hybrid", r"aggressive\s*hybrid|hybrid\s*aggressive|balanced\s*advantage|dynamic\s*asset"),
-    ("Hybrid", r"\bhybrid\b|\bbalanced\b"),
-    ("Small Cap", r"small\s*cap"),
-    ("Mid Cap", r"mid\s*cap"),
-    ("Large Cap", r"large\s*cap|blue\s*chip|bluechip"),
-    ("Large & Mid", r"large\s*(?:&|and)\s*mid"),
-    ("Flexi Cap", r"flexi\s*cap|multi\s*cap|focused"),
-    ("ELSS", r"\belss\b|tax\s*saver|equity\s*linked"),
-    ("Index", r"\bindex\b|next\s*50|nifty\s*50\b|sensex\b|etf\b"),
-    ("International", r"international|global|us\s*equity|nasdaq|overseas|world\s*fund"),
-    ("Contra/Value", r"\bcontra\b|value\s*discovery|\bvalue\b"),
-    ("Dividend Yield", r"dividend\s*yield"),
-    ("Sectoral/Thematic", r"infra|defence|pharma|healthcare|banking|financial|consumption|digital|technology|manufacturing|energy|commodity|reform|bharat\s*22|business\s*cycle|special\s*situations|thematic|sector"),
-]
-
-DEBT_LIKE = {
-    "Overnight", "Liquid", "Money Market", "Ultra Short", "Low Duration",
-    "Short Duration", "Corporate Bond", "Banking PSU", "Gilt", "Arbitrage",
-}
-
-SGB_TICKER_PATTERN = re.compile(r"^SGB.*-GB$", re.IGNORECASE)
-GOLD_ETF_TICKERS = {"GOLDBEES", "GOLDSHARE", "GOLDCASE", "AXISGOLD", "QGOLDHALF", "BSLGOLDETF", "IVZINGOLD"}
-GOLD_FUND_NAME_RE = re.compile(
-    r"gold\s*(etf|fof|fund\s*of\s*fund|fund\s*of\s*funds)|\bgold\b.*\b(etf|fof)\b",
-    re.IGNORECASE,
-)
-
-def is_gold_symbol(symbol: str) -> bool:
-    s = (symbol or "").strip().upper()
-    if not s:
-        return False
-    if SGB_TICKER_PATTERN.match(s):
-        return True
-    if s in GOLD_ETF_TICKERS or s.endswith("GOLD") or ("GOLD" in s and s.endswith("ETF")):
-        return True
-    return False
-
-def is_gold_fund(fund_name: str) -> bool:
-    return bool(GOLD_FUND_NAME_RE.search(fund_name or ""))
-
-def infer_category(fund_name: str, amfi_name=None) -> str:
-    if is_gold_fund(fund_name) or (amfi_name and is_gold_fund(amfi_name)):
-        return "Gold"
-    candidates = []
-    if amfi_name and str(amfi_name).strip():
-        candidates.append(str(amfi_name).strip())
-    if fund_name and str(fund_name).strip():
-        candidates.append(str(fund_name).strip())
-    blob = " | ".join(candidates).lower()
-    if not blob.strip():
-        return "Other Equity"
-    for label, pattern in CATEGORY_RULES:
-        if re.search(pattern, blob, flags=re.IGNORECASE):
-            return label
-    if re.search(r"debt|income|bond|gilt|duration|money\s*market", blob, flags=re.IGNORECASE):
-        return "Other Debt"
-    return "Other Equity"
 
 # -------------------------------------------------
 # SIDEBAR
@@ -1204,49 +1017,8 @@ if not fd_valid.empty and "Product" in fd_valid.columns and "Interest Return (IN
 # HEALTH SCORE — NRI-aware
 # Liquidity scores *true* liquidity (liquid MF + FDs ≤90d), not all FCNR as locked cash.
 # Allocation still tracks equity share but narrative treats FCNR as intentional USD book.
+# (score_* factor functions now live in lib/scoring.py)
 # -------------------------------------------------
-def score_allocation(equity_pct, target=50):
-    # Softer resident-60% target: NRI books often run lower equity by design
-    return max(0, 100 - abs(equity_pct - target) * 1.6)
-def score_concentration(top5_pct):
-    if top5_pct <= 35: return 100
-    if top5_pct >= 80: return 0
-    return 100 - (top5_pct - 35) / 45 * 100
-def score_liquidity_nri(true_liquid_pct):
-    # Adequate deployable liquidity for NRI: ~12–35% of NW in liquid MF + near maturities
-    if 12 <= true_liquid_pct <= 35: return 100
-    if true_liquid_pct < 12: return max(0, 100 - (12 - true_liquid_pct) * 5)
-    return max(0, 100 - (true_liquid_pct - 35) * 1.5)
-def score_diversification(mf_df):
-    if mf_df.empty:
-        return 50
-    cat = mf_df.groupby("Category")["Current Value"].sum()
-    if cat.sum() == 0:
-        return 50
-    hhi = ((cat / cat.sum()) ** 2).sum()
-    return min(100, max(0, (1 - hhi) * 100 / 0.85))
-def score_performance(mf_df):
-    """
-    Phase 2B — value-weighted beat rate vs Nifty50 1Y.
-    A ₹50L fund that beats the index counts far more than a ₹50k fund.
-    Falls back to equal-weight if Current Value is missing.
-    """
-    if mf_df is None or mf_df.empty:
-        return 60.0
-    need = ["1Y %", "vs Nifty50 1Y"]
-    if not all(c in mf_df.columns for c in need):
-        return 60.0
-    valid = mf_df.dropna(subset=need).copy()
-    if valid.empty:
-        return 60.0
-    beat = (valid["1Y %"] > valid["vs Nifty50 1Y"]).astype(float)
-    if "Current Value" in valid.columns:
-        w = pd.to_numeric(valid["Current Value"], errors="coerce").fillna(0.0)
-        wsum = float(w.sum())
-        if wsum > 0:
-            return float((beat * w).sum() / wsum * 100.0)
-    return float(beat.mean() * 100.0)
-
 alloc_score = score_allocation(equity_pct)
 conc_score = min(score_concentration(top5_mf_pct), score_concentration(top5_stock_pct) if not stocks_valid.empty else 100)
 liq_score = score_liquidity_nri(true_liquid_pct)

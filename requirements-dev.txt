@@ -1,0 +1,6 @@
+# Development / test dependencies (CI installs BOTH requirements.txt and this).
+# Keep production dependencies out of here; pytest and ruff are dev-only.
+-r requirements.txt
+
+pytest>=8.0
+ruff>=0.9
