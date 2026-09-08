@@ -14,3 +14,11 @@ def test_command_center_renders_without_exception():
     at.run(timeout=240)
     assert not at.exception, f"unexpected exception: {at.exception}"
     assert "cc_equity_pct" in at.session_state, "Command Center did not populate session state"
+    # Phase 1A twin-run gate: on this live run the canonical asset register (built from
+    # the page's own books) must reconcile to the page totals within the ₹1 tolerance.
+    rendered = [m.value for m in at.markdown]
+    assert any("Asset register total = portfolio total" in r for r in rendered), "register reconciliation missing"
+    assert any("Asset register invested = invested capital" in r for r in rendered), "register reconciliation missing"
+    assert not any("✗ FAIL" in r for r in rendered), "reconciliation FAILED on live run:\n" + "\n".join(
+        r for r in rendered if "✗ FAIL" in r
+    )

@@ -36,6 +36,8 @@ Workbook shape (verified against the committed sample): 3 sheets — **FD** (33 
 
 There are no liabilities, savings/drawdown, PPF/EPF, property, or transaction-history sheets. Security/auth only matters once real data is used.
 
+**Net-worth semantics (Phase 1A):** the k1 metric is labelled **"Total Assets (INR)"** (the `total_networth` variable/calculations are unchanged — only the label was renamed). `Net Worth = Total Assets − Liabilities` is computed exclusively by `lib/ledger.net_worth()`; since the workbook has no liabilities sheet, the Command Center shows a **session-only** liabilities input (`st.session_state["cc_liabilities"]`) and, at zero, the caption "Net Worth = Total Assets (no liabilities recorded)" instead of a second metric. Do not add a liabilities book or persist liabilities to session data — they are estimates by definition.
+
 ## Architecture
 
 | Path | Role |
@@ -52,6 +54,8 @@ There are no liabilities, savings/drawdown, PPF/EPF, property, or transaction-hi
 | `lib/valuation.py` | **FD valuation + FCNR attribution** (extracted Phase 0): `compute_fd_current_native`, `compute_fcnr_attribution`, `_safe_maturity_amount`. |
 | `lib/gold.py` | **Gold routing + category inference** (extracted Phase 0): `is_gold_symbol`, `is_gold_fund`, `infer_category`, `CATEGORY_RULES`, `DEBT_LIKE`. |
 | `lib/scoring.py` | **Health score factors** (extracted Phase 0): `score_allocation`, `score_concentration`, `score_liquidity_nri`, `score_diversification`, `score_performance`. |
+| `lib/register.py` | **Canonical family asset register + taxonomy** (Phase 1A): `build_asset_register`, `aggregate_by_class`, `aggregate_by_member`, `family_level_sum`, `NonUniqueKeyError`. Maps the Command Center books (`mf_valid`/`stocks_valid`/`gold_valid`/`fd_valid`) to 5 data-backed classes (Equity, Liquid, FCNR (USD), INR FD, Gold) + 4 no-data classes (Retirement, Real Estate, Savings/Cash, Liabilities) that are flagged, never summed. FD instrument keys use `acct:<no>` otherwise a unique fingerprint — a collision raises `NonUniqueKeyError` and Command Center halts the register-dependent UI instead of inventing/merging keys. |
+| `lib/ledger.py` | **Net-worth semantics** (Phase 1A): `net_worth(assets_total, liabilities_total=None)` only. `Net Worth = Total Assets − Liabilities`; zero/None liabilities ⇒ net worth == assets exactly (pinned by `tests/test_ledger.py`). Rejects negative/non-finite inputs. |
 | `lib/mf_holdings.py` | MF holdings ingestion (fund-disclosures → mfdata.in fallback). |
 | `lib/mf_health.py` | MF health analysis. |
 | `lib/news.py` | Portfolio news aggregation. |
@@ -81,6 +85,10 @@ Gold instruments (SGB tickers `SGB*-GB`, gold ETFs, gold FoFs) are routed **out*
 ## NRI-specific valuation
 
 FCNR (USD) deposits use historical FX from deposit date for cost basis, not today's rate. See `compute_fd_current_native()` and `compute_fcnr_attribution()` in `lib/valuation.py`. The identity `interest_at_current_fx + fx_on_principal == current_value_inr - cost_basis_inr` must reconcile within ₹1 (pinned by `tests/test_fcnr_attribution.py`).
+
+## Phase 1A golden baseline (tests/frozen_baseline.py)
+
+`tests/frozen_baseline.py` freezes the actual Command Center totals and the four validated books (`mf`/`stocks`/`gold`/`fd`, register-relevant columns) from a live capture run on the committed sample workbook (TODAY `2026-09-08`, USD_INR `94.49`). `tests/test_register.py` rebuilds the register from these frozen books and asserts class/member/register totals reconcile to `FROZEN_TOTALS` and `FROZEN_MEMBER_CURRENT/INVESTED` within ₹1 — i.e. the register (canonical view) equals the Command Center (page view) by construction; it also pins FD key uniqueness (all workbook FDs are `acct:`-backed) and the `NonUniqueKeyError` collision STOP. `tests/test_page_smoke.py` additionally asserts on every live run that the rendered Reconciliation block contains no `✗ FAIL` (register vs page reconciliation gate). If a future SPEC-approved Phase 1+ change alters valuation, recapture the baseline (run the Command Center once with a dump harness) rather than editing the frozen numbers by hand.
 
 ## Known resolved bug
 

@@ -29,6 +29,14 @@ from lib.scoring import (
     score_diversification,
     score_performance,
 )
+from lib.register import (
+    aggregate_by_class,
+    aggregate_by_member,
+    build_asset_register,
+    family_level_sum,
+    NonUniqueKeyError,
+)
+from lib.ledger import net_worth as compute_net_worth
 st.set_page_config(page_title="Family Net Worth", page_icon="💰", layout="wide", initial_sidebar_state="expanded")
 
 IST = pytz.timezone("Asia/Kolkata")
@@ -928,6 +936,19 @@ stocks_valid = stocks.dropna(subset=["Current Value"]) if not stocks.empty else 
 gold_valid = gold.dropna(subset=["Current Value"]) if not gold.empty else gold
 fd_valid = fd.dropna(subset=["Current Value (INR)"]) if not fd.empty else fd
 
+# PHASE 1A — canonical family asset register (built from the four books above; no re-valuation).
+# Stops loudly on an FD instrument-key collision rather than inventing/merging keys.
+try:
+    register = build_asset_register(mf_valid, stocks_valid, gold_valid, fd_valid)
+    register_classes = aggregate_by_class(register)
+    register_members = aggregate_by_member(register)
+    family_sum = family_level_sum(register)
+    register_error = None
+except NonUniqueKeyError as e:
+    register = register_classes = register_members = family_sum = None
+    register_error = str(e)
+    integrity_issues.append(("CRITICAL", f"Asset register halted: {register_error} Please add account numbers to the conflicting FD deposits."))
+
 total_mf = mf_valid["Current Value"].sum() if not mf_valid.empty else 0
 total_stocks = stocks_valid["Current Value"].sum() if not stocks_valid.empty else 0
 total_gold = gold_valid["Current Value"].sum() if not gold_valid.empty else 0
@@ -1058,6 +1079,28 @@ recon_tests.append((
     (not _gold_leaked_stocks) and (not _gold_leaked_mf),
     f"{len(gold)} gold holding(s) · leaked stocks={_gold_leaked_stocks} mf={_gold_leaked_mf}",
 ))
+
+# PHASE 1A — asset register reconciliation: register (canonical) vs Command Center (page) totals.
+if register is not None:
+    recon_tests.append((
+        "Asset register total = portfolio total",
+        abs(family_sum["total_assets"] - total_networth) < 1,
+        f"{format_inr(family_sum['total_assets'])} vs {format_inr(total_networth)}",
+    ))
+    recon_tests.append((
+        "Asset register invested = invested capital",
+        abs(family_sum["total_invested"] - total_invested) < 1,
+        f"{format_inr(family_sum['total_invested'])} vs {format_inr(total_invested)}",
+    ))
+    for _cls, _page_total in [("Equity", total_equity), ("Liquid", total_liquid_mf),
+                              ("FCNR (USD)", total_fcnr), ("INR FD", total_inr_fd),
+                              ("Gold", total_gold)]:
+        _reg_val = family_sum["by_class"].get(_cls, {}).get("current", 0.0) or 0.0
+        recon_tests.append((
+            f"Asset register {_cls.lower()} = Command Center {_cls.lower()} total",
+            abs(_reg_val - _page_total) < 1,
+            f"{format_inr(_reg_val)} vs {format_inr(_page_total)}",
+        ))
 
 # -------------------------------------------------
 # RED FLAGS
@@ -1287,12 +1330,36 @@ if _prev_nw and _prev_nw > 0:
     _nw_delta = f"{(total_networth - _prev_nw) / _prev_nw * 100:+.2f}% vs prior snapshot"
 
 k1, k2, k3, k4, k5, k6 = st.columns(6)
-k1.metric("Net Worth (INR)", format_inr_compact(total_networth), _nw_delta)
+k1.metric("Total Assets (INR)", format_inr_compact(total_networth), _nw_delta)
 k2.metric("Invested Capital", format_inr_compact(total_invested), "Total amount invested")
 k3.metric("Total P&L", format_inr_compact(total_pnl), f"{(total_pnl/total_invested*100):.1f}% overall" if total_invested else None)
 k4.metric("Equity (ex-liquid)", f"{equity_pct:.1f}%", "NRI view · stocks + non-liquid MF")
 k5.metric("FCNR (USD)", f"{fcnr_pct:.1f}%", f"INR FD {inr_fd_pct:.1f}% · Liquid {liquid_mf_pct:.1f}%")
 k6.metric("Health Score", f"{health_score:.0f} / 100", health_label)
+
+# ==================================================
+# PHASE 1A — Net Worth semantics: Total Assets − Liabilities (session-only)
+# The source workbook has no liabilities sheet. This input is a session-only estimate;
+# with zero liabilities Net Worth equals Total Assets exactly.
+# ==================================================
+_liab_value = float(st.session_state.get("cc_liabilities", 0.0) or 0.0)
+_ledger = compute_net_worth(total_networth, _liab_value)
+st.number_input(
+    "Liabilities (session-only, ₹)",
+    min_value=0.0,
+    value=_liab_value,
+    step=100000.0,
+    key="cc_liabilities",
+    help="No liabilities data exists in the source workbook — this is a session-only estimate. Net Worth = Total Assets − Liabilities.",
+)
+if _ledger["has_liabilities"]:
+    st.metric(
+        "Net Worth (INR)",
+        format_inr_compact(_ledger["net_worth"]),
+        f"Total Assets {format_inr_compact(_ledger['total_assets'])} − Liabilities {format_inr_compact(_ledger['total_liabilities'])}",
+    )
+else:
+    st.caption("Net Worth = Total Assets (no liabilities recorded)")
 
 # ==================================================
 # MARKET PULSE — card grid (Phase A)
@@ -1374,6 +1441,23 @@ for name, passed, detail in recon_tests:
     cls = "recon-pass" if passed else "recon-fail"
     mark = "✓ PASS" if passed else "✗ FAIL"
     st.markdown(f'<span class="{cls}">{mark}</span> — {name} ({detail})', unsafe_allow_html=True)
+
+# PHASE 1A — additive asset-register view by canonical class.
+# Display-only; totals mirror the reconciliation entries above. No re-valuation here.
+if register_classes is not None and not register_classes.empty:
+    with st.expander("Asset register · by canonical class (Phase 1A)"):
+        _class_view = register_classes.copy()
+        _class_view["Current (INR)"] = _class_view.apply(
+            lambda r: "" if not r["Data Backed"] else r["Current Value"], axis=1
+        )
+        _class_view["Invested (INR)"] = _class_view.apply(
+            lambda r: "" if not r["Data Backed"] else r["Invested"], axis=1
+        )
+        st.dataframe(
+            _class_view[["Asset Class", "Current (INR)", "Invested (INR)", "Data Backed"]],
+            hide_index=True, use_container_width=True,
+        )
+        st.caption("No-data classes (Retirement / Real Estate / Savings/Cash / Liabilities) have no workbook source and are never summed.")
 
 # ==================================================
 # HEALTH BREAKDOWN + ALLOCATION
@@ -1536,8 +1620,13 @@ st.markdown("---")
 c3, c4 = st.columns(2)
 with c3:
     st.markdown('<div class="section-header">By family member</div>', unsafe_allow_html=True)
-    if owner_map:
+    if register is not None and register_members is not None and not register_members.empty:
+        owner_df = register_members.rename(columns={"Member": "Owner", "Current Value": "Value"})[["Owner", "Value"]]
+    elif owner_map:
         owner_df = pd.DataFrame([{"Owner": k, "Value": v} for k, v in owner_map.items()])
+    else:
+        owner_df = pd.DataFrame(columns=["Owner", "Value"])
+    if not owner_df.empty:
         fig2 = px.bar(owner_df, x="Owner", y="Value", text_auto=".2s", color_discrete_sequence=["#3b82f6"])
         fig2.update_layout(margin=dict(t=5, b=5, l=5, r=5), height=240, showlegend=False,
                             paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font_color="#c2c9d6")
