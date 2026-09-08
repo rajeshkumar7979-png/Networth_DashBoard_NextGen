@@ -46,6 +46,11 @@ from lib.drivers import (
     snapshot_delta,
 )
 from lib import snapshot as snapshot_io
+from lib.intelligence import exposure as intel_exposure
+from lib.intelligence import evidence as intel_evidence
+from lib.intelligence import signals as intel_signals
+from lib.intelligence.portfolio_brain import build_briefing as intel_build_briefing
+from lib.intelligence.provider import DeterministicProvider as DeterministicIntelProvider
 st.set_page_config(page_title="Family Net Worth", page_icon="💰", layout="wide", initial_sidebar_state="expanded")
 
 IST = pytz.timezone("Asia/Kolkata")
@@ -1945,6 +1950,128 @@ with tab4:
         )
     else:
         st.caption("No gold holdings identified in the current data.")
+
+# ==================================================
+# PORTFOLIO INTELLIGENCE (foundation, Phase 1C)
+# Read-only deterministic roll-up over facts the page already computed: the
+# canonical register, the four books, the MF holdings disclosure cache, the P&L
+# drivers, snapshot history and the news feed. Nothing here is invented — a
+# missing input surfaces as "Insufficient evidence". Synthesis is rule-based
+# (DeterministicProvider); no external AI is connected. Pure modules in
+# lib/intelligence; the page only feeds and renders.
+# ==================================================
+_intel_briefing = None
+try:
+    if register is not None:
+        _intel_facts = intel_exposure.build_exposure_facts(
+            register=register,
+            mf_valid=mf_valid if "mf_valid" in dir() else None,
+            stocks_valid=stocks_valid if "stocks_valid" in dir() else None,
+            gold_valid=gold_valid if "gold_valid" in dir() else None,
+            fd_valid=fd_valid if "fd_valid" in dir() else None,
+            amfi_codes=amfi_codes,
+            holdings_by_scheme=intel_exposure.load_holdings_cache(),
+            now=now_ist,
+        )
+        _intel_evidence = intel_evidence.build_evidence_bag(
+            news_items=news_items if "news_items" in dir() else None,
+            coverage=_intel_facts.coverage,
+            drivers=cc_drivers,
+            history_df=history_df if "history_df" in dir() else None,
+            now=now_ist,
+        )
+        _intel_fd = fd if "fd" in dir() and fd is not None and not fd.empty else None
+        _intel_signals = intel_signals.evaluate_signals(
+            _intel_facts, _intel_evidence,
+            mf_valid=mf_valid if "mf_valid" in dir() else None,
+            fd_df=_intel_fd,
+            now=now_ist,
+        )
+        _intel_briefing = intel_build_briefing(
+            facts=_intel_facts,
+            evidence=_intel_evidence,
+            signals=_intel_signals,
+            question="What deserves attention this week?",
+            provider=DeterministicIntelProvider(),
+        )
+        st.session_state["cc_intel_briefing"] = _intel_briefing
+except Exception as _intel_err:
+    _intel_briefing = None
+    st.caption(f"Portfolio Intelligence unavailable this run: {_intel_err}")
+
+if _intel_briefing is not None:
+    with st.expander("Portfolio Intelligence · signals, coverage & look-through"):
+        try:
+            _sig_rows = [
+                {
+                    "Level": s.level,
+                    "Rule": s.label,
+                    "What we know": s.message,
+                    "Invalidated by": s.invalidation,
+                }
+                for s in _intel_briefing.signals
+                if s.level != "info"
+            ]
+            if _sig_rows:
+                _sig_df = pd.DataFrame(_sig_rows)
+                st.dataframe(
+                    _sig_df,
+                    hide_index=True,
+                    use_container_width=True,
+                    column_config={
+                        "Level": st.column_config.TextColumn("Level", width="small"),
+                        "Rule": st.column_config.TextColumn("Rule", width="medium"),
+                        "What we know": st.column_config.TextColumn("What we know", width="large"),
+                        "Invalidated by": st.column_config.TextColumn("Invalidated by", width="large"),
+                    },
+                )
+            else:
+                st.caption("No elevated signal this run — the rules see nothing abnormal.")
+            st.caption("Signal rules are deterministic (lib.intelligence.signals); levels only "
+                       "ever reach info when their fact is missing (insufficient evidence).")
+
+            _cov = _intel_facts.coverage
+            _cov_pct = f"{_cov.coverage_pct:.0f}%" if _cov.coverage_pct is not None else "n/a"
+            st.markdown(
+                f"**Holdings disclosure coverage {_cov_pct}** — "
+                f"{_cov.covered_funds} of {_cov.covered_funds + _cov.missing_funds} fund(s) "
+                f"disclose holdings; look-through uses disclosed market values ("
+                f"{'market-value-derived' if 'market_value_derived' in _intel_facts.weight_basis else 'published weights'}).",
+                unsafe_allow_html=False,
+            )
+            if _cov.missing_funds:
+                st.caption("No disclosure (insufficient evidence): " + ", ".join(list(_cov.missing_names)[:5]))
+
+            _uds = intel_exposure.underlying_df(_intel_facts)
+            if not _uds.empty:
+                _top = _uds.sort_values("value_inr", ascending=False).head(5)
+                st.markdown(f"**Top underlying positions (through funds, top {len(_top)})**")
+                st.dataframe(
+                    _top[["name", "value_inr", "pct_of_assets", "schemes", "confidence"]],
+                    hide_index=True,
+                    use_container_width=True,
+                    column_config={
+                        "name": st.column_config.TextColumn("Security"),
+                        "value_inr": st.column_config.NumberColumn("Value (INR)", format="₹%d"),
+                        "pct_of_assets": st.column_config.NumberColumn("% of assets", format="%.1f%%"),
+                        "schemes": st.column_config.TextColumn("Via funds"),
+                        "confidence": st.column_config.NumberColumn("Confidence", format="%.2f"),
+                    },
+                )
+
+            _synth = _intel_briefing.synthesis
+            if _synth is not None:
+                st.markdown(f"**Synthesis ({_synth.model})** — {_synth.summary}")
+                if _synth.claims:
+                    for _c in _synth.claims:
+                        st.caption(("✓ " if _c.supported else "⚠ ") + _c.text)
+            if _intel_briefing.synthesis_reason:
+                st.caption(f"Reason: {_intel_briefing.synthesis_reason}")
+            st.caption("Decision-support only: the numbers above come from this page's own "
+                       "calc (register/drivers/snapshots) and statutory disclosure caches. "
+                       "No AI provider is connected; nothing here is an order.")
+        except Exception as _intel_render_err:
+            st.caption(f"Portfolio Intelligence render skipped: {_intel_render_err}")
 
 st.markdown("---")
 src = "AMFI live" if (len(amfi_navs) and not amfi_cache_date) else (f"AMFI cache {amfi_cache_date}" if amfi_cache_date else "AMFI offline")
