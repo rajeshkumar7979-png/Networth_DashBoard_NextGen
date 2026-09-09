@@ -12,3 +12,6 @@ data/history.csv
 
 # Intelligence Data Gateway cache (FRED/SEC disk fallback, deterministic keys)
 data/intel_gateway_cache/
+
+# Portfolio-aware Live Research cache (gnews query buckets, deterministic keys)
+data/live_research_cache/

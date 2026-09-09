@@ -50,6 +50,7 @@ from lib.intelligence import exposure as intel_exposure
 from lib.intelligence import evidence as intel_evidence
 from lib.intelligence import signals as intel_signals
 from lib.intelligence import research as intel_research
+from lib.intelligence import live as intel_live
 from lib.intelligence import ai as intel_ai
 from lib.intelligence.portfolio_brain import build_briefing as intel_build_briefing
 from lib.intelligence.provider import DeterministicProvider as DeterministicIntelProvider
@@ -2099,22 +2100,45 @@ try:
             amfi_codes=amfi_codes,
         )
         _nav_evs = intel_research.list_source_results(
-            intel_mf.load_mf_nav_evidence(limit=2000, only_isins=_pm_index.isins or None,
-                                          now=now_ist))
+            (intel_mf.load_mf_nav_evidence(limit=2000, only_isins=_pm_index.isins or None,
+                                           now=now_ist),))
         _hold_evs = intel_research.list_source_results(
-            intel_mf.load_mf_holdings_evidence(now=now_ist))
+            (intel_mf.load_mf_holdings_evidence(now=now_ist),))
+        # ---- portfolio-aware live research cohort (network-free) ----
+        # Deriving the plan and reading cached gnews/gateway records is safe on
+        # every page load; live retrieval happens ONLY via the explicit refresh
+        # button in the "Current External Developments" expander below. News is
+        # OBSERVED FACT evidence labeled with exact-identifier relevance and can
+        # never alter any number on this page.
+        _live_plan = intel_live.build_live_plan(
+            stock_symbols=list(_stock_syms or ()),
+            fund_names=list(_fund_names or ()),
+            gold_symbols=list(_gold_syms or ()),
+            has_usd_book=bool(intel_live.usd_book_present(_intel_facts)),
+            now=now_ist,
+        )
+        _live_cohort = intel_live.load_live_cohort(plan=_live_plan, now=now_ist)
+        _cohort_evs = _live_cohort.to_evidence() if _live_cohort.has_records else ()
+        # The cache-backed cohort replaces the generic page-news feed items in the
+        # base evidence AND becomes the gateway-scored external developments, so
+        # deterministic research ranks portfolio-mapped stories first.
+        _research_evidence = intel_evidence.EvidenceBag(
+            items=tuple(e for e in _intel_evidence.items
+                        if not e.id.startswith("ev:news:")) + _cohort_evs)
+        _gateway_evidence = _cohort_evs if _cohort_evs else \
+            intel_research.gateway_cached_evidence(now=now_ist)
         _delta = intel_research.delta_from_history(
             history_df if "history_df" in dir() else None)
         _research_brief = intel_research.build_research_brief(
             facts=_intel_facts,
-            evidence=_intel_evidence,
+            evidence=_research_evidence,
             signals=_intel_signals,
             drivers=cc_drivers if "cc_drivers" in dir() else None,
             delta=_delta,
             portfolio_index=_pm_index,
             nav_evidence=_nav_evs,
             holdings_evidence=_hold_evs,
-            gateway_evidence=intel_research.gateway_cached_evidence(now=now_ist),
+            gateway_evidence=_gateway_evidence,
             question="What changed, and where is the evidence thin?",
             now=now_ist,
         )
@@ -2317,6 +2341,74 @@ try:
 except Exception as _gw_err:
     st.session_state["cc_intel_gateway_status"] = []
     st.caption(f"Data gateway status unavailable: {_gw_err}")
+
+# ---- Current External Developments: portfolio-aware live research ----
+# Cache-read-only cohort on page load; live retrieval only via the explicit
+# refresh button. gnews/FRED/SEC records stay OBSERVED FACT evidence labelled by
+# exact-identifier relevance and never change the numbers computed above.
+if "_live_cohort" in dir() and _live_cohort is not None:
+    with st.expander("Current External Developments · portfolio-aware live research"):
+        try:
+            _live_caption = (f"**{_live_cohort.record_count} cached record(s)** "
+                             f"({len(_live_cohort.news_records)} news · "
+                             f"{len(_live_cohort.gateway_records)} gateway)")
+            if _live_cohort.last_retrieved_at is not None:
+                _live_caption += f" · last retrieved {_live_cohort.last_retrieved_at:%d %b %Y %H:%M} UTC"
+            if _live_cohort.stale_sources:
+                _live_caption += (f" · stale sources: {', '.join(_live_cohort.stale_sources)} "
+                                  "(refresh to update)")
+            st.caption(_live_caption)
+            if st.button("Refresh research evidence (network call on demand)",
+                         key="cc_live_refresh"):
+                with st.spinner("Fetching live research evidence…"):
+                    st.session_state["cc_live_result"] = intel_live.run_live_research(
+                        facts=_intel_facts,
+                        now=now_ist,
+                        plan=_live_plan,
+                    )
+                    st.session_state["cc_live_refreshed_at"] = now_ist
+                st.rerun()
+            _live_result = st.session_state.get("cc_live_result")
+            if _live_result is not None and _live_result.refreshed_at is not None:
+                st.caption(f"Last explicit refresh: {_live_result.refreshed_at:%d %b %Y %H:%M} UTC · "
+                           f"status: {_live_result.status} · "
+                           f"{len(_live_result.failures)} failure(s)")
+                if _live_result.failures:
+                    with st.expander(f"Refresh failures ({len(_live_result.failures)})"):
+                        for _src, _reason in _live_result.failures:
+                            st.caption(f"· {_src}: {_reason}")
+            _dev_rows = intel_live.development_rows(
+                _live_cohort, index=_pm_index, now=now_ist)
+            if _dev_rows:
+                st.dataframe(
+                    pd.DataFrame(_dev_rows[:20]), hide_index=True,
+                    use_container_width=True,
+                    column_config={
+                        "Development": st.column_config.TextColumn(width="large"),
+                        "Affected": st.column_config.TextColumn(width="small"),
+                        "Category": st.column_config.TextColumn(width="small"),
+                        "Source": st.column_config.TextColumn(width="small"),
+                        "Published": st.column_config.TextColumn(width="small"),
+                        "Quality": st.column_config.NumberColumn(format="%.2f"),
+                        "Relevance": st.column_config.TextColumn(width="small"),
+                        "Link": st.column_config.TextColumn(width="small"),
+                    })
+                st.caption("Relevance = exact identifier matching only "
+                           "(lib.intelligence.sources.mapping), never fuzzy. Quality = "
+                           "deterministic evidence score (mapped first, fresh above stale). "
+                           "All records are OBSERVED FACT evidence from Google News RSS and "
+                           "the FRED/SEC gateway cache — they never alter the numbers above.")
+            else:
+                st.caption("No cached news/gateway records yet — press 'Refresh research "
+                           "evidence' to fetch. A network call happens only on that explicit "
+                           "action, never on page open.")
+            _st_rows = intel_live.live_status(now=now_ist)
+            if _st_rows:
+                st.markdown("**Live research cache status**")
+                st.dataframe(pd.DataFrame(_st_rows), hide_index=True,
+                             use_container_width=True)
+        except Exception as _live_render_err:
+            st.caption(f"Live research panel unavailable: {_live_render_err}")
 
 st.markdown("---")
 src = "AMFI live" if (len(amfi_navs) and not amfi_cache_date) else (f"AMFI cache {amfi_cache_date}" if amfi_cache_date else "AMFI offline")

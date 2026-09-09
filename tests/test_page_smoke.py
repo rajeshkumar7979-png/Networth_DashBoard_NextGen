@@ -29,3 +29,18 @@ def test_command_center_renders_without_exception():
     assert any("NOT a cash-flow measurement" in r for r in rendered), "cashflow label missing"
     # Phase 1B delta block present.
     assert any("Snapshot delta" in r or "snapshot delta" in r for r in rendered), "delta section missing"
+    # Research & Synthesis + portfolio-aware live-research panel actually rendered.
+    # cc_research_brief is set only on success inside the research try-block (which
+    # derives the live plan + cached cohort), so a None here means the block was
+    # silently swallowed by its except. Expander-internal markup is not surfaced in
+    # AppTest's at.markdown, so we gate on session state instead.
+    if "cc_research_brief" in at.session_state:
+        research_brief = at.session_state["cc_research_brief"]
+    else:
+        research_brief = None
+    assert research_brief is not None, "research brief missing"
+    if "cc_ai_outcome" in at.session_state:
+        ai_outcome = at.session_state["cc_ai_outcome"]
+    else:
+        ai_outcome = None
+    assert ai_outcome is None, "AI research must not auto-run on page load"
