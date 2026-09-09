@@ -50,6 +50,7 @@ from lib.intelligence import exposure as intel_exposure
 from lib.intelligence import evidence as intel_evidence
 from lib.intelligence import signals as intel_signals
 from lib.intelligence import research as intel_research
+from lib.intelligence import ai as intel_ai
 from lib.intelligence.portfolio_brain import build_briefing as intel_build_briefing
 from lib.intelligence.provider import DeterministicProvider as DeterministicIntelProvider
 from lib.intelligence.sources import gateway_status as intel_gateway_status
@@ -2197,6 +2198,111 @@ if _research_brief is not None:
                        "disclosures; decision-support only — nothing here is an order.")
         except Exception as _research_render_err:
             st.caption(f"Research & Synthesis render skipped: {_research_render_err}")
+
+# ==================================================
+# AI RESEARCH (explicit opt-in only — NEVER called during page load).
+# Provider-neutral: talks to lib.intelligence.ai, model is switchable via env.
+# Deterministic facts + the existing ResearchBrief stay the source of truth.
+# ==================================================
+if _research_brief is not None:
+    with st.expander("AI Research · provider-grounded interpretation (opt-in)"):
+        try:
+            _ai_cfg = intel_ai.ai_config_status()
+            st.caption(
+                f"Provider: **{_ai_cfg['provider']}** · Model: **{_ai_cfg['model']}** · "
+                f"Structured output: {'on' if _ai_cfg['structured_output'] else 'off'} · "
+                f"Configured: **{'yes' if _ai_cfg['configured'] else 'no'}**")
+            if _ai_cfg["configured"]:
+                st.caption(
+                    "Pressing the button sends ONLY a minimal evidence-grounded context "
+                    "(deterministic totals and change summaries, a bounded evidence "
+                    "catalog, and the allow-list of evidence ids) to the configured "
+                    "provider. Raw positions, account numbers, holder names and "
+                    "credentials are never sent. The deterministic Research Brief above "
+                    "is unaffected either way.")
+            else:
+                st.warning(
+                    "No AI API key configured. Set `AI_API_KEY` in the environment/"
+                    "secrets (optionally `AI_PROVIDER`, `AI_MODEL`, `AI_BASE_URL`, "
+                    "`AI_TIMEOUT_SECONDS`) to enable the AI research provider. Until "
+                    "then the deterministic Research Brief is the only synthesis — "
+                    "unchanged.")
+            _ai_fp = (
+                tuple(sorted(_research_brief.totals.items())),
+                _research_brief.evidence_count,
+                _research_brief.mapped_count,
+                len(_research_brief.changes),
+                len(_research_brief.external),
+                len(_research_brief.gaps),
+            )
+            if st.session_state.get("cc_ai_outcome_for") != _ai_fp:
+                st.session_state.pop("cc_ai_outcome", None)
+            if st.button("Run AI research (explicit call to the configured provider)",
+                         key="cc_ai_run",
+                         disabled=not _ai_cfg["configured"]):
+                with st.spinner("Running AI research…"):
+                    st.session_state["cc_ai_outcome"] = intel_ai.run_ai_research(
+                        brief=_research_brief,
+                        facts=_intel_facts.all_facts()
+                            if _intel_facts is not None else (),
+                        evidence=tuple(_intel_evidence.items)
+                            if _intel_evidence is not None else (),
+                        now=now_ist)
+                    st.session_state["cc_ai_outcome_for"] = _ai_fp
+            _ai_outcome = st.session_state.get("cc_ai_outcome")
+            if _ai_outcome is None:
+                st.caption("Not run yet — press the button to invoke the AI provider "
+                           "explicitly. Nothing is sent to any external provider "
+                           "during normal page loads.")
+            elif _ai_outcome.status == intel_ai.STATUS_OK and _ai_outcome.assessment is not None:
+                _a = _ai_outcome.assessment
+                st.markdown(f"### AI interpretation — {_a.provider} / {_a.model} "
+                            f"({_a.requested_format} transport)")
+                st.caption(
+                    f"Confidence **{(_a.confidence or 0.0):.2f}** · "
+                    f"{_a.latency_ms:.0f} ms · {_a.created_at:%d %b %Y %H:%M} · "
+                    f"{len(_a.findings)} finding(s), "
+                    f"{sum(1 for f in _a.findings if f.grounded)} evidence-grounded")
+                if _a.overall_assessment:
+                    st.markdown(_a.overall_assessment)
+                if _a.uncertainty:
+                    st.caption(f"Uncertainty: {_a.uncertainty}")
+                for _section in ("key_findings", "risks", "opportunities", "research_needs"):
+                    _findings = [f for f in _a.findings if f.section == _section]
+                    if not _findings:
+                        continue
+                    st.markdown(f"**{_section.replace('_', ' ').title()}**")
+                    for _f in _findings:
+                        _mark = "✓" if _f.grounded else "⚠"
+                        st.markdown(f"{_mark} **[{_f.kind}]** {_f.text}")
+                        if _f.evidence_ids:
+                            st.caption("evidence: " + ", ".join(_f.evidence_ids))
+                        if _f.downgrade_reason:
+                            st.caption(f"downgraded: {_f.downgrade_reason}")
+                if _a.invalidation_conditions:
+                    st.markdown("**Invalidated by**")
+                    for _cond in _a.invalidation_conditions:
+                        st.caption("↻ " + _cond)
+                if _a.limitations:
+                    st.markdown("**Limitations**")
+                    for _lim in _a.limitations:
+                        st.caption("· " + _lim)
+                if _a.downgrades:
+                    st.markdown("**Grounding / validation notes**")
+                    for _dg in _a.downgrades:
+                        st.caption("× " + _dg)
+                st.caption(
+                    "AI INTERPRETATION only — every deterministic number above "
+                    "(and in the Research Brief) remains authoritative. Nothing "
+                    "here is financial advice, a recommendation to trade, or an "
+                    "order; gold/SGB/FD amounts are restated, never recomputed by "
+                    "the model.")
+            else:
+                st.warning(f"{_ai_outcome.status_label}: {_ai_outcome.reason}")
+                st.caption("Falling back to the deterministic Research Brief "
+                           "synthesis — unchanged.")
+        except Exception as _ai_err:
+            st.caption(f"AI Research section unavailable: {_ai_err}")
 
 # ---- Intelligence data gateway: read-only provider status (no network) ----
 try:

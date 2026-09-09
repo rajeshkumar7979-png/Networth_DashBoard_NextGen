@@ -1,0 +1,99 @@
+# AI Research Provider v1 — provider-neutral AI interpretation layer.
+#
+# Importing this package performs no network access and requires no
+# credentials. Live provider calls happen only inside run_ai_research() on an
+# explicit opt-in action.
+from lib.intelligence.ai.client import (
+    AIOutputError,
+    AIProviderClient,
+    AIProviderError,
+    AIProviderTimeout,
+    AIProviderUnavailable,
+    AIRequest,
+    AIResponse,
+    OpenAICompatClient,
+    build_client,
+    get_ai_client,
+    register_ai_provider,
+    unregister_ai_provider,
+)
+from lib.intelligence.ai.config import (
+    AIConfig,
+    ai_config_status,
+    load_ai_config,
+    redact,
+)
+from lib.intelligence.ai.model import (
+    LABEL_FAILED,
+    LABEL_INSUFFICIENT,
+    LABEL_MALFORMED,
+    LABEL_NOT_CONFIGURED,
+    STATUS_FAILED,
+    STATUS_INSUFFICIENT,
+    STATUS_MALFORMED,
+    STATUS_NOT_CONFIGURED,
+    STATUS_OK,
+    AIAssessment,
+    AIFinding,
+    AIOutcome,
+)
+from lib.intelligence.ai.parse import extract_json_object, parse_assessment
+from lib.intelligence.ai.pipeline import run_ai_research
+from lib.intelligence.ai.prompts import (
+    DEFAULT_QUESTION,
+    build_context,
+    build_messages,
+)
+from lib.intelligence.ai.schema import OUTPUT_SCHEMA
+from lib.intelligence.ai.validator import (
+    build_synthesis,
+    deterministic_fallback,
+    ground_assessment,
+    inherit_fact_ids,
+    known_evidence_ids,
+    validate_assessment_claims,
+)
+
+__all__ = [
+    "AIAssessment",
+    "AIConfig",
+    "AIFinding",
+    "AIOutcome",
+    "AIOutputError",
+    "AIProviderClient",
+    "AIProviderError",
+    "AIProviderTimeout",
+    "AIProviderUnavailable",
+    "AIRequest",
+    "AIResponse",
+    "DEFAULT_QUESTION",
+    "LABEL_FAILED",
+    "LABEL_INSUFFICIENT",
+    "LABEL_MALFORMED",
+    "LABEL_NOT_CONFIGURED",
+    "OpenAICompatClient",
+    "OUTPUT_SCHEMA",
+    "STATUS_FAILED",
+    "STATUS_INSUFFICIENT",
+    "STATUS_MALFORMED",
+    "STATUS_NOT_CONFIGURED",
+    "STATUS_OK",
+    "ai_config_status",
+    "build_client",
+    "build_context",
+    "build_messages",
+    "build_synthesis",
+    "deterministic_fallback",
+    "extract_json_object",
+    "get_ai_client",
+    "ground_assessment",
+    "inherit_fact_ids",
+    "known_evidence_ids",
+    "load_ai_config",
+    "parse_assessment",
+    "redact",
+    "register_ai_provider",
+    "run_ai_research",
+    "unregister_ai_provider",
+    "validate_assessment_claims",
+]
