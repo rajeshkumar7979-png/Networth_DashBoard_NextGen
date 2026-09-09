@@ -51,6 +51,7 @@ from lib.intelligence import evidence as intel_evidence
 from lib.intelligence import signals as intel_signals
 from lib.intelligence.portfolio_brain import build_briefing as intel_build_briefing
 from lib.intelligence.provider import DeterministicProvider as DeterministicIntelProvider
+from lib.intelligence.sources import gateway_status as intel_gateway_status
 st.set_page_config(page_title="Family Net Worth", page_icon="💰", layout="wide", initial_sidebar_state="expanded")
 
 IST = pytz.timezone("Asia/Kolkata")
@@ -2072,6 +2073,20 @@ if _intel_briefing is not None:
                        "No AI provider is connected; nothing here is an order.")
         except Exception as _intel_render_err:
             st.caption(f"Portfolio Intelligence render skipped: {_intel_render_err}")
+
+# ---- Intelligence data gateway: read-only provider status (no network) ----
+try:
+    _gw_rows = intel_gateway_status()
+    st.session_state["cc_intel_gateway_status"] = _gw_rows
+    if _gw_rows:
+        with st.expander("Portfolio Intelligence · data gateway (external-provider status)"):
+            st.dataframe(pd.DataFrame(_gw_rows), hide_index=True, use_container_width=True)
+            st.caption("Read-only cache status; no external call happens on page open. "
+                       "FRED/SEC/MF evidence is normalized to observed FACT evidence by "
+                       "lib.intelligence.sources and never alters the numbers above.")
+except Exception as _gw_err:
+    st.session_state["cc_intel_gateway_status"] = []
+    st.caption(f"Data gateway status unavailable: {_gw_err}")
 
 st.markdown("---")
 src = "AMFI live" if (len(amfi_navs) and not amfi_cache_date) else (f"AMFI cache {amfi_cache_date}" if amfi_cache_date else "AMFI offline")
