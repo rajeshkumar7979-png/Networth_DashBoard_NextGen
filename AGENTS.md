@@ -1,5 +1,112 @@
 # AGENTS.md — Networth Dashboard (NextGen)
 
+## Permanent engineering operating contract
+
+This is the standing engineering contract for **all** future implementation work in this repository. Apply it **automatically** on every task — do not wait to be reminded, and do not require re-explanation. Only an explicit, task-level instruction from the user overrides a rule here.
+
+### 1. Understand before changing
+
+- Inspect the relevant existing architecture first. Reuse modules in `lib/`, the established `st.session_state` cross-page flow, the frozen test baseline, and the intelligence model — do not reimplement capabilities that already exist.
+- Search the repository before creating a new abstraction or a new file. If a function, classifier, formatter, cache, or adapter already covers the need, extend it.
+- Re-read `INVESTMENT_OS_SPEC.md` (the audited v1.1 spec) before adding features: every feature has a Data-Availability Class (1–5) that defines what data exists vs. what must not be invented.
+- Understand existing financial semantics before modifying anything. Identify dependencies and downstream consumers — pages import `lib/*`, intelligence imports `lib/*`, tests pin behavior. A change to `lib/` must be re-verified through its consumers.
+- Never assume a missing capability means it must be rebuilt. Verify whether it already exists in another layer (page vs `lib` vs script vs committed cache) first.
+
+### 2. Design before implementing
+
+- Think through the smallest correct architecture that satisfies the requested behavior — no speculative generality.
+- Prefer simple, deterministic, pure, testable components over clever or stateful ones.
+- Preserve provider neutrality where it exists (e.g. `lib/intelligence/sources/` is a provider-neutral gateway; pages depend on adapters, never on raw URLs).
+- Explicitly distinguish what is currently implemented from what is future architecture. Do not implement roadmap items that are not the requested task.
+- State your assumptions explicitly and reject any assumption the repository/spec does not support — especially any that would invent data.
+
+### 3. Financial correctness is a hard constraint
+
+- Existing financial calculations are the source of truth unless the task explicitly changes them. Deterministic tests pin the current numbers (`tests/frozen_baseline.py`, `tests/test_drivers.py`, `tests/test_fcnr_attribution.py`, `tests/test_fd_valuation.py`, `tests/test_ledger.py`, `tests/test_register.py`, `tests/test_golden_totals.py`).
+- Never silently redefine financial terminology. Examples already frozen: `Net Worth = Total Assets − Liabilities` is computed **only** by `lib/ledger.net_worth()`; per-class `invested_basis_change` is the **"Invested-Basis Change"** and is never called a "flow", "deposit", "withdrawal", "SIP", "redemption", or transaction.
+- Never invent transaction history, cash flows, SIPs, returns, valuations, holdings, tax consequences, corporate actions, or exposures. Missing data stays missing and renders as "no data" / "insufficient evidence".
+- Distinguish facts, calculated facts, signals, AI interpretations, and recommendations (the `FactKind` taxonomy in `lib/intelligence/model.py`). External data is an observed `FACT`; our deterministic math is a `CALCULATED FACT`; never label either as AI.
+- Never convert unknown/missing values into zero merely to make calculations or UI look complete.
+- Preserve precision where financially material (e.g. full-precision FD attribution with a labeled rounding residual, not silent rounding).
+- Preserve provenance for external data: source identity, retrieval/publication timestamps, and the valuation method used.
+
+### 4. Implement completely
+
+- Implement the requested behavior including realistic failure modes, not just the happy path.
+- Handle — wherever relevant — malformed data, missing data, duplicate data, stale data, provider failures, timeouts, missing credentials, corrupted caches, identifier collisions, empty datasets, and schema changes.
+- Failures must degrade safely (live → disk cache → stale-degraded → explicit "no data"); a failure must never silently alter or corrupt portfolio information.
+- Do not leave obvious TODOs, dead code, or knowingly incomplete behavior unless the task explicitly asks for a scaffold.
+
+### 5. Self-review before reporting completion
+
+- After implementing, independently review your own work as if reviewing another engineer's pull request. Ask:
+  - What could be wrong? What assumptions did I make?
+  - What edge cases did I miss?
+  - Can existing behavior regress? Can data provenance become misleading?
+  - Can identifiers collide? Can stale/missing data be misrepresented?
+  - Can a failure path corrupt or alter financial results?
+  - Did I accidentally expand scope, duplicate existing logic, or add unnecessary dependencies?
+  - Did I create security/privacy issues (secrets, logging, account-number redaction)?
+  - Does the implementation actually satisfy the architectural intent?
+- If you find defects, **fix them yourself** before reporting completion. Do not stop at "tests pass" when code inspection reveals a problem.
+
+### 6. Test the implementation
+
+- Add focused tests for new behavior and regression tests for any important bug you discover. Test happy paths **and** meaningful failure paths.
+- Run the complete existing suite, not only the new tests: `pytest` (the default suite is network-free; `pytest -m smoke` is the optional network/multipage AppTest).
+- Run lint and static checks: `ruff check .`. Run formatting/diff checks: `git diff --check`.
+- Where relevant, compare important financial outputs against the established baseline (`FROZEN_TOTALS` / `FROZEN_BOOKS`) instead of trusting a one-off run.
+
+### 7. Regression safety
+
+- Before declaring completion, verify: unrelated existing functionality is unchanged; existing session-state keys and cross-page flow still work; existing financial metrics are unchanged where they should be; no unintended files, caches, data files, or configuration changed.
+- Inspect `git status` and `git diff`. Check for accidental secrets, debug code, temporary files, generated artifacts, or unnecessary dependencies.
+
+### 8. Data / external-provider safety
+
+- Use authoritative sources where available; preserve source identity and provenance.
+- Record retrieval/publication timestamps appropriately and distinguish cached/stale data from freshly retrieved data.
+- Never claim an external source says something it does not.
+- Never infer identity using fuzzy matching where exact identity is required (see `lib/intelligence/sources/mapping.py` — exact match only).
+- A provider failure must never become a financial fact: failure degrades to unavailable/stale, never to a successful record with made-up values.
+- Credentials must never leak into source records, logs, cache keys, cache files, UI, or error messages. Keys come from the environment/secrets, never from source code.
+- Network calls happen only where explicitly intended (e.g. opening the Command Center must not trigger gateway provider calls; the gateway fetches only when its `fetch_*` functions are invoked).
+
+### 9. AI safety (for when AI is eventually introduced)
+
+- Python/deterministic systems remain the source of truth for financial facts.
+- AI may interpret verified facts but must never invent them; AI-generated claims must retain evidence/provenance.
+- Insufficient evidence results in expressed uncertainty, never fabrication.
+- Recommendations remain decision support, never automatic trading.
+- Clearly distinguish fact, calculation, signal, interpretation, and recommendation in any output.
+
+### 10. Scope discipline
+
+- Implement the requested phase completely. Do not silently implement unrelated roadmap items.
+- Do not introduce databases, automation, new APIs, AI providers, infrastructure, or dependencies merely because they may be useful later.
+- Do proactively fix defects that are directly caused by the implementation or necessary for correctness.
+- If a requested design conflicts with existing financial semantics, stop and resolve the conflict rather than silently implementing something unsafe.
+
+### 11. Efficiency
+
+- Do not repeatedly ask the user to perform engineering checks you can perform yourself.
+- Do not stop merely because the first implementation works, and do not create artificial review cycles.
+- Complete implementation + self-review + testing + correction as one engineering task whenever possible.
+- Ask the user only when a genuine product/architecture/business decision cannot be determined safely from the repository or the specification.
+
+### 12. Reporting
+
+When finished, report: what was implemented; important design decisions; files changed; tests/checks performed; defects discovered and fixed during self-review; remaining limitations; whether the implementation is ready for commit. Never claim "complete" merely because the requested code was written.
+
+## Project-specific rules (inviolable)
+
+- The original `Networth_DashBoard` repository is **never** modified. All work happens in this repository: `Networth_DashBoard_NextGen`.
+- `INVESTMENT_OS_SPEC.md` is a working specification and must remain **untracked** unless explicitly instructed otherwise. Do not modify it unless asked.
+- Existing data caches and sample/demo data (`data/Networth_Raw_Data.xlsx`, `data/amfi_scheme_universe.json`, `data/mf_holdings_cache.json`, `data/mf_holdings_meta.json`, `data/amfi_nav_cache.json`, `data/history.csv`) must not be modified unless explicitly requested. `data/intel_gateway_cache/` is gitignored runtime data that the gateway may write.
+- Preserve the existing dashboard. Prefer extending existing functionality over rebuilding it.
+- No automatic trading. No invented financial history. No unsupported financial conclusions.
+- The committed workbook is fabricated sample data (obfuscated names like "Mrs. KAVITA KHANDELWAL", account numbers like `ABC123`/); do not treat it as private, and never use sample-data assumptions as a substitute for protecting real data if it is later replaced.
+
 ## What this is
 
 Streamlit multi-page app for a family net-worth dashboard (NRI-focused). Dark institutional theme.
@@ -13,7 +120,7 @@ pip install -r requirements.txt -r requirements-dev.txt
 streamlit run app.py
 ```
 
-Python 3.11. No build step.
+Python 3.11 (matches CI `setup-python@v6`). No build step.
 
 ## Test & lint
 
@@ -22,9 +129,10 @@ pip install -r requirements-dev.txt   # adds pytest + ruff
 pytest        # deterministic regression suite (no network); smoke excluded by default
 pytest -m smoke   # optional network/multipage Streamlit AppTest (flaky offline)
 ruff check .  # lint, minimal E/F scope (see ruff.toml)
+git diff --check   # whitespace/conflict-marker gate before reporting done
 ```
 
-CI (`.github/workflows/ci.yml`) installs **both** `requirements.txt` and `requirements-dev.txt`, then runs `ruff check .` and `pytest` on every push/PR. The default pytest suite never hits the network; the `smoke`-marked AppTest does.
+CI (`.github/workflows/ci.yml`) installs **both** `requirements.txt` and `requirements-dev.txt`, then runs `ruff check .` and `pytest` on every push/PR. The default pytest suite never hits the network; the `smoke`-marked AppTest does. The operating contract (§6–§7) requires the **full** suite + lint + diff-check to pass before completion is reported.
 
 Extraction rule: the pure financial compute (FD valuation, FCNR attribution, gold routing, category inference, health scoring) lives in `lib/valuation.py`, `lib/gold.py`, `lib/scoring.py`. Command Center imports and delegates to these — **do not redefine financial calculations in the page**, and do not change the math without a SPEC-approved Phase 1+ change. The deterministic tests pin the current numbers.
 
@@ -43,7 +151,7 @@ There are no liabilities, savings/drawdown, PPF/EPF, property, or transaction-hi
 | Path | Role |
 |---|---|
 | `app.py` | Entrypoint. Calls `st.navigation` with 5 pages. |
-| `pages/1_Command_Center.py` | **Main page (~2000 lines).** All portfolio logic, valuation, scoring, charts. |
+| `pages/1_Command_Center.py` | **Main page (~2000 lines).** All portfolio logic, valuation, scoring, charts; imports and delegates financial compute to `lib/*`. |
 | `pages/2_Deep_Health.py` | Decision desk for maturing money. Reads `st.session_state` from Command Center. |
 | `pages/3_Asset_Detail.py` | Detail drill-down. |
 | `pages/4_News.py` | News feed. |
@@ -62,11 +170,13 @@ There are no liabilities, savings/drawdown, PPF/EPF, property, or transaction-hi
 | `lib/mf_health.py` | MF health analysis. |
 | `lib/news.py` | Portfolio news aggregation. |
 | `lib/theme.py` | CSS injection (`inject_css`). |
+| `lib/intelligence/` | **Portfolio intelligence foundation** (committed): shared domain model (`model.py` — `FactKind`/`SourceClass`/`SourceType`, `make_fact`, `make_evidence`, `slugify`), `evidence.py` (evidence bag + provenance), `exposure.py` (look-through exposure facts + `Coverage`), `signals.py` (deterministic signal rules), `provider.py` (deterministic/reasoner provider protocol + `validate_claims`), `portfolio_brain.py` (`build_briefing`). Pages consume it read-only; the Command Center renders a briefing expander. |
+| `lib/intelligence/sources/` | **Intelligence Data Gateway v1** (provider-neutral): `record.py` (`SourceRecord`/`SourceResult`), `errors.py`, `httpio.py` (network seam), `cache.py` (TTL JSON cache under `data/intel_gateway_cache/`, gitignored), `fred.py`/`sec.py`/`mf.py`, `mapping.py` (exact-match portfolio relevance). Live fetch is on-demand only; `gateway_status()` reads caches with no network. |
 | `scripts/update_holdings_cache.py` | CLI script run by GitHub Actions daily. Refreshes `data/mf_holdings_cache.json`. |
 
 ## Cross-page data flow
 
-Pages communicate via `st.session_state`. Command Center writes keys like `matured_fd_amount`, `mf_holdings_for_health`, `cc_equity_pct`, etc. Deep Health and MF Health read them. There is no shared database — everything is session-scoped and recomputed on each page load.
+Pages communicate via `st.session_state`. Command Center writes keys like `matured_fd_amount`, `mf_holdings_for_health`, `cc_equity_pct`, `cc_intel_briefing`, `cc_intel_gateway_status`. Deep Health and MF Health read them. There is no shared database — everything is session-scoped and recomputed on each page load.
 
 ## External data sources (called at runtime)
 
@@ -77,8 +187,9 @@ Pages communicate via `st.session_state`. Command Center writes keys like `matur
 - **goldprice.dev** — INR gold spot.
 - **fund-disclosures / mfdata.in** — MF portfolio holdings (used by holdings refresh script).
 - **Google News RSS** — news feed.
+- **FRED** and **SEC EDGAR** — via the Intelligence Data Gateway (`lib/intelligence/sources/`): explicit on-demand `fetch_*` functions only, TTL-cached to `data/intel_gateway_cache/`. `FRED_API_KEY` (env) and `SEC_USER_AGENT` (env, optional) are the only credentials.
 
-All have TTL-based Streamlit caching. Network failures degrade gracefully to disk/previous cache.
+All have TTL-based Streamlit caching. Network failures degrade gracefully to disk/previous cache. Per §8, opening a page must not trigger hidden gateway network calls.
 
 ## Gold routing logic
 
@@ -97,11 +208,20 @@ The workbook has **no cash-flow/transaction ledger** (SPEC R-403 retired). The p
 - `delta_current_c = invested_basis_change_c + market_valuation_change_c` (exact)
 - `delta_pnl = Σ market_valuation_change_c` (exact)
 
-Current-run P&L decomposes into six valuation drivers (`decompose_current`) plus a labeled rounding residual bounded by `fd_rounding_bound(n)=1.5*n_fd+1` (worst case ~23 for 23 FDs, not `<1`). Command Center's FD loop accumulates full-precision pre-round attribution (`fd_attrib`) keyed by `Product` (FCNR vs INR FD); the page's three driver reconciliation entries use that bound. Historical snapshots are persisted via `lib/snapshot.fbuild_snapshot_row/upsert_snapshot` into `data/history.csv` (gitignored) with enriched columns (`schema`, `class_current_*`, `class_invested_*`, `member_current_*`, `member_invested_*`, `fcnr_interest_total`, `fcnr_fx_principal_total`, `inr_fd_interest_total`, …). Persistence semantics: historical rows are append-only/immutable; today's row is upserted (same-date replace), and older dates are never rewritten. A legacy pre-Phase 1B prior row cannot decompose; the delta block flags it as unattributed instead of mixing in transactions. Pinned by `tests/test_drivers.py` and `tests/test_snapshot.py`.
+Current-run P&L decomposes into six valuation drivers (`decompose_current`) plus a labeled rounding residual bounded by `fd_rounding_bound(n)=1.5*n_fd+1` (worst case ~23 for 23 FDs, not `<1`). Command Center's FD loop accumulates full-precision pre-round attribution (`fd_attrib`) keyed by `Product` (FCNR vs INR FD); the page's three driver reconciliation entries use that bound. Historical snapshots are persisted via `lib/snapshot.build_snapshot_row/upsert_snapshot` into `data/history.csv` (gitignored) with enriched columns (`schema`, `class_current_*`, `class_invested_*`, `member_current_*`, `member_invested_*`, `fcnr_interest_total`, `fcnr_fx_principal_total`, `inr_fd_interest_total`, …). Persistence semantics: historical rows are append-only/immutable; today's row is upserted (same-date replace), and older dates are never rewritten. A legacy pre-Phase 1B prior row cannot decompose; the delta block flags it as unattributed instead of mixing in transactions. Pinned by `tests/test_drivers.py` and `tests/test_snapshot.py`.
 
 ## Phase 1A golden baseline (tests/frozen_baseline.py)
 
 `tests/frozen_baseline.py` freezes the actual Command Center totals and the four validated books (`mf`/`stocks`/`gold`/`fd`, register-relevant columns) from a live capture run on the committed sample workbook (TODAY `2026-09-08`, USD_INR `94.49`). `tests/test_register.py` rebuilds the register from these frozen books and asserts class/member/register totals reconcile to `FROZEN_TOTALS` and `FROZEN_MEMBER_CURRENT/INVESTED` within ₹1 — i.e. the register (canonical view) equals the Command Center (page view) by construction; it also pins FD key uniqueness (all workbook FDs are `acct:`-backed) and the `NonUniqueKeyError` collision STOP. `tests/test_page_smoke.py` additionally asserts on every live run that the rendered Reconciliation block contains no `✗ FAIL` (register vs page reconciliation gate). `FROZEN_BOOKS` also backs Phase 1B's `CLASS_PNL_GOLDEN` (5 class P&L values) and `FROZEN_FD_DRIVERS` (full-precision FCNR/INR FD components, `n_fd=23`) used by `tests/test_drivers.py`; these were captured from the same baseline and need no live run to reproduce. If a future SPEC-approved Phase 1+ change alters valuation, recapture the baseline (run the Command Center once with a dump harness) rather than editing the frozen numbers by hand.
+
+## Intelligence foundation & data gateway vocabulary
+
+The intelligence layers add a provenance vocabulary (§3, §8, §9) layered on top of — never replacing — the financial compute:
+
+- **Facts** (`Fact` in `lib/intelligence/model.py`) carry kind (`FACT` / `CALCULATED FACT` / `SIGNAL` / `AI INTERPRETATION` / `RECOMMENDATION`), source class (A authoritative … D experimental), and source type (calculated / observed / official-filing / news / ai-inferred).
+- **Evidence** (`Evidence`/`Provenance`) attaches provenance to every external claim. `INSUFFICIENT_EVIDENCE` is the explicit "no data" fallback — never a fabricated value.
+- **Signals** (`lib/intelligence/signals.py`) are deterministic rules over facts+evidence (e.g. FCNR concentration ≥ 35% → warn). They are facts with a level, not advice.
+- **Gateway records** (`lib/intelligence/sources/`) normalize external data (FRED observations, SEC filings/company-facts summary, AMFI NAV, fund holdings) into observed `SourceRecord`s that convert to `Evidence` unchanged. Exact-identifier entity mapping only (`mapping.py`); a provider failure is an `unavailable` result, never evidence.
 
 ## Known resolved bug
 
