@@ -49,9 +49,12 @@ from lib import snapshot as snapshot_io
 from lib.intelligence import exposure as intel_exposure
 from lib.intelligence import evidence as intel_evidence
 from lib.intelligence import signals as intel_signals
+from lib.intelligence import research as intel_research
 from lib.intelligence.portfolio_brain import build_briefing as intel_build_briefing
 from lib.intelligence.provider import DeterministicProvider as DeterministicIntelProvider
 from lib.intelligence.sources import gateway_status as intel_gateway_status
+from lib.intelligence.sources import mapping as intel_mapping
+from lib.intelligence.sources import mf as intel_mf
 st.set_page_config(page_title="Family Net Worth", page_icon="💰", layout="wide", initial_sidebar_state="expanded")
 
 IST = pytz.timezone("Asia/Kolkata")
@@ -2073,6 +2076,127 @@ if _intel_briefing is not None:
                        "No AI provider is connected; nothing here is an order.")
         except Exception as _intel_render_err:
             st.caption(f"Portfolio Intelligence render skipped: {_intel_render_err}")
+
+# ==================================================
+# RESEARCH & SYNTHESIS (evidence-based research brief, v1)
+# Answers: what changed, which external developments map to the portfolio, what
+# deserves attention, what invalidates a conclusion, and where evidence is thin.
+# Deterministic and network-free: reuses the facts/evidence/signals the briefing
+# already built plus cache-read-only NAV/holdings/gateway records and the
+# snapshot delta. Synthesis is rule-based; no AI provider is connected.
+# Nothing here is an order.
+# ==================================================
+_research_brief = None
+try:
+    if _intel_briefing is not None:
+        _pm_index = intel_mapping.build_portfolio_index(
+            register=register,
+            mf_valid=mf_valid if "mf_valid" in dir() else None,
+            stocks_valid=stocks_valid if "stocks_valid" in dir() else None,
+            gold_valid=gold_valid if "gold_valid" in dir() else None,
+            fd_valid=fd_valid if "fd_valid" in dir() else None,
+            amfi_codes=amfi_codes,
+        )
+        _nav_evs = intel_research.list_source_results(
+            intel_mf.load_mf_nav_evidence(limit=2000, only_isins=_pm_index.isins or None,
+                                          now=now_ist))
+        _hold_evs = intel_research.list_source_results(
+            intel_mf.load_mf_holdings_evidence(now=now_ist))
+        _delta = intel_research.delta_from_history(
+            history_df if "history_df" in dir() else None)
+        _research_brief = intel_research.build_research_brief(
+            facts=_intel_facts,
+            evidence=_intel_evidence,
+            signals=_intel_signals,
+            drivers=cc_drivers if "cc_drivers" in dir() else None,
+            delta=_delta,
+            portfolio_index=_pm_index,
+            nav_evidence=_nav_evs,
+            holdings_evidence=_hold_evs,
+            gateway_evidence=intel_research.gateway_cached_evidence(now=now_ist),
+            question="What changed, and where is the evidence thin?",
+            now=now_ist,
+        )
+        st.session_state["cc_research_brief"] = _research_brief
+except Exception as _research_err:
+    _research_brief = None
+    st.caption(f"Research & Synthesis unavailable this run: {_research_err}")
+
+if _research_brief is not None:
+    with st.expander("Research & Synthesis · what changed, risks, and evidence gaps"):
+        try:
+            _rb = _research_brief
+            st.markdown(
+                f"**Research brief {_rb.as_of.strftime('%d %b %Y %H:%M')}** — "
+                f"{len(_rb.changes)} change row(s) · {_rb.mapped_count} mapped external "
+                f"record(s) · {len(_rb.risks)} risk(s) · {len(_rb.gaps)} evidence gap(s).")
+            if _rb.synthesis is not None:
+                st.markdown(f"**Synthesis ({_rb.synthesis.model})** — {_rb.synthesis.summary}")
+
+            if _rb.changes:
+                st.markdown("**What changed this run**")
+                _ch = pd.DataFrame([
+                    {
+                        "Kind": c.kind.replace("_", " "),
+                        "Item": c.label,
+                        "Amount (INR)": f"{c.amount:,.0f}" if c.amount is not None else "—",
+                        "Note": c.note,
+                    }
+                    for c in _rb.changes
+                ])
+                st.dataframe(_ch, hide_index=True, use_container_width=True,
+                             column_config={"Note": st.column_config.TextColumn(width="large")})
+                st.caption(_rb.not_a_cashflow_label)
+
+            if _rb.external:
+                st.markdown("**External developments (mapped to holdings first)**")
+                _ext = pd.DataFrame([
+                    {
+                        "Category": d.category,
+                        "Mapped": "yes" if d.mapped else "no",
+                        "Evidence": d.headline,
+                        "Source": d.evidence.provenance.source,
+                        "Quality": d.quality.score,
+                    }
+                    for d in _rb.external[:8]
+                ])
+                st.dataframe(_ext, hide_index=True, use_container_width=True,
+                             column_config={
+                                 "Mapped": st.column_config.TextColumn(width="small"),
+                                 "Evidence": st.column_config.TextColumn(width="large"),
+                                 "Quality": st.column_config.NumberColumn(format="%.2f"),
+                             })
+                st.caption("Relevance uses exact identifier matching only "
+                           "(lib.intelligence.sources.mapping) — never fuzzy.")
+
+            if _rb.risks:
+                st.markdown("**Risks that deserve attention**")
+                for _c in _rb.risks:
+                    st.markdown(f"**{_c.title}** _(strength {_c.strength})_ — {_c.statement}")
+                    st.caption(f"↻ invalidated by: {_c.invalidation}")
+
+            if _rb.research_needs:
+                st.markdown("**Research needs (decision-support, not orders)**")
+                for _c in _rb.research_needs:
+                    st.markdown(f"**{_c.title}** _(strength {_c.strength})_ — {_c.statement}")
+                    st.caption(f"↻ invalidated by: {_c.invalidation}")
+
+            if _rb.gaps:
+                st.markdown("**Where evidence is insufficient**")
+                for _g in _rb.gaps:
+                    st.caption("· " + _g)
+
+            if _rb.synthesis is not None and _rb.synthesis.claims:
+                st.markdown(f"**Claims ({_rb.synthesis.model})**")
+                for _c in _rb.synthesis.claims:
+                    st.caption(("✓ " if _c.supported else "⚠ ") + _c.text)
+            if _rb.synthesis_reason:
+                st.caption(f"Reason: {_rb.synthesis_reason}")
+            st.caption("Synthesis is deterministic rule-based (no AI provider connected). "
+                       "Every number comes from this page's own calc or cached statutory "
+                       "disclosures; decision-support only — nothing here is an order.")
+        except Exception as _research_render_err:
+            st.caption(f"Research & Synthesis render skipped: {_research_render_err}")
 
 # ---- Intelligence data gateway: read-only provider status (no network) ----
 try:

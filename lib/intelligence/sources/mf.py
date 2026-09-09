@@ -43,10 +43,19 @@ def _parse_mf_date(value):
 
 
 def load_mf_nav_evidence(*, universe_cache_path=None, amfi_cache_path=None,
-                         limit: int = 500, now=None) -> SourceResult:
+                         limit: int = 500, only_isins=None, now=None) -> SourceResult:
     """NAV records from the AMFI universe cache (preferred) or the NAV disk
-    cache fallback. Missing data stays missing — never a fabricated zero."""
+    cache fallback. Missing data stays missing — never a fabricated zero.
+
+    `only_isins` (optional iterable of ISINs) restricts records to exactly those
+    identifiers, so a portfolio-aware research brief only loads the NAVs it can
+    map to held funds instead of the whole universe.
+    """
     now = now or utc_now()
+    want = None
+    if only_isins:
+        want = {str(i).strip().upper() for i in only_isins if str(i).strip()}
+        want.discard("")
     universe_path = Path(universe_cache_path) if universe_cache_path else AMFI_UNIVERSE_CACHE
     universe = load_json(universe_path, {})
     rows = universe.get("rows") if isinstance(universe, dict) else []
@@ -54,12 +63,14 @@ def load_mf_nav_evidence(*, universe_cache_path=None, amfi_cache_path=None,
         fetched_at = parse_iso(universe.get("fetched_at"))
         records = []
         for row in rows:
-            if len(records) >= limit:
-                break
             isin = str(row.get("isin_primary") or row.get("isin_secondary") or "").strip().upper()
             nav = row.get("nav")
             if not isin or nav is None:
                 continue
+            if want is not None and isin not in want:
+                continue
+            if len(records) >= limit:
+                break
             records.append(SourceRecord(
                 id=make_record_id("amfi", "nav", isin),
                 provider="amfi",
@@ -101,10 +112,12 @@ def load_mf_nav_evidence(*, universe_cache_path=None, amfi_cache_path=None,
     if isinstance(nav, dict) and nav:
         records = []
         for isin, nav_value in nav.items():
-            if len(records) >= limit:
-                break
             if nav_value is None:
                 continue
+            if want is not None and str(isin).strip().upper() not in want:
+                continue
+            if len(records) >= limit:
+                break
             records.append(SourceRecord(
                 id=make_record_id("amfi", "nav", str(isin)),
                 provider="amfi",

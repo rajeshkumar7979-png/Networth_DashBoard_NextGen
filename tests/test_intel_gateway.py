@@ -512,6 +512,39 @@ def test_mf_nav_no_cache_is_unavailable(tmp_path):
     assert result.status == "unavailable" and result.records == ()
 
 
+def test_mf_nav_universe_filtered_to_portfolio_isins(tmp_path):
+    universe = _write(tmp_path, "universe.json", {
+        "fetched_at": "2026-09-07T04:38:49+00:00",
+        "rows": [
+            {"scheme_code": "120828", "isin_primary": "INF966L01689", "isin_secondary": "",
+             "scheme_name": "Quant Small Cap Fund", "amc": "quant Mutual Fund",
+             "category": "Open Ended Schemes", "nav": 123.45, "nav_date": "06-09-2026"},
+            {"scheme_code": "119598", "isin_primary": "INF209KA12Z1", "isin_secondary": "",
+             "scheme_name": "HDFC Top 100", "amc": "HDFC AMC",
+             "category": "Open Ended Schemes", "nav": 55.5, "nav_date": "06-09-2026"},
+        ],
+    })
+    result = load_mf_nav_evidence(universe_cache_path=universe,
+                                  amfi_cache_path=tmp_path / "missing.json",
+                                  only_isins=["INF966L01689"])
+    assert result.status == "ok"
+    assert [r.entity for r in result.records] == ["INF966L01689"]
+
+
+def test_mf_nav_fallback_filtered_to_portfolio_isins(tmp_path):
+    empty = _write(tmp_path, "empty.json", {"rows": []})
+    amfi = _write(tmp_path, "amfi.json", {
+        "saved_at": "2026-08-20 08:02",
+        "nav": {"INF966L01689": 120.0, "INF209KA12Z1": 55.5},
+        "code": {"INF966L01689": "120828", "INF209KA12Z1": "119598"},
+        "name": {"INF966L01689": "Quant Small Cap Fund", "INF209KA12Z1": "HDFC Top 100"},
+    })
+    result = load_mf_nav_evidence(universe_cache_path=empty, amfi_cache_path=amfi,
+                                  only_isins=["INF209KA12Z1"])
+    assert result.status == "ok"
+    assert [r.entity for r in result.records] == ["INF209KA12Z1"]
+
+
 def test_mf_holdings_primary_source(tmp_path):
     holdings = _write(tmp_path, "holdings.json", {
         "120828": [{"name": "HDFC Bank", "isin": "INE040A01034",

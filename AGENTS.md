@@ -223,6 +223,16 @@ The intelligence layers add a provenance vocabulary (§3, §8, §9) layered on t
 - **Signals** (`lib/intelligence/signals.py`) are deterministic rules over facts+evidence (e.g. FCNR concentration ≥ 35% → warn). They are facts with a level, not advice.
 - **Gateway records** (`lib/intelligence/sources/`) normalize external data (FRED observations, SEC filings/company-facts summary, AMFI NAV, fund holdings) into observed `SourceRecord`s that convert to `Evidence` unchanged. Exact-identifier entity mapping only (`mapping.py`); a provider failure is an `unavailable` result, never evidence.
 
+## Research & Synthesis v1 (evidence-based research brief)
+
+`lib/intelligence/research.py` answers the research questions on top of the same facts/evidence/signals the briefing already uses, deterministically and **network-free**:
+
+- `build_research_brief(...)` -> `ResearchBrief` with `changes` (P&L drivers + Invested-Basis Change + market/valuation change + labeled residual), `external` (ranked developments: mapped-to-portfolio first, then news/macro, by a deterministic `score_evidence` quality score), `risks` (elevated signals), `research_needs` (decision-support questions where evidence is thin — never orders), `gaps` (explicit "insufficient evidence" items), a `synthesis` (`ResearchSynthesizer`, deterministic rule-based), and `research-*` conclusions.
+- **Every conclusion carries an `invalidation` condition and a `strength` label** (`strong`/`moderate`/`weak`/`insufficient`). No AI provider is connected; a future AI plugs in behind the existing `provider.py` registry and its claims are still downgraded by `validate_claims` when a cited fact id is absent.
+- **Reuse rules**: the brief consumes the existing register/drivers/snapshot delta (`lib/drivers.py`, `delta_from_history` over `data/history.csv`), the existing `EvidenceBag`, `evaluate_signals`, `build_portfolio_index`/`assess_relevance` (exact-match only) and cache-read-only gateway loaders (`load_mf_nav_evidence(only_isins=...)`, `load_mf_holdings_evidence`, `gateway_cached_evidence`). Opening the Command Center never triggers gateway network calls.
+- **Vocabulary frozen (tests pin it)**: the invested difference between snapshots is the **"Invested-Basis Change"**, `cashflow_measurement=False`, labeled with `NOT_A_CASHFLOW_LABEL`, and `tests/test_intel_research.py` asserts no "deposit/withdrawal/SIP/redemption/XIRR/buy/sell" wording leaks into any change row or conclusion. The research layer is decision-support only — it never contains orders or trade actions.
+- Command Center computes the brief after the intelligence expander and stores it in `st.session_state["cc_research_brief"]`; render is read-only.
+
 ## Known resolved bug
 
 `pages/1_Command_Center.py` previously had a `notess` typo (should be `notes`) that would NameError on the simple-interest FD fallback path with a long-tenor warning. Phase 0 extracted valuation into `lib/valuation.py` and fixed the typo there; the fixed path is pinned by `tests/test_fd_valuation.py::test_simple_interest_fallback_formula`.
