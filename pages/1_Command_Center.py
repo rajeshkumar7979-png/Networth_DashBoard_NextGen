@@ -57,8 +57,24 @@ from lib.intelligence.provider import DeterministicProvider as DeterministicInte
 from lib.intelligence.sources import gateway_status as intel_gateway_status
 from lib.intelligence.sources import mapping as intel_mapping
 from lib.intelligence.sources import mf as intel_mf
-st.set_page_config(page_title="Family Net Worth", page_icon="💰", layout="wide", initial_sidebar_state="expanded")
-
+from lib import theme
+from lib.ui import (
+    page_header_html as ui_page_header,
+    section_header_html as ui_section,
+    pill as ui_badge,
+    status_pill as ui_pill,
+    stacked_bar as ui_alloc_bar,
+    caption as ui_caption,
+    empty_state as ui_empty,
+    banner as ui_banner,
+    hero_metrics as ui_hero,
+    kpi_cards as ui_kpi_cards,
+    watchlist as ui_watch,
+    research_row as ui_research_row,
+    research_grid as ui_research_grid,
+    unavailable as ui_unavailable,
+    evidence_trail as ui_evidence,
+)
 IST = pytz.timezone("Asia/Kolkata")
 now_ist = datetime.now(IST)
 TODAY_NAIVE = pd.Timestamp(now_ist.date())
@@ -66,139 +82,11 @@ HISTORY_PATH = "data/history.csv"
 AMFI_CACHE_PATH = "data/amfi_nav_cache.json"
 
 # -------------------------------------------------
-# THEME
+# THEME — one shared design system (lib.theme + lib.ui). R-1701.
 # Collapse Streamlit header so title isn't eaten on mobile Chrome/iOS.
-# Extra top padding + safe-area for iPhone. Prefer toolbarMode="minimal"
-# in .streamlit/config.toml as well.
+# No page-local <style> blocks.
 # -------------------------------------------------
-st.markdown("""
-<style>
-    .stApp { background: #0a0e17; color: #e5e9f0; }
-    header[data-testid="stHeader"] {
-        background: transparent !important;
-        height: 0 !important;
-        min-height: 0 !important;
-        border: none !important;
-        padding: 0 !important;
-    }
-    div[data-testid="stDecoration"] { display: none !important; }
-    div[data-testid="stToolbar"] { display: none !important; }
-    #MainMenu { visibility: hidden; }
-    footer { visibility: hidden; }
-    section[data-testid="stSidebar"] { background-color: #0f1420 !important; border-right: 1px solid #1c2333; }
-    .main-title {
-        font-size: 1.7rem; font-weight: 700; color: #f8fafc; letter-spacing: -0.03em;
-        margin: 0 0 0.05rem 0; padding-top: 0.35rem; position: relative; z-index: 2;
-    }
-    .sub-title { color: #6b7688; font-size: 0.82rem; margin-bottom: 0.8rem; font-weight: 400; }
-    .section-header {
-        font-size: 0.75rem; font-weight: 700; color: #8b95a8; margin: 1.2rem 0 0.55rem 0;
-        text-transform: uppercase; letter-spacing: 0.08em; display: flex; align-items: center; gap: 8px;
-    }
-    .section-header::after { content: ""; flex: 1; height: 1px; background: #1c2333; }
-    div[data-testid="stMetric"] {
-        background: linear-gradient(155deg, #12182a 0%, #0e1420 100%);
-        border: 1px solid #1c2333; border-radius: 12px; padding: 12px 15px 10px 15px;
-    }
-    div[data-testid="stMetric"]:hover { border-color: #2a3552; }
-    div[data-testid="stMetricValue"] { font-size: 1.3rem !important; font-weight: 700 !important; color: #f8fafc !important; }
-    div[data-testid="stMetricLabel"] { color: #6b7688 !important; font-size: 0.67rem !important; font-weight: 600 !important; text-transform: uppercase; letter-spacing: 0.05em; }
-    div[data-testid="stMetricDelta"] { font-size: 0.75rem !important; }
-    .stTabs [data-baseweb="tab-list"] { background-color: #0f1420; gap: 3px; border-radius: 9px; padding: 3px; border: 1px solid #1c2333; }
-    .stTabs [data-baseweb="tab"] { color: #6b7688 !important; border-radius: 6px; padding: 6px 16px; font-weight: 500; }
-    .stTabs [aria-selected="true"] { background: linear-gradient(135deg, #1e2942, #17203a) !important; color: #f8fafc !important; font-weight: 600; }
-    .stDataFrame { border: 1px solid #1c2333; border-radius: 9px; overflow: hidden; }
-    p, span, label, .stMarkdown { color: #c2c9d6 !important; }
-    .flag-card { border-radius: 10px; padding: 10px 14px; margin-bottom: 7px; display: flex; gap: 11px; align-items: flex-start; border: 1px solid; }
-    .flag-critical { background: rgba(239,68,68,0.08); border-color: rgba(239,68,68,0.28); }
-    .flag-warning  { background: rgba(245,158,11,0.08); border-color: rgba(245,158,11,0.28); }
-    .flag-info     { background: rgba(59,130,246,0.08); border-color: rgba(59,130,246,0.28); }
-    .flag-title { font-weight: 600; font-size: 0.85rem; color: #f1f5f9; margin: 0; }
-    .flag-body  { font-size: 0.78rem; color: #9aa4b8; margin: 1px 0 0 0; }
-    .news-item { padding: 8px 0; border-bottom: 1px solid #1c2333; }
-    .news-item a { color: #d7dce6 !important; text-decoration: none; font-size: 0.84rem; font-weight: 500; }
-    .news-item a:hover { color: #7fa8f5 !important; }
-    .news-meta { font-size: 0.71rem; color: #5b6478; margin-top: 1px; }
-    .block-container {
-        padding-top: 1.4rem !important;
-        padding-bottom: 2rem;
-        max-width: 1400px;
-    }
-    @supports (padding: env(safe-area-inset-top)) {
-        .block-container { padding-top: calc(1.4rem + env(safe-area-inset-top)) !important; }
-    }
-    @media (max-width: 768px) {
-        .block-container { padding-top: 1.8rem !important; padding-left: 0.9rem !important; padding-right: 0.9rem !important; }
-        .main-title { font-size: 1.45rem; padding-top: 0.5rem; }
-        .sub-title { font-size: 0.75rem; }
-        div[data-testid="stMetricValue"] { font-size: 1.15rem !important; }
-    }
-    .caveat { font-size: 0.72rem; color: #5b6478; font-style: italic; }
-    .recon-pass { color: #22c55e; font-weight: 600; }
-    .recon-fail { color: #ef4444; font-weight: 600; }
-    /* compact attention grid */
-    .flag-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 4px; }
-    @media (max-width: 900px) { .flag-grid { grid-template-columns: 1fr; } }
-    .flag-card { border-radius: 8px; padding: 7px 10px; margin-bottom: 0; display: flex; gap: 8px; align-items: flex-start; border: 1px solid; }
-    .flag-title { font-weight: 600; font-size: 0.78rem; color: #f1f5f9; margin: 0; line-height: 1.25; }
-    .flag-body  { font-size: 0.70rem; color: #9aa4b8; margin: 1px 0 0 0; line-height: 1.3; }
-    /* market pulse ticker — TradingView-style dark */
-    .ticker-wrap { width:100%; overflow:hidden; background:#0b0f18; border:1px solid #1c2333;
-                    border-radius:10px; padding:10px 0; white-space:nowrap; margin: 8px 0 4px 0; }
-    .ticker-move { display:inline-block; animation: ticker-scroll 50s linear infinite; }
-    .ticker-wrap:hover .ticker-move { animation-play-state: paused; }
-    @keyframes ticker-scroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
-    .ticker-item { display:inline-flex; align-items:baseline; gap:6px; padding:0 26px;
-                   font-size:0.82rem; font-weight:600; color:#e5e9f0; }
-    .ticker-name { color:#8b95a8; font-weight:600; letter-spacing:0.02em; }
-    .ticker-val { color:#f8fafc; font-variant-numeric: tabular-nums; }
-    .ticker-chg { font-weight:700; font-variant-numeric: tabular-nums; }
-    .ticker-up .ticker-chg { color:#22c55e; }
-    .ticker-down .ticker-chg { color:#ef4444; }
-    .ticker-arrow { font-size:0.95rem; font-weight:800; }
-    .ticker-up .ticker-arrow { color:#22c55e; }
-    .ticker-down .ticker-arrow { color:#ef4444; }
-    .ticker-na { color:#5b6478; }
-    .crit-banner { background:#3b1219; border:1px solid #7f1d1d; color:#fecaca;
-                   border-radius:10px; padding:10px 14px; margin: 8px 0 4px 0; font-size:0.82rem; }
-    /* Phase A — command center */
-    .pulse-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin:8px 0 4px 0; }
-    @media (max-width:1100px){ .pulse-grid{ grid-template-columns:repeat(2,minmax(0,1fr));} }
-    .pulse-card { background:linear-gradient(155deg,#12182a 0%,#0e1420 100%); border:1px solid #1c2333;
-                  border-radius:10px; padding:12px 14px; min-height:78px; overflow:hidden; }
-    .pulse-card:hover { border-color:#2a3552; }
-    .pulse-label { font-size:0.65rem; font-weight:700; color:#6b7688; text-transform:uppercase; letter-spacing:0.06em; }
-    .pulse-val { font-size:1.05rem; font-weight:700; color:#f8fafc; margin-top:2px; font-variant-numeric:tabular-nums; }
-    .pulse-chg-up { color:#22c55e; font-size:0.78rem; font-weight:700; }
-    .pulse-chg-dn { color:#ef4444; font-size:0.78rem; font-weight:700; }
-    .pulse-chg-na { color:#5b6478; font-size:0.78rem; }
-    .attn-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin:6px 0 8px 0; }
-    @media (max-width:1100px){ .attn-grid{ grid-template-columns:repeat(2,1fr);} }
-    .attn-tile { border-radius:10px; padding:10px 12px; border:1px solid; min-height:88px; }
-    .attn-tag { display:inline-block; font-size:0.60rem; font-weight:800; letter-spacing:0.06em;
-                padding:2px 7px; border-radius:4px; margin-bottom:6px; }
-    .tag-urgent { background:#7f1d1d; color:#fecaca; }
-    .tag-review { background:#78350f; color:#fde68a; }
-    .tag-upcoming { background:#1e3a5f; color:#93c5fd; }
-    .attn-title { font-size:0.82rem; font-weight:700; color:#f1f5f9; margin:0 0 3px 0; line-height:1.25; }
-    .attn-body { font-size:0.70rem; color:#9aa4b8; margin:0; line-height:1.3; }
-    .why-box { background:#0f1420; border:1px solid #1c2333; border-radius:10px; padding:10px 14px; margin-top:8px; }
-    .why-box li { color:#9aa4b8; font-size:0.78rem; margin:3px 0; }
-    .status-row { display:flex; flex-wrap:wrap; gap:10px; margin:6px 0 4px 0; }
-    .status-pill { font-size:0.72rem; color:#9aa4b8; background:#0f1420; border:1px solid #1c2333;
-                   border-radius:999px; padding:4px 10px; }
-    .status-dot { display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:5px; }
-    .dot-live { background:#22c55e; }
-    .dot-cache { background:#eab308; }
-    .dot-off { background:#ef4444; }
-    .alloc-legend { list-style:none; margin:8px 0 0 0; padding:0; }
-    .alloc-legend li { display:flex; justify-content:space-between; gap:12px; font-size:0.78rem;
-                       color:#9aa4b8; padding:4px 0; border-bottom:1px solid #141a28; }
-    .alloc-legend .nm { color:#e5e9f0; font-weight:600; }
-    .alloc-legend .amt { font-variant-numeric:tabular-nums; color:#c2c9d6; }
-    .snap-note { font-size:0.72rem; color:#6b7688; margin-top:4px; }
-</style>
-""", unsafe_allow_html=True)
+theme.inject_css()
 
 def to_naive_ts(x):
     if x is None or (isinstance(x, float) and pd.isna(x)):
@@ -1363,8 +1251,11 @@ with st.sidebar:
 # ==================================================
 # HEADER — command center
 # ==================================================
-st.markdown('<div class="main-title">Family Net Worth</div>', unsafe_allow_html=True)
-st.markdown(f'<div class="sub-title">Portfolio Command Center · Last updated {now_ist.strftime("%d %b %Y, %H:%M IST")}</div>', unsafe_allow_html=True)
+st.markdown(ui_page_header(
+    "Portfolio intelligence terminal",
+    "Command Center",
+    f"Last updated {now_ist.strftime('%d %b %Y, %H:%M IST')} · all amounts in INR unless noted",
+), unsafe_allow_html=True)
 
 # Data status pills
 amfi_dot = "dot-off" if len(amfi_navs) == 0 else ("dot-cache" if amfi_cache_date else "dot-live")
@@ -1372,25 +1263,32 @@ amfi_lbl = "AMFI offline" if len(amfi_navs) == 0 else ("AMFI cache" if amfi_cach
 stocks_ok = (not stocks.empty and stocks["Current Price"].notna().any()) if not stocks.empty else False
 gold_ok = (not gold.empty and gold["Current Price"].notna().any()) if not gold.empty else False
 fx_ok = usd_inr is not None
-status_html = (
-    f'<div class="status-row">'
-    f'<span class="status-pill"><span class="status-dot {amfi_dot}"></span>{amfi_lbl} ({len(amfi_navs)})</span>'
-    f'<span class="status-pill"><span class="status-dot {"dot-live" if stocks_ok else "dot-off"}"></span>Stocks {"live" if stocks_ok else "n/a"}</span>'
-    f'<span class="status-pill"><span class="status-dot {"dot-live" if gold_ok else "dot-off"}"></span>Gold {"live" if gold_ok else "n/a"}</span>'
-    f'<span class="status-pill"><span class="status-dot {"dot-live" if fx_ok else "dot-off"}"></span>FX {"live" if fx_ok else "n/a"}</span>'
-    f'<span class="status-pill"><span class="status-dot dot-live"></span>Market pulse</span>'
-    f'</div>'
+st.markdown(
+    '<div class="t-meta-row">'
+    + ui_pill(f"{amfi_lbl} · {len(amfi_navs)} schemes",
+              "off" if len(amfi_navs) == 0 else ("cache" if amfi_cache_date else "ok"))
+    + ui_pill(f"Stocks {'live' if stocks_ok else 'n/a'}", "ok" if stocks_ok else "off")
+    + ui_pill(f"Gold {'live' if gold_ok else 'n/a'}", "ok" if gold_ok else "off")
+    + ui_pill(f"USD/INR {'live' if fx_ok else 'n/a'}", "ok" if fx_ok else "off")
+    + ui_pill("Market pulse", "info")
+    + '</div>',
+    unsafe_allow_html=True,
 )
-st.markdown(status_html, unsafe_allow_html=True)
 
 if len(amfi_navs) == 0:
-    st.error("AMFI data failed to load this run and no disk cache found — mutual fund values below are excluded.")
+    st.markdown(ui_banner(
+        "<b>AMFI data failed to load</b> this run and no disk cache found — "
+        "mutual fund values below are excluded.", "critical"), unsafe_allow_html=True)
 elif amfi_cache_date:
-    st.warning(f"AMFI live fetch failed — using disk cache from {amfi_cache_date} · {len(amfi_navs)} NAVs")
+    st.markdown(ui_banner(
+        f"<b>AMFI live fetch failed</b> — using disk cache from {amfi_cache_date} · "
+        f"{len(amfi_navs)} NAVs.", "warn"), unsafe_allow_html=True)
 elif mf_failed > 0:
-    st.warning(f"{mf_failed} fund(s) missing a live NAV · {len(amfi_navs)} AMFI NAVs OK")
+    st.markdown(ui_banner(
+        f"{mf_failed} fund(s) missing a live NAV · {len(amfi_navs)} AMFI NAVs OK.",
+        "warn"), unsafe_allow_html=True)
 
-# Headline metrics — compact Cr form + optional vs prior history day
+# Optional vs prior history day (used by the hero cards below)
 _prev_nw = _prev_eq = None
 if history_df is not None and not history_df.empty and "net_worth" in history_df.columns:
     try:
@@ -1406,137 +1304,95 @@ _nw_delta = None
 if _prev_nw and _prev_nw > 0:
     _nw_delta = f"{(total_networth - _prev_nw) / _prev_nw * 100:+.2f}% vs prior snapshot"
 
-k1, k2, k3, k4, k5, k6 = st.columns(6)
-k1.metric("Total Assets (INR)", format_inr_compact(total_networth), _nw_delta)
-k2.metric("Invested Capital", format_inr_compact(total_invested), "Total amount invested")
-k3.metric("Total P&L", format_inr_compact(total_pnl), f"{(total_pnl/total_invested*100):.1f}% overall" if total_invested else None)
-k4.metric("Equity (ex-liquid)", f"{equity_pct:.1f}%", "NRI view · stocks + non-liquid MF")
-k5.metric("FCNR (USD)", f"{fcnr_pct:.1f}%", f"INR FD {inr_fd_pct:.1f}% · Liquid {liquid_mf_pct:.1f}%")
-k6.metric("Health Score", f"{health_score:.0f} / 100", health_label)
-
-# ==================================================
-# PHASE 1A — Net Worth semantics: Total Assets − Liabilities (session-only)
-# The source workbook has no liabilities sheet. This input is a session-only estimate;
-# with zero liabilities Net Worth equals Total Assets exactly.
-# ==================================================
+# Net-worth semantics: Total Assets − Liabilities (session-only liabilities input).
 _liab_value = float(st.session_state.get("cc_liabilities", 0.0) or 0.0)
 _ledger = compute_net_worth(total_networth, _liab_value)
-st.number_input(
-    "Liabilities (session-only, ₹)",
-    min_value=0.0,
-    value=_liab_value,
-    step=100000.0,
-    key="cc_liabilities",
-    help="No liabilities data exists in the source workbook — this is a session-only estimate. Net Worth = Total Assets − Liabilities.",
+
+# HERO — executive snapshot: one dominant net-worth number + supporting metrics
+st.markdown(ui_hero(
+    {"label": "Net Worth", "value": format_inr_compact(_ledger["net_worth"]),
+     "tone": "accent",
+     "delta": _nw_delta or "current value this run",
+     "sub": ("Total Assets − Liabilities" if _ledger["has_liabilities"]
+             else "= Total Assets (no liabilities recorded)")},
+    [
+        {"label": "Total Assets (INR)", "value": format_inr_compact(total_networth),
+         "sub": "MF + stocks + gold + FD"},
+        {"label": "Invested Basis", "value": format_inr_compact(total_invested),
+         "sub": "book cost at purchase / deposit FX"},
+        {"label": "Total P&L", "value": format_inr_compact(total_pnl),
+         "tone": "up" if total_pnl >= 0 else "down",
+         "sub": f"{total_pnl / total_invested * 100:.1f}% overall" if total_invested else "—"},
+        {"label": "Equity (ex-liquid)", "value": f"{equity_pct:.1f}%",
+         "tone": "warn" if equity_pct < 35 else "neutral",
+         "sub": "NRI view · stocks + non-liquid MF"},
+        {"label": "Health Score", "value": f"{health_score:.0f} / 100",
+         "tone": "warn" if health_score < 55 else ("neutral" if health_score < 75 else "up"),
+         "sub": health_label},
+    ],
+    foot=("Net Worth = Total Assets − Liabilities. No liabilities sheet exists in the "
+          "source workbook — the field below is a session-only estimate."),
+), unsafe_allow_html=True)
+
+_LIAB_HELP = ("No liabilities data exists in the source workbook — this is a "
+              "session-only estimate. Net Worth = Total Assets − Liabilities.")
+_lcols = st.columns([2, 6])
+with _lcols[0]:
+    st.number_input(
+        "Liabilities (session-only, ₹)",
+        min_value=0.0,
+        value=_liab_value,
+        step=100000.0,
+        key="cc_liabilities",
+        help=_LIAB_HELP,
+    )
+with _lcols[1]:
+    if _ledger["has_liabilities"]:
+        st.markdown(
+            ui_caption(f"Net Worth = Total Assets {format_inr_compact(_ledger['total_assets'])} "
+                       f"− Liabilities {format_inr_compact(_ledger['total_liabilities'])}. "
+                       "Liabilities are an estimator, never a book."),
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            ui_caption("Net Worth = Total Assets (no liabilities recorded) — the workbook "
+                       "has no liabilities sheet, so this input is an estimate."),
+            unsafe_allow_html=True,
+        )
+
+# ==================================================
+# PORTFOLIO POSTURE — allocation readout
+# ==================================================
+st.markdown(ui_section("Portfolio posture"), unsafe_allow_html=True)
+st.markdown(ui_alloc_bar([
+    {"label": "Equity (stocks + non-liquid MF)", "value": total_equity, "color": "#f59e0b"},
+    {"label": "Liquid MF", "value": total_liquid_mf, "color": "#22c55e"},
+    {"label": "INR FD", "value": total_inr_fd, "color": "#3b82f6"},
+    {"label": "FCNR (USD)", "value": total_fcnr, "color": "#06b6d4"},
+    {"label": "Gold", "value": total_gold, "color": "#eab308"},
+], total=total_networth), unsafe_allow_html=True)
+_posture_bits = []
+if equity_pct < 25:
+    _posture_bits.append(f"equity-light posture ({equity_pct:.1f}%)")
+elif equity_pct < 40:
+    _posture_bits.append(f"moderate equity posture ({equity_pct:.1f}%)")
+else:
+    _posture_bits.append(f"equity-oriented posture ({equity_pct:.1f}%)")
+if fcnr_pct > 0:
+    _posture_bits.append(f"USD book {fcnr_pct:.1f}% of assets")
+if gold_pct > 0:
+    _posture_bits.append(f"gold diversifier {gold_pct:.1f}%")
+_posture_bits.append(f"health {health_score:.0f}/100 ({health_label.lower()})")
+st.markdown(
+    f'<div class="t-caption">{" · ".join(_posture_bits)} — a descriptive readout, not advice.</div>',
+    unsafe_allow_html=True,
 )
-if _ledger["has_liabilities"]:
-    st.metric(
-        "Net Worth (INR)",
-        format_inr_compact(_ledger["net_worth"]),
-        f"Total Assets {format_inr_compact(_ledger['total_assets'])} − Liabilities {format_inr_compact(_ledger['total_liabilities'])}",
-    )
-else:
-    st.caption("Net Worth = Total Assets (no liabilities recorded)")
 
 # ==================================================
-# MARKET PULSE — card grid (Phase A)
+# WHAT CHANGED — P&L drivers (valuation attribution only)
 # ==================================================
-st.markdown('<div class="section-header">Market pulse</div>', unsafe_allow_html=True)
-pulse_rows = build_market_pulse_rows()
-pulse_cards = []
-for row in pulse_rows:
-    if row["Value"] is None:
-        chg_html = '<div class="pulse-chg-na">—</div>'
-        val = "—"
-    else:
-        val = row["fmt"].format(row["Value"])
-        chg = row["Chg %"]
-        if chg is None:
-            chg_html = '<div class="pulse-chg-na">—</div>'
-        elif chg >= 0:
-            chg_html = f'<div class="pulse-chg-up">▲ {chg:+.2f}%</div>'
-        else:
-            chg_html = f'<div class="pulse-chg-dn">▼ {chg:+.2f}%</div>'
-    ath = row.get("ATH %")
-    if ath is not None:
-        ath_html = f'<div class="pulse-chg-na" style="font-size:0.68rem">{ath:.1f}% from ATH</div>'
-    else:
-        ath_html = ""
-    pulse_cards.append(
-        f'<div class="pulse-card"><div class="pulse-label">{row["Market"]}</div>'
-        f'<div class="pulse-val">{val}</div>{chg_html}{ath_html}</div>'
-    )
-st.markdown(f'<div class="pulse-grid">{"".join(pulse_cards)}</div>', unsafe_allow_html=True)
-st.caption("Free delayed sources · Gold ₹/10g & Silver ₹/kg (INR) · day change vs prior close · ATH from Yahoo daily history")
-
-# ==================================================
-# CRITICAL integrity
-# ==================================================
-crit = [m for sev, m in integrity_issues if sev == "CRITICAL"]
-if crit:
-    bullets = "".join(f"<div>• {c}</div>" for c in crit[:6])
-    st.markdown(f'<div class="crit-banner"><b>Critical data issues</b>{bullets}</div>', unsafe_allow_html=True)
-
-# ==================================================
-# WHAT NEEDS MY ATTENTION — tagged tiles
-# ==================================================
-st.markdown(f'<div class="section-header">What needs my attention · {len(flags)} item(s)</div>', unsafe_allow_html=True)
-if not flags:
-    st.info("Nothing flagged right now.")
-else:
-    tiles = []
-    for level, title, body in flags[:8]:
-        if level == "critical":
-            tag, tag_cls, border = "URGENT", "tag-urgent", "#7f1d1d"
-        elif level == "warning":
-            tag, tag_cls, border = "REVIEW", "tag-review", "#78350f"
-        else:
-            tag, tag_cls, border = "UPCOMING", "tag-upcoming", "#1e3a5f"
-        tiles.append(
-            f'<div class="attn-tile" style="border-color:{border};background:#0f1420">'
-            f'<span class="attn-tag {tag_cls}">{tag}</span>'
-            f'<p class="attn-title">{title}</p>'
-            f'<p class="attn-body">{body}</p></div>'
-        )
-    st.markdown(f'<div class="attn-grid">{"".join(tiles)}</div>', unsafe_allow_html=True)
-
-# ==================================================
-# DATA INTEGRITY (Phase 3) — visible, not buried
-# ==================================================
-if integrity_issues:
-    sev_order = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3}
-    integrity_issues.sort(key=lambda x: sev_order.get(x[0], 9))
-    with st.expander(f"Data integrity check — {len(integrity_issues)} issue(s) found"):
-        for sev, msg in integrity_issues:
-            st.markdown(f"**{sev}** — {msg}")
-
-# ==================================================
-# RECONCILIATION (Phase 4)
-# ==================================================
-st.markdown('<div class="section-header">Reconciliation</div>', unsafe_allow_html=True)
-for name, passed, detail in recon_tests:
-    cls = "recon-pass" if passed else "recon-fail"
-    mark = "✓ PASS" if passed else "✗ FAIL"
-    st.markdown(f'<span class="{cls}">{mark}</span> — {name} ({detail})', unsafe_allow_html=True)
-
-# PHASE 1A — additive asset-register view by canonical class.
-# Display-only; totals mirror the reconciliation entries above. No re-valuation here.
-if register_classes is not None and not register_classes.empty:
-    with st.expander("Asset register · by canonical class (Phase 1A)"):
-        _class_view = register_classes.copy()
-        _class_view["Current (INR)"] = _class_view.apply(
-            lambda r: "" if not r["Data Backed"] else r["Current Value"], axis=1
-        )
-        _class_view["Invested (INR)"] = _class_view.apply(
-            lambda r: "" if not r["Data Backed"] else r["Invested"], axis=1
-        )
-        st.dataframe(
-            _class_view[["Asset Class", "Current (INR)", "Invested (INR)", "Data Backed"]],
-            hide_index=True, use_container_width=True,
-        )
-        st.caption("No-data classes (Retirement / Real Estate / Savings/Cash / Liabilities) have no workbook source and are never summed.")
-
-# PHASE 1B — P&L drivers (valuation attribution only; no cash-flow interpretation).
+st.markdown(ui_section("What changed · current P&L drivers"), unsafe_allow_html=True)
 if cc_drivers is not None:
     _drv_rows = []
     _fcnr_drivers = {"fcnr_interest", "fcnr_fx_principal"}
@@ -1563,178 +1419,102 @@ if cc_drivers is not None:
             "Amount (INR)": round(cc_drivers["residual"], 2),
             "% of P&L": None,
         })
-    with st.expander("P&L drivers \u00b7 Phase 1B"):
-        st.dataframe(pd.DataFrame(_drv_rows), hide_index=True, use_container_width=True)
-        _dnote = (
-            f"Attributed {format_inr(cc_drivers['attributed'])} of "
-            f"Total P&L {format_inr(cc_drivers['total_pnl'])}. "
-        )
-        if cc_drivers["missing_fx"]:
-            _dnote += "USD/INR unavailable this run \u2014 FCNR interest/FX slices are n/a (never guessed). "
-        if not cc_drivers["residual_ok"]:
-            _dnote += "Residual exceeds the documented rounding bound \u2014 review source data. "
-        _dnote += "Valuation attribution only, not cash-flow events."
-        st.markdown(
-            f'<p class="caveat">{_dnote} {NOT_A_CASHFLOW_LABEL}</p>',
-            unsafe_allow_html=True,
-        )
-
-# ==================================================
-# HEALTH BREAKDOWN + ALLOCATION
-# ==================================================
-c1, c2 = st.columns(2)
-with c1:
-    st.markdown('<div class="section-header">Portfolio health breakdown</div>', unsafe_allow_html=True)
-    bd = pd.DataFrame({"Factor": list(factor_scores.keys()), "Score": list(factor_scores.values())})
-    fig_h = go.Figure(go.Bar(x=bd["Score"], y=bd["Factor"], orientation="h",
-        marker_color=["#ef4444" if s < 55 else ("#f59e0b" if s < 75 else "#22c55e") for s in bd["Score"]],
-        text=[f"{s:.0f}" for s in bd["Score"]], textposition="outside"))
-    fig_h.update_layout(height=210, margin=dict(t=5, b=5, l=5, r=25), xaxis=dict(range=[0, 105], showgrid=False),
-                         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font_color="#c2c9d6")
-    st.plotly_chart(fig_h, use_container_width=True, key="chart_health")
-
-    _why = []
-    if factor_scores.get("Liquidity", 100) < 50:
-        _why.append(
-            f"Deployable liquidity is {true_liquid_pct:.1f}% of NW "
-            f"(liquid MF + deposits maturing ≤90d). Long FCNR is not treated as cash."
-        )
-    if factor_scores.get("Allocation", 100) < 40:
-        _gap40 = max(0, 0.40 * total_networth - total_equity)
-        _why.append(
-            f"Equity (ex-liquid) is {equity_pct:.1f}% of NW — NRI books often run lower by design; "
-            f"~{format_inr(_gap40)} more equity would reach 40%."
-        )
-    if factor_scores.get("Concentration", 100) < 60:
-        _why.append("Top holdings concentration is elevated.")
-    if factor_scores.get("Performance", 100) < 55:
-        _why.append("Trailing fund performance vs Nifty50 is mixed.")
-    if fcnr_pct > 0:
-        _why.append(
-            f"FCNR is {fcnr_pct:.1f}% of NW — USD principal + interest + INR FX vs deposit-date rate "
-            f"(not the same as resident INR FD)."
-        )
-    if inr_fd_pct > 0:
-        _why.append(f"INR FDs are {inr_fd_pct:.1f}% of NW (domestic fixed income).")
-    if gold_pct > 0:
-        _why.append(f"Gold is {gold_pct:.1f}% of NW (SGB + ETFs + FoFs) — diversifier, not equity.")
-    if not _why:
-        _why.append("No single factor is dragging hard — score is moderate overall.")
-    _why_html = "".join(f"<li>{x}</li>" for x in _why)
+    st.dataframe(pd.DataFrame(_drv_rows), hide_index=True, use_container_width=True)
+    _dnote = (
+        f"Attributed {format_inr(cc_drivers['attributed'])} of "
+        f"Total P&L {format_inr(cc_drivers['total_pnl'])}. "
+    )
+    if cc_drivers["missing_fx"]:
+        _dnote += "USD/INR unavailable this run \u2014 FCNR interest/FX slices are n/a (never guessed). "
+    if not cc_drivers["residual_ok"]:
+        _dnote += "Residual exceeds the documented rounding bound \u2014 review source data. "
+    _dnote += "Valuation attribution only, not cash-flow events."
     st.markdown(
-        f'<div class="why-box"><b style="color:#e5e9f0;font-size:0.82rem">Why score is {health_score:.0f}? (NRI view)</b>'
-        f'<ul style="margin:6px 0 0 0;padding-left:18px">{_why_html}</ul></div>',
+        f'<div class="t-caption">{_dnote} {NOT_A_CASHFLOW_LABEL}</div>',
         unsafe_allow_html=True,
     )
-
-with c2:
-    st.markdown('<div class="section-header">Asset allocation · NRI books</div>', unsafe_allow_html=True)
-    alloc_df = pd.DataFrame({
-        "Asset": ["Equity (stocks + non-liquid MF)", "Liquid MF", "INR FD", "FCNR (USD)", "Gold"],
-        "Value": [total_equity, total_liquid_mf, total_inr_fd, total_fcnr, total_gold],
-    })
-    alloc_df = alloc_df[alloc_df["Value"] > 0].reset_index(drop=True)
-    colors = ["#f59e0b", "#22c55e", "#3b82f6", "#06b6d4", "#eab308"]
-    fig = px.pie(alloc_df, values="Value", names="Asset", hole=0.62, color_discrete_sequence=colors)
-    fig.update_traces(textposition="inside", textinfo="percent", textfont_size=12)
-    fig.update_layout(margin=dict(t=5, b=5, l=5, r=5), height=200, showlegend=False,
-                       paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font_color="#c2c9d6",
-                       annotations=[dict(text=f"{format_inr_compact(total_networth)}<br>Net Worth",
-                                         x=0.5, y=0.5, font_size=13, showarrow=False, font_color="#e5e9f0")])
-    st.plotly_chart(fig, use_container_width=True, key="chart_alloc")
-    # Legend with amounts (mockup-style)
-    legend_items = ""
-    for asset, val, col in zip(alloc_df["Asset"], alloc_df["Value"], colors):
-        pct = (val / total_networth * 100) if total_networth else 0
-        legend_items += (
-            f'<li><span class="nm"><span style="color:{col}">●</span> {asset}</span>'
-            f'<span class="amt">{pct:.1f}% · {format_inr(val)}</span></li>'
-        )
-    st.markdown(f'<ul class="alloc-legend">{legend_items}</ul>', unsafe_allow_html=True)
+else:
+    st.markdown(ui_empty(
+        "P&L drivers unavailable",
+        "The register did not build this run — see data integrity below.",
+    ), unsafe_allow_html=True)
 
 # ==================================================
-# FX RETURN ATTRIBUTION — new, addresses the FCNR audit directly
+# FCNR RETURN ATTRIBUTION — interest + FX split (what changed · USD book)
 # ==================================================
 if not fd_valid.empty and (fd_valid["Currency"] == "USD").any():
-    st.markdown('<div class="section-header">FCNR return attribution (interest + FX)</div>', unsafe_allow_html=True)
+    st.markdown(ui_section("FCNR return · USD FD attribution (interest + FX)"),
+                unsafe_allow_html=True)
     st.caption(
         "NRI FCNR-style USD deposits: INR return = interest accrued on principal + FX from USD/INR move "
         "since each deposit's own date (cost basis at deposit-date FX, mark-to-market at today's FX)."
     )
     usd_fd = fd_valid[fd_valid["Currency"] == "USD"]
-    fi1, fi2, fi3 = st.columns(3)
-    fi1.metric("FCNR interest (INR)", format_inr(usd_fd["Interest Return (INR)"].sum()))
-    fi2.metric("FCNR FX gain/(loss) (INR)", format_inr(total_fx_gain))
-    fi3.metric("Total FCNR return (INR)", format_inr(usd_fd["Interest Return (INR)"].sum() + total_fx_gain))
+    st.markdown(ui_kpi_cards([
+        {"label": "FCNR interest (INR)", "value": format_inr(usd_fd["Interest Return (INR)"].sum()),
+         "tone": "up", "sub": "interest accrued at current FX"},
+        {"label": "FCNR FX gain/(loss) (INR)", "value": format_inr(total_fx_gain),
+         "tone": "up" if total_fx_gain >= 0 else "down", "sub": "FX on principal vs deposit date"},
+        {"label": "Total FCNR return (INR)", "value": format_inr(usd_fd["Interest Return (INR)"].sum() + total_fx_gain),
+         "tone": "accent", "sub": "interest + FX"},
+    ]), unsafe_allow_html=True)
 
 # ==================================================
-# HISTORY
+# WHAT NEEDS MY ATTENTION — tagged tiles
 # ==================================================
-st.markdown('<div class="section-header">History</div>', unsafe_allow_html=True)
-if len(history_df) < 2:
-    st.caption("Building history — open this app on a few different days to see trends.")
-    if not history_df.empty:
-        st.dataframe(history_df.round(2), hide_index=True, use_container_width=True)
+st.markdown(ui_section("What needs my attention"), unsafe_allow_html=True)
+if not flags:
+    st.markdown(ui_empty("Nothing flagged right now.", "No warning or review items on this run."),
+                unsafe_allow_html=True)
 else:
-    fig_hist = make_subplots(rows=1, cols=3, subplot_titles=("Net worth", "Equity % vs FD %", "Health score"))
-    fig_hist.add_trace(go.Scatter(x=history_df["date"], y=history_df["net_worth"], line=dict(color="#3b82f6", width=2), showlegend=False), row=1, col=1)
-    fig_hist.add_trace(go.Scatter(x=history_df["date"], y=history_df["equity_pct"], name="Equity %", line=dict(color="#22c55e", width=2)), row=1, col=2)
-    fig_hist.add_trace(go.Scatter(x=history_df["date"], y=history_df["fd_pct"], name="FD %", line=dict(color="#3b82f6", width=2)), row=1, col=2)
-    fig_hist.add_trace(go.Scatter(x=history_df["date"], y=history_df["health_score"], line=dict(color="#f59e0b", width=2), showlegend=False), row=1, col=3)
-    fig_hist.update_layout(height=250, margin=dict(t=30, b=5, l=5, r=5), paper_bgcolor="rgba(0,0,0,0)",
-                            plot_bgcolor="rgba(0,0,0,0)", font_color="#c2c9d6", legend=dict(orientation="h", y=-0.15))
-    st.plotly_chart(fig_hist, use_container_width=True, key="chart_hist")
-    st.dataframe(history_df.round(2), hide_index=True, use_container_width=True)
-    st.download_button("Download history.csv (full precision)", history_df.to_csv(index=False), "networth_history.csv", "text/csv")
+    _tiles = []
+    for level, title, body in flags[:8]:
+        _tiles.append({"level": level, "title": title, "body": body})
+    st.markdown(ui_watch(_tiles), unsafe_allow_html=True)
 
-# PHASE 1B — delta decomposition between the two most recent snapshots.
-# Shows per-class Invested-Basis Change vs Market/Valuation Change. A legacy
-# (pre-Phase 1B) prior snapshot cannot be decomposed and is flagged.
-st.markdown('<div class="section-header">Snapshot delta \u00b7 change since prior snapshot</div>', unsafe_allow_html=True)
-if len(history_df) >= 2:
-    _hist_sorted = history_df.sort_values("date").reset_index(drop=True)
-    _delta = snapshot_delta(_hist_sorted.iloc[-2], _hist_sorted.iloc[-1])
-    if _delta["available"]:
-        _delta_rows = []
-        for _cls in ASSET_CLASSES:
-            _d = _delta["by_class"].get(_cls)
-            if _d is None:
-                _delta_rows.append({"Asset Class": _cls, "\u0394 Current Value": None,
-                                    "Invested-Basis Change (not cash flow)": None, "Market/Valuation Change": None})
-            else:
-                _delta_rows.append({"Asset Class": _cls,
-                                    "\u0394 Current Value": round(_d["delta_current"], 2),
-                                    "Invested-Basis Change (not cash flow)": round(_d["invested_basis_change"], 2),
-                                    "Market/Valuation Change": round(_d["market_valuation_change"], 2)})
-        _dt = _delta["totals"]
-        _delta_rows.append({"Asset Class": "TOTAL",
-                            "\u0394 Current Value": round(_dt["delta_current"], 2),
-                            "Invested-Basis Change (not cash flow)": round(_dt["invested_basis_change"], 2),
-                            "Market/Valuation Change": round(_dt["market_valuation_change"], 2)})
-        st.dataframe(pd.DataFrame(_delta_rows), hide_index=True, use_container_width=True)
-        _dcap = [NOT_A_CASHFLOW_LABEL]
-        if _delta["unattributed_abs"] > 1e-6:
-            _dcap.append(f"Unattributed / unavailable: \u20B9{_delta['unattributed_abs']:.2f}")
-        if _delta["fcnr"] is not None:
-            _dcap.append(
-                f"FCNR \u0394 interest {format_inr(_delta['fcnr']['delta_interest'])} \u00b7 "
-                f"\u0394 FX on principal {format_inr(_delta['fcnr']['delta_fx'])}"
-            )
-        st.caption(" \u00b7 ".join(_dcap))
+# Critical integrity banner (also surfaced as a flag tile above)
+crit = [m for sev, m in integrity_issues if sev == "CRITICAL"]
+if crit:
+    bullets = "".join(f"<div>• {c}</div>" for c in crit[:6])
+    st.markdown(ui_banner(f"<b>Critical data issues</b>{bullets}", "critical"),
+                unsafe_allow_html=True)
+
+# ==================================================
+# MARKET PULSE — card grid (Phase A)
+# ==================================================
+st.markdown(ui_section("Market pulse"), unsafe_allow_html=True)
+pulse_rows = build_market_pulse_rows()
+pulse_cards = []
+for row in pulse_rows:
+    if row["Value"] is None:
+        val = "—"
+        chg = None
+        sub = "no quote this run"
     else:
-        st.caption(f"{_delta['reason']} (|\u0394| \u2248 \u20B9{_delta['unattributed_abs']:,.0f})")
-else:
-    st.caption("Add a second snapshot (next day\u2019s run) to see the \u0394 Current Value decomposition.")
+        val = row["fmt"].format(row["Value"])
+        chg = row["Chg %"]
+        sub = None
+        if chg is not None:
+            sub = f"{'▲' if chg >= 0 else '▼'} {chg:+.2f}%"
+    ath = row.get("ATH %")
+    if ath is not None:
+        sub = f"{sub + ' · ' if sub else ''}{ath:.1f}% from ATH"
+    pulse_cards.append({
+        "label": row["Market"],
+        "value": val,
+        "sub": sub or "",
+        "tone": "up" if (chg is not None and chg >= 0)
+                else ("down" if (chg is not None and chg < 0) else ""),
+    })
+st.markdown(ui_kpi_cards(pulse_cards, cols=4), unsafe_allow_html=True)
+st.caption("Free delayed sources · Gold ₹/10g & Silver ₹/kg (INR) · day change vs prior close · ATH from Yahoo daily history")
 
 # ==================================================
-# NEWS
+# COMPUTE — news + portfolio intelligence + research + gateway
+# Build-only band: these blocks fetch/read data and set session state but
+# render nothing at this position. The executive bands below render from them.
 # ==================================================
-# ==================================================
-# NEWS
-# ==================================================
-from lib.news import get_portfolio_news, group_by_asset, get_sentiment
-
-st.markdown('<div class="section-header">News Pulse · Holdings + NRI</div>', unsafe_allow_html=True)
+from lib.news import get_portfolio_news, group_by_asset
 
 _stock_syms = []
 if not stocks_valid.empty and "Symbol" in stocks_valid.columns:
@@ -1759,203 +1539,11 @@ try:
 except Exception:
     news_items = []
 
+groups = []
 if news_items:
     groups = group_by_asset(news_items, max_groups=9, min_nri_tax_groups=1, min_macro_groups=1)
-    cols = st.columns(3)
-    for i, g in enumerate(groups):
-        with cols[i % 3]:
-            mark = "🔴" if g["sentiment"] == "red" else ("🟢" if g["sentiment"] == "green" else "⚪")
-            label = "Negative" if g["sentiment"] == "red" else ("Positive" if g["sentiment"] == "green" else "Neutral")
-            st.markdown(f"{mark} **{g['asset']}** — {label}")
-    st.page_link("pages/4_News.py", label="View all news →", icon="📰")
-else:
-    st.caption("No recent news this run.")
 
-st.markdown("---")
 
-# ==================================================
-# BY FAMILY MEMBER + CATEGORY MIX
-# ==================================================
-c3, c4 = st.columns(2)
-with c3:
-    st.markdown('<div class="section-header">By family member</div>', unsafe_allow_html=True)
-    if register is not None and register_members is not None and not register_members.empty:
-        owner_df = register_members.rename(columns={"Member": "Owner", "Current Value": "Value"})[["Owner", "Value"]]
-    elif owner_map:
-        owner_df = pd.DataFrame([{"Owner": k, "Value": v} for k, v in owner_map.items()])
-    else:
-        owner_df = pd.DataFrame(columns=["Owner", "Value"])
-    if not owner_df.empty:
-        fig2 = px.bar(owner_df, x="Owner", y="Value", text_auto=".2s", color_discrete_sequence=["#3b82f6"])
-        fig2.update_layout(margin=dict(t=5, b=5, l=5, r=5), height=240, showlegend=False,
-                            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font_color="#c2c9d6")
-        st.plotly_chart(fig2, use_container_width=True, key="chart_owner")
-with c4:
-    st.markdown('<div class="section-header">Category mix (MF) — overlap proxy</div>', unsafe_allow_html=True)
-    if not mf_valid.empty:
-        cat_df = mf_valid.groupby("Category")["Current Value"].sum().reset_index().sort_values("Current Value", ascending=False)
-        fig3 = px.bar(cat_df, x="Current Value", y="Category", orientation="h", color_discrete_sequence=["#22c55e"])
-        fig3.update_layout(margin=dict(t=5, b=5, l=5, r=5), height=240, showlegend=False,
-                            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font_color="#c2c9d6")
-        st.plotly_chart(fig3, use_container_width=True, key="chart_cat")
-        st.markdown('<p class="caveat">Category-level concentration, not real stock-level overlap — genuine holdings-level overlap needs paid portfolio-disclosure data with no free equivalent.</p>', unsafe_allow_html=True)
-
-# ==================================================
-# TOP 5 STOCK CONCENTRATION + HOLDINGS SNAPSHOT
-# ==================================================
-snap_l, snap_r = st.columns([1, 1])
-with snap_l:
-    st.markdown('<div class="section-header">Top 5 stock concentration</div>', unsafe_allow_html=True)
-    if not stocks_valid.empty and total_stocks > 0:
-        top5 = stocks_valid.nlargest(5, "Current Value")[["Symbol", "Current Value"]].copy()
-        top5_sum = top5["Current Value"].sum()
-        other_val = max(total_stocks - top5_sum, 0)
-        pie_df = pd.concat([
-            top5.rename(columns={"Symbol": "Name", "Current Value": "Value"}),
-            pd.DataFrame([{"Name": "Others", "Value": other_val}]),
-        ], ignore_index=True)
-        fig_t5 = px.pie(pie_df, values="Value", names="Name", hole=0.55,
-                        color_discrete_sequence=["#3b82f6", "#f59e0b", "#a855f7", "#ef4444", "#22c55e", "#64748b"])
-        fig_t5.update_traces(textposition="inside", textinfo="percent", textfont_size=11)
-        fig_t5.update_layout(margin=dict(t=5, b=5, l=5, r=5), height=220, showlegend=True,
-                             legend=dict(orientation="h", y=-0.15, font=dict(size=10)),
-                             paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font_color="#c2c9d6",
-                             annotations=[dict(text=f"{top5_stock_pct:.0f}%<br>Top 5", x=0.5, y=0.5,
-                                               font_size=14, showarrow=False, font_color="#e5e9f0")])
-        st.plotly_chart(fig_t5, use_container_width=True, key="chart_top5")
-    else:
-        st.caption("No stock holdings for concentration chart.")
-
-with snap_r:
-    st.markdown('<div class="section-header">Holdings snapshot · Gold</div>', unsafe_allow_html=True)
-    if not gold_valid.empty:
-        _g_cols = [c for c in ["Owner", "Symbol", "Quantity", "Invested", "Current Price", "Current Value", "P&L", "Return %"] if c in gold_valid.columns]
-        _g = gold_valid[_g_cols].copy()
-        _g_height = min(360, 48 + 28 * max(len(_g), 1))
-        st.dataframe(
-            style_money_df(_g),
-            column_config={
-                "Quantity": st.column_config.NumberColumn(format="%g"),
-                "Invested": st.column_config.NumberColumn(format="₹%d"),
-                "Current Value": st.column_config.NumberColumn(format="₹%d"),
-                "P&L": st.column_config.NumberColumn(format="₹%d"),
-                "Return %": st.column_config.NumberColumn(format="%.1f%%"),
-                "Current Price": st.column_config.NumberColumn(format="₹%.2f"),
-            },
-            use_container_width=True, height=_g_height, hide_index=True,
-        )
-        st.markdown(
-            f'<p class="snap-note">Total Gold {format_inr(total_gold)} · {gold_pct:.1f}% of net worth · SGB/ETF via Groww/Yahoo · FoFs via AMFI</p>',
-            unsafe_allow_html=True,
-        )
-    else:
-        st.caption("No gold holdings identified.")
-
-# ==================================================
-# HOLDINGS DETAIL
-# ==================================================
-st.markdown('<div class="section-header">Holdings detail</div>', unsafe_allow_html=True)
-tab1, tab2, tab3, tab4 = st.tabs(["Mutual Funds", "Stocks", "FCNR & INR FDs", "Gold"])
-
-with tab1:
-    if not mf.empty:
-        st.caption(
-            f"{len(mf)} consolidated holdings — "
-            f"'vs Nifty50' is a broad equity bar only (not each fund's official benchmark). "
-            f"Mid/small/flexi/contra can look better or worse vs Nifty50 for the wrong reason. "
-            f"'—' means insufficient history or debt-like category."
-        )
-        _mf_view = mf[["Owner", "Fund Name", "Category", "Current Value", "P&L", "Return %",
-                        "1Y %", "3Y %", "5Y %", "vs Nifty50 1Y", "vs Nifty50 3Y", "vs Nifty50 5Y"]]
-        st.dataframe(
-            style_money_df(_mf_view),
-            column_config={
-                "Current Value": st.column_config.NumberColumn(format="₹%d"),
-                "P&L": st.column_config.NumberColumn(format="₹%d"),
-                "Return %": st.column_config.NumberColumn(format="%.1f%%"),
-                "1Y %": st.column_config.NumberColumn(format="%.1f%%"),
-                "3Y %": st.column_config.NumberColumn(format="%.1f%%"),
-                "5Y %": st.column_config.NumberColumn(format="%.1f%%"),
-                "vs Nifty50 1Y": st.column_config.NumberColumn(format="%.1f%%"),
-                "vs Nifty50 3Y": st.column_config.NumberColumn(format="%.1f%%"),
-                "vs Nifty50 5Y": st.column_config.NumberColumn(format="%.1f%%"),
-            }, use_container_width=True, height=380)
-
-with tab2:
-    if not stocks.empty:
-        st.dataframe(
-            style_money_df(stocks[["Owner", "Symbol", "Quantity", "Invested", "Current Price", "Current Value", "P&L", "Return %"]]),
-            column_config={
-                "Quantity": st.column_config.NumberColumn(format="%d"),
-                "Invested": st.column_config.NumberColumn(format="₹%d"),
-                "Current Value": st.column_config.NumberColumn(format="₹%d"),
-                "P&L": st.column_config.NumberColumn(format="₹%d"),
-                "Return %": st.column_config.NumberColumn(format="%.1f%%"),
-                "Current Price": st.column_config.NumberColumn(format="₹%.2f"),
-            }, use_container_width=True, height=380)
-        st.caption("Fundamental red flags (P/E, debt/equity, promoter pledging) need paid/structured data — not shown here to avoid false precision.")
-
-with tab3:
-    if not fd.empty:
-        st.caption(
-            "NRI view: USD rows are labeled FCNR (interest + FX vs deposit-date rate). "
-            "INR rows are domestic FDs. Native currency and INR shown side by side — "
-            "a FCNR is never displayed as though it were an INR deposit. Sorted by days to maturity."
-        )
-        _fd_cols = [c for c in [
-            "Holder Name", "Product", "Currency", "Principal (Native)", "Principal (INR, at deposit FX)",
-            "ROI %", "Days to Maturity", "Current Value (Native)", "Current Value (INR)",
-            "Interest Return (INR)", "FX Gain/Loss (INR)", "Maturity Date",
-        ] if c in fd.columns]
-        _fd_view = fd[_fd_cols].copy()
-        if "Days to Maturity" in _fd_view.columns:
-            _fd_view = _fd_view.sort_values("Days to Maturity", ascending=True, na_position="last")
-        st.dataframe(
-            style_money_df(_fd_view, pnl_cols=("FX Gain/Loss (INR)", "Interest Return (INR)")),
-            column_config={
-                "Holder Name": st.column_config.TextColumn("Holder", width="medium"),
-                "Product": st.column_config.TextColumn("Product", width="small"),
-                "Currency": st.column_config.TextColumn("Ccy", width="small"),
-                "Principal (Native)": st.column_config.NumberColumn("Principal", format="%.2f"),
-                "Principal (INR, at deposit FX)": st.column_config.NumberColumn("Principal INR", format="%.0f"),
-                "ROI %": st.column_config.NumberColumn("ROI %", format="%.2f%%", width="small"),
-                "Days to Maturity": st.column_config.NumberColumn("Days left", width="small"),
-                "Current Value (Native)": st.column_config.NumberColumn("Value (native)", format="%.2f"),
-                "Current Value (INR)": st.column_config.NumberColumn("Value (INR)", format="%.0f"),
-                "Interest Return (INR)": st.column_config.NumberColumn("Interest", format="%.0f"),
-                "FX Gain/Loss (INR)": st.column_config.NumberColumn("FX P&L", format="%.0f"),
-                "Maturity Date": st.column_config.TextColumn("Matures", width="small"),
-            },
-            use_container_width=True,
-            hide_index=True,
-        )
-
-with tab4:
-    if not gold.empty:
-        st.caption(
-            "Unified Gold book: Sovereign Gold Bonds (SGB…-GB), gold ETFs (e.g. GOLDBEES), and Gold ETF FoFs. "
-            "Same rows as the Gold snapshot above — excluded from Stocks and Mutual Funds so gold appears in one book only. "
-            "SGB maturity/interest are not invented — source file does not carry them."
-        )
-        _g_tab_cols = [c for c in ["Owner", "Symbol", "Quantity", "Invested", "Current Price", "Current Value", "P&L", "Return %"] if c in gold.columns]
-        _g_tab = gold[_g_tab_cols]
-        _g_tab_h = min(400, 48 + 28 * max(len(_g_tab), 1))
-        st.dataframe(
-            style_money_df(_g_tab),
-            column_config={
-                "Quantity": st.column_config.NumberColumn(format="%g"),
-                "Invested": st.column_config.NumberColumn(format="₹%d"),
-                "Current Value": st.column_config.NumberColumn(format="₹%d"),
-                "P&L": st.column_config.NumberColumn(format="₹%d"),
-                "Return %": st.column_config.NumberColumn(format="%.1f%%"),
-                "Current Price": st.column_config.NumberColumn(format="₹%.2f"),
-            }, use_container_width=True, height=_g_tab_h, hide_index=True)
-        st.markdown(
-            f'<p class="snap-note">Total Gold {format_inr(total_gold)} · {gold_pct:.1f}% of net worth</p>',
-            unsafe_allow_html=True,
-        )
-    else:
-        st.caption("No gold holdings identified in the current data.")
 
 # ==================================================
 # PORTFOLIO INTELLIGENCE (foundation, Phase 1C)
@@ -2005,79 +1593,7 @@ except Exception as _intel_err:
     _intel_briefing = None
     st.caption(f"Portfolio Intelligence unavailable this run: {_intel_err}")
 
-if _intel_briefing is not None:
-    with st.expander("Portfolio Intelligence · signals, coverage & look-through"):
-        try:
-            _sig_rows = [
-                {
-                    "Level": s.level,
-                    "Rule": s.label,
-                    "What we know": s.message,
-                    "Invalidated by": s.invalidation,
-                }
-                for s in _intel_briefing.signals
-                if s.level != "info"
-            ]
-            if _sig_rows:
-                _sig_df = pd.DataFrame(_sig_rows)
-                st.dataframe(
-                    _sig_df,
-                    hide_index=True,
-                    use_container_width=True,
-                    column_config={
-                        "Level": st.column_config.TextColumn("Level", width="small"),
-                        "Rule": st.column_config.TextColumn("Rule", width="medium"),
-                        "What we know": st.column_config.TextColumn("What we know", width="large"),
-                        "Invalidated by": st.column_config.TextColumn("Invalidated by", width="large"),
-                    },
-                )
-            else:
-                st.caption("No elevated signal this run — the rules see nothing abnormal.")
-            st.caption("Signal rules are deterministic (lib.intelligence.signals); levels only "
-                       "ever reach info when their fact is missing (insufficient evidence).")
 
-            _cov = _intel_facts.coverage
-            _cov_pct = f"{_cov.coverage_pct:.0f}%" if _cov.coverage_pct is not None else "n/a"
-            st.markdown(
-                f"**Holdings disclosure coverage {_cov_pct}** — "
-                f"{_cov.covered_funds} of {_cov.covered_funds + _cov.missing_funds} fund(s) "
-                f"disclose holdings; look-through uses disclosed market values ("
-                f"{'market-value-derived' if 'market_value_derived' in _intel_facts.weight_basis else 'published weights'}).",
-                unsafe_allow_html=False,
-            )
-            if _cov.missing_funds:
-                st.caption("No disclosure (insufficient evidence): " + ", ".join(list(_cov.missing_names)[:5]))
-
-            _uds = intel_exposure.underlying_df(_intel_facts)
-            if not _uds.empty:
-                _top = _uds.sort_values("value_inr", ascending=False).head(5)
-                st.markdown(f"**Top underlying positions (through funds, top {len(_top)})**")
-                st.dataframe(
-                    _top[["name", "value_inr", "pct_of_assets", "schemes", "confidence"]],
-                    hide_index=True,
-                    use_container_width=True,
-                    column_config={
-                        "name": st.column_config.TextColumn("Security"),
-                        "value_inr": st.column_config.NumberColumn("Value (INR)", format="₹%d"),
-                        "pct_of_assets": st.column_config.NumberColumn("% of assets", format="%.1f%%"),
-                        "schemes": st.column_config.TextColumn("Via funds"),
-                        "confidence": st.column_config.NumberColumn("Confidence", format="%.2f"),
-                    },
-                )
-
-            _synth = _intel_briefing.synthesis
-            if _synth is not None:
-                st.markdown(f"**Synthesis ({_synth.model})** — {_synth.summary}")
-                if _synth.claims:
-                    for _c in _synth.claims:
-                        st.caption(("✓ " if _c.supported else "⚠ ") + _c.text)
-            if _intel_briefing.synthesis_reason:
-                st.caption(f"Reason: {_intel_briefing.synthesis_reason}")
-            st.caption("Decision-support only: the numbers above come from this page's own "
-                       "calc (register/drivers/snapshots) and statutory disclosure caches. "
-                       "No AI provider is connected; nothing here is an order.")
-        except Exception as _intel_render_err:
-            st.caption(f"Portfolio Intelligence render skipped: {_intel_render_err}")
 
 # ==================================================
 # RESEARCH & SYNTHESIS (evidence-based research brief, v1)
@@ -2147,81 +1663,220 @@ except Exception as _research_err:
     _research_brief = None
     st.caption(f"Research & Synthesis unavailable this run: {_research_err}")
 
+
+
+# PHASE 1B — delta decomposition between the two most recent snapshots.
+# Shows per-class Invested-Basis Change vs Market/Valuation Change. A legacy
+# (pre-Phase 1B) prior snapshot cannot be decomposed and is flagged.
+st.markdown(ui_section("Snapshot delta \u00b7 change since prior snapshot"), unsafe_allow_html=True)
+if len(history_df) >= 2:
+    _hist_sorted = history_df.sort_values("date").reset_index(drop=True)
+    _delta = snapshot_delta(_hist_sorted.iloc[-2], _hist_sorted.iloc[-1])
+    if _delta["available"]:
+        _delta_rows = []
+        for _cls in ASSET_CLASSES:
+            _d = _delta["by_class"].get(_cls)
+            if _d is None:
+                _delta_rows.append({"Asset Class": _cls, "\u0394 Current Value": None,
+                                    "Invested-Basis Change (not cash flow)": None, "Market/Valuation Change": None})
+            else:
+                _delta_rows.append({"Asset Class": _cls,
+                                    "\u0394 Current Value": round(_d["delta_current"], 2),
+                                    "Invested-Basis Change (not cash flow)": round(_d["invested_basis_change"], 2),
+                                    "Market/Valuation Change": round(_d["market_valuation_change"], 2)})
+        _dt = _delta["totals"]
+        _delta_rows.append({"Asset Class": "TOTAL",
+                            "\u0394 Current Value": round(_dt["delta_current"], 2),
+                            "Invested-Basis Change (not cash flow)": round(_dt["invested_basis_change"], 2),
+                            "Market/Valuation Change": round(_dt["market_valuation_change"], 2)})
+        st.dataframe(pd.DataFrame(_delta_rows), hide_index=True, use_container_width=True)
+        _dcap = [NOT_A_CASHFLOW_LABEL]
+        if _delta["unattributed_abs"] > 1e-6:
+            _dcap.append(f"Unattributed / unavailable: \u20B9{_delta['unattributed_abs']:.2f}")
+        if _delta["fcnr"] is not None:
+            _dcap.append(
+                f"FCNR \u0394 interest {format_inr(_delta['fcnr']['delta_interest'])} \u00b7 "
+                f"\u0394 FX on principal {format_inr(_delta['fcnr']['delta_fx'])}"
+            )
+        st.caption(" \u00b7 ".join(_dcap))
+    else:
+        st.caption(f"{_delta['reason']} (|\u0394| \u2248 \u20B9{_delta['unattributed_abs']:,.0f})")
+else:
+    st.caption("Add a second snapshot (next day\u2019s run) to see the \u0394 Current Value decomposition.")
+
+
+# ==================================================
+# CURRENT EXTERNAL DEVELOPMENTS — portfolio-aware live research
+# Cache-read-only cohort; live retrieval happens ONLY via the explicit refresh
+# button. Records stay OBSERVED FACT evidence labelled by exact-identifier
+# relevance and never change the numbers computed above.
+# ==================================================
+st.markdown(ui_section("Current external developments · portfolio-aware"),
+            unsafe_allow_html=True)
+if "_live_cohort" not in dir() or _live_cohort is None:
+    st.markdown(ui_empty(
+        "No live research cohort", "The research layer did not build this run."),
+        unsafe_allow_html=True)
+else:
+    try:
+        _live_caption = (f"**{_live_cohort.record_count} cached record(s)** "
+                         f"({len(_live_cohort.news_records)} news · "
+                         f"{len(_live_cohort.gateway_records)} gateway)")
+        if _live_cohort.last_retrieved_at is not None:
+            _live_caption += f" · last retrieved {_live_cohort.last_retrieved_at:%d %b %Y %H:%M} UTC"
+        if _live_cohort.stale_sources:
+            _live_caption += (f" · stale sources: {', '.join(_live_cohort.stale_sources)} "
+                              "(refresh to update)")
+        st.caption(_live_caption)
+        _row_a, _row_b = st.columns([1, 3])
+        with _row_a:
+            if st.button("Refresh research evidence (on demand)",
+                         key="cc_live_refresh"):
+                with st.spinner("Fetching live research evidence…"):
+                    st.session_state["cc_live_result"] = intel_live.run_live_research(
+                        facts=_intel_facts, now=now_ist, plan=_live_plan,
+                    )
+                    st.session_state["cc_live_refreshed_at"] = now_ist
+                st.rerun()
+        with _row_b:
+            _live_result = st.session_state.get("cc_live_result")
+            if _live_result is not None and _live_result.refreshed_at is not None:
+                st.caption(f"Last explicit refresh: {_live_result.refreshed_at:%d %b %Y %H:%M} UTC · "
+                           f"status: {_live_result.status} · "
+                           f"{len(_live_result.failures)} failure(s)")
+                if _live_result.failures:
+                    with st.expander(f"Refresh failures ({len(_live_result.failures)})"):
+                        for _src, _reason in _live_result.failures:
+                            st.caption(f"· {_src}: {_reason}")
+        _dev_rows = intel_live.development_rows(_live_cohort, index=_pm_index, now=now_ist)
+        if _dev_rows:
+            _dev_cards = []
+            for _d in _dev_rows[:8]:
+                _mapped = str(_d.get("Relevance", "no")).strip().lower() != "no"
+                _dev_cards.append(ui_research_row(
+                    title=str(_d.get("Development", "")),
+                    meta=str(_d.get("Published") or ""),
+                    body=str(_d.get("Category") or ""),
+                    tag="MAPPED" if _mapped else "CONTEXT",
+                    href=str(_d.get("Link") or ""),
+                ))
+            st.markdown(ui_research_grid(_dev_cards), unsafe_allow_html=True)
+            with st.expander(f"Full developments table ({len(_dev_rows)} rows)"):
+                st.dataframe(
+                    pd.DataFrame(_dev_rows[:20]), hide_index=True,
+                    use_container_width=True,
+                    column_config={
+                        "Development": st.column_config.TextColumn(width="large"),
+                        "Affected": st.column_config.TextColumn(width="small"),
+                        "Category": st.column_config.TextColumn(width="small"),
+                        "Source": st.column_config.TextColumn(width="small"),
+                        "Published": st.column_config.TextColumn(width="small"),
+                        "Quality": st.column_config.NumberColumn(format="%.2f"),
+                        "Relevance": st.column_config.TextColumn(width="small"),
+                        "Link": st.column_config.TextColumn(width="small"),
+                    })
+            st.caption("Relevance uses exact identifier matching only "
+                       "(lib.intelligence.sources.mapping), never fuzzy. Quality = "
+                       "deterministic evidence score (mapped first, fresh above stale). "
+                       "All records are OBSERVED FACT evidence from Google News RSS and "
+                       "the FRED/SEC gateway cache — they never alter the numbers above.")
+            if "groups" in dir() and groups:
+                _news_chips = "".join(ui_badge(
+                    ("NEGATIVE" if g["sentiment"] == "red"
+                     else ("POSITIVE" if g["sentiment"] == "green" else "NEUTRAL"))
+                    + " · " + g["asset"],
+                    "negative" if g["sentiment"] == "red"
+                    else ("positive" if g["sentiment"] == "green" else "neutral"))
+                    for g in groups)
+                st.markdown(f'<div class="t-caption">News by asset: {_news_chips}</div>',
+                            unsafe_allow_html=True)
+            st.page_link("pages/4_News.py", label="Open Intel & News →", icon="📰")
+        else:
+            st.caption("No cached news/gateway records yet — press 'Refresh research "
+                       "evidence' to fetch. A network call happens only on that explicit "
+                       "action, never on page open.")
+        _st_rows = intel_live.live_status(now=now_ist)
+        if _st_rows:
+            with st.expander("Live research cache status"):
+                st.dataframe(pd.DataFrame(_st_rows), hide_index=True,
+                             use_container_width=True)
+    except Exception as _live_render_err:
+        st.caption(f"Live research panel unavailable: {_live_render_err}")
+
+st.markdown("---")
+
+
+# ==================================================
+# RESEARCH & SYNTHESIS — executive readout (deterministic, network-free)
+# ==================================================
+st.markdown(ui_section("Research & Synthesis · decision readout"),
+            unsafe_allow_html=True)
 if _research_brief is not None:
-    with st.expander("Research & Synthesis · what changed, risks, and evidence gaps"):
-        try:
-            _rb = _research_brief
-            st.markdown(
-                f"**Research brief {_rb.as_of.strftime('%d %b %Y %H:%M')}** — "
-                f"{len(_rb.changes)} change row(s) · {_rb.mapped_count} mapped external "
-                f"record(s) · {len(_rb.risks)} risk(s) · {len(_rb.gaps)} evidence gap(s).")
-            if _rb.synthesis is not None:
-                st.markdown(f"**Synthesis ({_rb.synthesis.model})** — {_rb.synthesis.summary}")
+    try:
+        _rb = _research_brief
+        st.markdown(
+            f"**Research brief {_rb.as_of.strftime('%d %b %Y %H:%M')}** — "
+            f"{len(_rb.changes)} change row(s) · {_rb.mapped_count} mapped external "
+            f"record(s) · {len(_rb.risks)} risk(s) · {len(_rb.gaps)} evidence gap(s).")
+        if _rb.synthesis is not None:
+            st.markdown(f"**Synthesis ({_rb.synthesis.model})** — {_rb.synthesis.summary}")
 
-            if _rb.changes:
-                st.markdown("**What changed this run**")
-                _ch = pd.DataFrame([
-                    {
-                        "Kind": c.kind.replace("_", " "),
-                        "Item": c.label,
-                        "Amount (INR)": f"{c.amount:,.0f}" if c.amount is not None else "—",
-                        "Note": c.note,
-                    }
-                    for c in _rb.changes
-                ])
-                st.dataframe(_ch, hide_index=True, use_container_width=True,
-                             column_config={"Note": st.column_config.TextColumn(width="large")})
-                st.caption(_rb.not_a_cashflow_label)
+        if _rb.changes:
+            st.markdown("**What changed this run**")
+            _ch = pd.DataFrame([
+                {
+                    "Kind": c.kind.replace("_", " "),
+                    "Item": c.label,
+                    "Amount (INR)": f"{c.amount:,.0f}" if c.amount is not None else "—",
+                    "Note": c.note,
+                }
+                for c in _rb.changes
+            ])
+            st.dataframe(_ch, hide_index=True, use_container_width=True,
+                         column_config={"Note": st.column_config.TextColumn(width="large")})
+            st.caption(_rb.not_a_cashflow_label)
 
-            if _rb.external:
-                st.markdown("**External developments (mapped to holdings first)**")
-                _ext = pd.DataFrame([
-                    {
-                        "Category": d.category,
-                        "Mapped": "yes" if d.mapped else "no",
-                        "Evidence": d.headline,
-                        "Source": d.evidence.provenance.source,
-                        "Quality": d.quality.score,
-                    }
-                    for d in _rb.external[:8]
-                ])
-                st.dataframe(_ext, hide_index=True, use_container_width=True,
-                             column_config={
-                                 "Mapped": st.column_config.TextColumn(width="small"),
-                                 "Evidence": st.column_config.TextColumn(width="large"),
-                                 "Quality": st.column_config.NumberColumn(format="%.2f"),
-                             })
-                st.caption("Relevance uses exact identifier matching only "
-                           "(lib.intelligence.sources.mapping) — never fuzzy.")
+        if _rb.risks:
+            st.markdown("**Risks that deserve attention**")
+            _risk_items = [{
+                "level": "warning" if r.strength in ("weak", "moderate") else "critical",
+                "title": r.title,
+                "body": r.statement,
+                "what": "invalidated by: " + r.invalidation,
+            } for r in _rb.risks[:5]]
+            st.markdown(ui_watch(_risk_items), unsafe_allow_html=True)
 
-            if _rb.risks:
-                st.markdown("**Risks that deserve attention**")
-                for _c in _rb.risks:
-                    st.markdown(f"**{_c.title}** _(strength {_c.strength})_ — {_c.statement}")
-                    st.caption(f"↻ invalidated by: {_c.invalidation}")
+        if _rb.research_needs:
+            st.markdown("**Research needs (decision-support, not orders)**")
+            _needs = [ui_research_row(
+                title=n.title,
+                meta=f"strength {n.strength}",
+                body=n.statement,
+            ) for n in _rb.research_needs[:5]]
+            st.markdown(ui_research_grid(_needs), unsafe_allow_html=True)
 
-            if _rb.research_needs:
-                st.markdown("**Research needs (decision-support, not orders)**")
-                for _c in _rb.research_needs:
-                    st.markdown(f"**{_c.title}** _(strength {_c.strength})_ — {_c.statement}")
-                    st.caption(f"↻ invalidated by: {_c.invalidation}")
+        if _rb.gaps:
+            st.markdown("**Where evidence is insufficient**")
+            st.markdown(ui_evidence(list(_rb.gaps[:6])), unsafe_allow_html=True)
 
-            if _rb.gaps:
-                st.markdown("**Where evidence is insufficient**")
-                for _g in _rb.gaps:
-                    st.caption("· " + _g)
+        if _rb.synthesis is not None and _rb.synthesis.claims:
+            st.markdown(f"**Claims ({_rb.synthesis.model})**")
+            for _c in _rb.synthesis.claims:
+                st.caption(("✓ " if _c.supported else "⚠ ") + _c.text)
+        if _rb.synthesis_reason:
+            st.caption(f"Reason: {_rb.synthesis_reason}")
+        st.caption("Synthesis is deterministic rule-based (no AI provider connected). "
+                   "Every number comes from this page's own calc or cached statutory "
+                   "disclosures; decision-support only — nothing here is an order.")
+    except Exception as _research_render_err:
+        st.caption(f"Research & Synthesis render skipped: {_research_render_err}")
+else:
+    st.markdown(ui_unavailable(
+        "Research brief unavailable", "The research layer did not build this run."),
+        unsafe_allow_html=True)
 
-            if _rb.synthesis is not None and _rb.synthesis.claims:
-                st.markdown(f"**Claims ({_rb.synthesis.model})**")
-                for _c in _rb.synthesis.claims:
-                    st.caption(("✓ " if _c.supported else "⚠ ") + _c.text)
-            if _rb.synthesis_reason:
-                st.caption(f"Reason: {_rb.synthesis_reason}")
-            st.caption("Synthesis is deterministic rule-based (no AI provider connected). "
-                       "Every number comes from this page's own calc or cached statutory "
-                       "disclosures; decision-support only — nothing here is an order.")
-        except Exception as _research_render_err:
-            st.caption(f"Research & Synthesis render skipped: {_research_render_err}")
+st.markdown("---")
+
 
 # ==================================================
 # AI RESEARCH (explicit opt-in only — NEVER called during page load).
@@ -2280,8 +1935,8 @@ if _research_brief is not None:
                            "during normal page loads.")
             elif _ai_outcome.status == intel_ai.STATUS_OK and _ai_outcome.assessment is not None:
                 _a = _ai_outcome.assessment
-                st.markdown(f"### AI interpretation — {_a.provider} / {_a.model} "
-                            f"({_a.requested_format} transport)")
+                st.markdown(ui_section(
+                    f"AI interpretation · {_a.provider} / {_a.model} ({_a.requested_format} transport)"))
                 st.caption(
                     f"Confidence **{(_a.confidence or 0.0):.2f}** · "
                     f"{_a.latency_ms:.0f} ms · {_a.created_at:%d %b %Y %H:%M} · "
@@ -2328,87 +1983,408 @@ if _research_brief is not None:
         except Exception as _ai_err:
             st.caption(f"AI Research section unavailable: {_ai_err}")
 
-# ---- Intelligence data gateway: read-only provider status (no network) ----
-try:
-    _gw_rows = intel_gateway_status()
-    st.session_state["cc_intel_gateway_status"] = _gw_rows
-    if _gw_rows:
-        with st.expander("Portfolio Intelligence · data gateway (external-provider status)"):
-            st.dataframe(pd.DataFrame(_gw_rows), hide_index=True, use_container_width=True)
-            st.caption("Read-only cache status; no external call happens on page open. "
-                       "FRED/SEC/MF evidence is normalized to observed FACT evidence by "
-                       "lib.intelligence.sources and never alters the numbers above.")
-except Exception as _gw_err:
-    st.session_state["cc_intel_gateway_status"] = []
-    st.caption(f"Data gateway status unavailable: {_gw_err}")
 
-# ---- Current External Developments: portfolio-aware live research ----
-# Cache-read-only cohort on page load; live retrieval only via the explicit
-# refresh button. gnews/FRED/SEC records stay OBSERVED FACT evidence labelled by
-# exact-identifier relevance and never change the numbers computed above.
-if "_live_cohort" in dir() and _live_cohort is not None:
-    with st.expander("Current External Developments · portfolio-aware live research"):
-        try:
-            _live_caption = (f"**{_live_cohort.record_count} cached record(s)** "
-                             f"({len(_live_cohort.news_records)} news · "
-                             f"{len(_live_cohort.gateway_records)} gateway)")
-            if _live_cohort.last_retrieved_at is not None:
-                _live_caption += f" · last retrieved {_live_cohort.last_retrieved_at:%d %b %Y %H:%M} UTC"
-            if _live_cohort.stale_sources:
-                _live_caption += (f" · stale sources: {', '.join(_live_cohort.stale_sources)} "
-                                  "(refresh to update)")
-            st.caption(_live_caption)
-            if st.button("Refresh research evidence (network call on demand)",
-                         key="cc_live_refresh"):
-                with st.spinner("Fetching live research evidence…"):
-                    st.session_state["cc_live_result"] = intel_live.run_live_research(
-                        facts=_intel_facts,
-                        now=now_ist,
-                        plan=_live_plan,
+# ==================================================
+# DEEPER ANALYTICS — compact drill-down (tabs)
+# ==================================================
+st.markdown(ui_section("Deeper analytics"), unsafe_allow_html=True)
+_t_h, _t_hist, _t_hold, _t_struct, _t_intel = st.tabs(
+    ["Health & allocation", "History", "Holdings", "Structure", "Intelligence"])
+
+with _t_h:
+
+    # ==================================================
+    # DETAILED POSTURE — health factors + allocation
+    # ==================================================
+    c1, c2 = st.columns(2)
+    with c1:
+        st.markdown(ui_section("Portfolio health breakdown"), unsafe_allow_html=True)
+        bd = pd.DataFrame({"Factor": list(factor_scores.keys()), "Score": list(factor_scores.values())})
+        fig_h = go.Figure(go.Bar(x=bd["Score"], y=bd["Factor"], orientation="h",
+            marker_color=["#ef4444" if s < 55 else ("#f59e0b" if s < 75 else "#22c55e") for s in bd["Score"]],
+            text=[f"{s:.0f}" for s in bd["Score"]], textposition="outside"))
+        fig_h.update_layout(height=210, margin=dict(t=5, b=5, l=5, r=25), xaxis=dict(range=[0, 105], showgrid=False),
+                             paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font_color="#c2c9d6")
+        st.plotly_chart(fig_h, use_container_width=True, key="chart_health")
+
+        _why = []
+        if factor_scores.get("Liquidity", 100) < 50:
+            _why.append(
+                f"Deployable liquidity is {true_liquid_pct:.1f}% of NW "
+                f"(liquid MF + deposits maturing ≤90d). Long FCNR is not treated as cash."
+            )
+        if factor_scores.get("Allocation", 100) < 40:
+            _gap40 = max(0, 0.40 * total_networth - total_equity)
+            _why.append(
+                f"Equity (ex-liquid) is {equity_pct:.1f}% of NW — NRI books often run lower by design; "
+                f"~{format_inr(_gap40)} more equity would reach 40%."
+            )
+        if factor_scores.get("Concentration", 100) < 60:
+            _why.append("Top holdings concentration is elevated.")
+        if factor_scores.get("Performance", 100) < 55:
+            _why.append("Trailing fund performance vs Nifty50 is mixed.")
+        if fcnr_pct > 0:
+            _why.append(
+                f"FCNR is {fcnr_pct:.1f}% of NW — USD principal + interest + INR FX vs deposit-date rate "
+                f"(not the same as resident INR FD)."
+            )
+        if inr_fd_pct > 0:
+            _why.append(f"INR FDs are {inr_fd_pct:.1f}% of NW (domestic fixed income).")
+        if gold_pct > 0:
+            _why.append(f"Gold is {gold_pct:.1f}% of NW (SGB + ETFs + FoFs) — diversifier, not equity.")
+        if not _why:
+            _why.append("No single factor is dragging hard — score is moderate overall.")
+        _why_html = "".join(f"<li>{x}</li>" for x in _why)
+        st.markdown(
+            f'<div class="t-card"><span class="t-card-title">'
+            f'Why score is {health_score:.0f}? (NRI view)</span>'
+            f'<ul class="t-list" style="margin-top:6px">{_why_html}</ul></div>',
+            unsafe_allow_html=True,
+        )
+
+    with c2:
+        st.markdown(ui_section("Asset allocation · NRI books"), unsafe_allow_html=True)
+        alloc_df = pd.DataFrame({
+            "Asset": ["Equity (stocks + non-liquid MF)", "Liquid MF", "INR FD", "FCNR (USD)", "Gold"],
+            "Value": [total_equity, total_liquid_mf, total_inr_fd, total_fcnr, total_gold],
+        })
+        alloc_df = alloc_df[alloc_df["Value"] > 0].reset_index(drop=True)
+        colors = ["#f59e0b", "#22c55e", "#3b82f6", "#06b6d4", "#eab308"]
+        fig = px.pie(alloc_df, values="Value", names="Asset", hole=0.62, color_discrete_sequence=colors)
+        fig.update_traces(textposition="inside", textinfo="percent", textfont_size=12)
+        fig.update_layout(margin=dict(t=5, b=5, l=5, r=5), height=200, showlegend=False,
+                           paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font_color="#c2c9d6",
+                           annotations=[dict(text=f"{format_inr_compact(total_networth)}<br>Net Worth",
+                                             x=0.5, y=0.5, font_size=13, showarrow=False, font_color="#e5e9f0")])
+        st.plotly_chart(fig, use_container_width=True, key="chart_alloc")
+        legend_items = "".join(
+            f'<li><span class="nm"><span style="color:{col}">●</span> {asset}</span>'
+            f'<span class="amt">{((val / total_networth * 100) if total_networth else 0):.1f}% · {format_inr(val)}</span></li>'
+            for asset, val, col in zip(alloc_df["Asset"], alloc_df["Value"], colors)
+        )
+        st.markdown(f'<ul class="t-alloc-legend">{legend_items}</ul>', unsafe_allow_html=True)
+
+with _t_hold:
+    st.markdown(ui_section("Mutual funds"), unsafe_allow_html=True)
+    if not mf.empty:
+        st.caption(
+            f"{len(mf)} consolidated holdings — "
+            f"'vs Nifty50' is a broad equity bar only (not each fund's official benchmark). "
+            f"Mid/small/flexi/contra can look better or worse vs Nifty50 for the wrong reason. "
+            f"'—' means insufficient history or debt-like category."
+        )
+        _mf_view = mf[["Owner", "Fund Name", "Category", "Current Value", "P&L", "Return %",
+                        "1Y %", "3Y %", "5Y %", "vs Nifty50 1Y", "vs Nifty50 3Y", "vs Nifty50 5Y"]]
+        st.dataframe(
+            style_money_df(_mf_view),
+            column_config={
+                "Current Value": st.column_config.NumberColumn(format="₹%d"),
+                "P&L": st.column_config.NumberColumn(format="₹%d"),
+                "Return %": st.column_config.NumberColumn(format="%.1f%%"),
+                "1Y %": st.column_config.NumberColumn(format="%.1f%%"),
+                "3Y %": st.column_config.NumberColumn(format="%.1f%%"),
+                "5Y %": st.column_config.NumberColumn(format="%.1f%%"),
+                "vs Nifty50 1Y": st.column_config.NumberColumn(format="%.1f%%"),
+                "vs Nifty50 3Y": st.column_config.NumberColumn(format="%.1f%%"),
+                "vs Nifty50 5Y": st.column_config.NumberColumn(format="%.1f%%"),
+            }, use_container_width=True, height=380)
+
+    st.markdown(ui_section("Stocks"), unsafe_allow_html=True)
+    if not stocks.empty:
+        st.dataframe(
+            style_money_df(stocks[["Owner", "Symbol", "Quantity", "Invested", "Current Price", "Current Value", "P&L", "Return %"]]),
+            column_config={
+                "Quantity": st.column_config.NumberColumn(format="%d"),
+                "Invested": st.column_config.NumberColumn(format="₹%d"),
+                "Current Value": st.column_config.NumberColumn(format="₹%d"),
+                "P&L": st.column_config.NumberColumn(format="₹%d"),
+                "Return %": st.column_config.NumberColumn(format="%.1f%%"),
+                "Current Price": st.column_config.NumberColumn(format="₹%.2f"),
+            }, use_container_width=True, height=380)
+        st.caption("Fundamental red flags (P/E, debt/equity, promoter pledging) need paid/structured data — not shown here to avoid false precision.")
+
+    st.markdown(ui_section("FCNR & INR FDs"), unsafe_allow_html=True)
+    if not fd.empty:
+        st.caption(
+            "NRI view: USD rows are labeled FCNR (interest + FX vs deposit-date rate). "
+            "INR rows are domestic FDs. Native currency and INR shown side by side — "
+            "a FCNR is never displayed as though it were an INR deposit. Sorted by days to maturity."
+        )
+        _fd_cols = [c for c in [
+            "Holder Name", "Product", "Currency", "Principal (Native)", "Principal (INR, at deposit FX)",
+            "ROI %", "Days to Maturity", "Current Value (Native)", "Current Value (INR)",
+            "Interest Return (INR)", "FX Gain/Loss (INR)", "Maturity Date",
+        ] if c in fd.columns]
+        _fd_view = fd[_fd_cols].copy()
+        if "Days to Maturity" in _fd_view.columns:
+            _fd_view = _fd_view.sort_values("Days to Maturity", ascending=True, na_position="last")
+        st.dataframe(
+            style_money_df(_fd_view, pnl_cols=("FX Gain/Loss (INR)", "Interest Return (INR)")),
+            column_config={
+                "Holder Name": st.column_config.TextColumn("Holder", width="medium"),
+                "Product": st.column_config.TextColumn("Product", width="small"),
+                "Currency": st.column_config.TextColumn("Ccy", width="small"),
+                "Principal (Native)": st.column_config.NumberColumn("Principal", format="%.2f"),
+                "Principal (INR, at deposit FX)": st.column_config.NumberColumn("Principal INR", format="%.0f"),
+                "ROI %": st.column_config.NumberColumn("ROI %", format="%.2f%%", width="small"),
+                "Days to Maturity": st.column_config.NumberColumn("Days left", width="small"),
+                "Current Value (Native)": st.column_config.NumberColumn("Value (native)", format="%.2f"),
+                "Current Value (INR)": st.column_config.NumberColumn("Value (INR)", format="%.0f"),
+                "Interest Return (INR)": st.column_config.NumberColumn("Interest", format="%.0f"),
+                "FX Gain/Loss (INR)": st.column_config.NumberColumn("FX P&L", format="%.0f"),
+                "Maturity Date": st.column_config.TextColumn("Matures", width="small"),
+            },
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    st.markdown(ui_section("Gold"), unsafe_allow_html=True)
+    if not gold.empty:
+        st.caption(
+            "Unified Gold book: Sovereign Gold Bonds (SGB…-GB), gold ETFs (e.g. GOLDBEES), and Gold ETF FoFs. "
+            "Same rows as the Gold snapshot above — excluded from Stocks and Mutual Funds so gold appears in one book only. "
+            "SGB maturity/interest are not invented — source file does not carry them."
+        )
+        _g_tab_cols = [c for c in ["Owner", "Symbol", "Quantity", "Invested", "Current Price", "Current Value", "P&L", "Return %"] if c in gold.columns]
+        _g_tab = gold[_g_tab_cols]
+        _g_tab_h = min(400, 48 + 28 * max(len(_g_tab), 1))
+        st.dataframe(
+            style_money_df(_g_tab),
+            column_config={
+                "Quantity": st.column_config.NumberColumn(format="%g"),
+                "Invested": st.column_config.NumberColumn(format="₹%d"),
+                "Current Value": st.column_config.NumberColumn(format="₹%d"),
+                "P&L": st.column_config.NumberColumn(format="₹%d"),
+                "Return %": st.column_config.NumberColumn(format="%.1f%%"),
+                "Current Price": st.column_config.NumberColumn(format="₹%.2f"),
+            }, use_container_width=True, height=_g_tab_h, hide_index=True)
+        st.markdown(
+            f'<div class="t-caption">Total Gold {format_inr(total_gold)} · {gold_pct:.1f}% of net worth</div>',
+            unsafe_allow_html=True,
+        )
+    else:
+        st.caption("No gold holdings identified in the current data.")
+
+
+with _t_struct:
+    # ==================================================
+    # BY FAMILY MEMBER + CATEGORY MIX
+    # ==================================================
+    c3, c4 = st.columns(2)
+    with c3:
+        st.markdown(ui_section("By family member"), unsafe_allow_html=True)
+        if register is not None and register_members is not None and not register_members.empty:
+            owner_df = register_members.rename(columns={"Member": "Owner", "Current Value": "Value"})[["Owner", "Value"]]
+        elif owner_map:
+            owner_df = pd.DataFrame([{"Owner": k, "Value": v} for k, v in owner_map.items()])
+        else:
+            owner_df = pd.DataFrame(columns=["Owner", "Value"])
+        if not owner_df.empty:
+            fig2 = px.bar(owner_df, x="Owner", y="Value", text_auto=".2s", color_discrete_sequence=["#3b82f6"])
+            fig2.update_layout(margin=dict(t=5, b=5, l=5, r=5), height=240, showlegend=False,
+                                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font_color="#c2c9d6")
+            st.plotly_chart(fig2, use_container_width=True, key="chart_owner")
+    with c4:
+        st.markdown(ui_section("Category mix (MF) · overlap proxy"), unsafe_allow_html=True)
+        if not mf_valid.empty:
+            cat_df = mf_valid.groupby("Category")["Current Value"].sum().reset_index().sort_values("Current Value", ascending=False)
+            fig3 = px.bar(cat_df, x="Current Value", y="Category", orientation="h", color_discrete_sequence=["#22c55e"])
+            fig3.update_layout(margin=dict(t=5, b=5, l=5, r=5), height=240, showlegend=False,
+                                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font_color="#c2c9d6")
+            st.plotly_chart(fig3, use_container_width=True, key="chart_cat")
+            st.markdown(ui_caption("Category-level concentration, not real stock-level overlap — genuine holdings-level overlap needs paid portfolio-disclosure data with no free equivalent."), unsafe_allow_html=True)
+
+
+    # ==================================================
+    # TOP 5 STOCK CONCENTRATION + HOLDINGS SNAPSHOT
+    # ==================================================
+    snap_l, snap_r = st.columns([1, 1])
+    with snap_l:
+        st.markdown(ui_section("Top 5 stock concentration"), unsafe_allow_html=True)
+        if not stocks_valid.empty and total_stocks > 0:
+            top5 = stocks_valid.nlargest(5, "Current Value")[["Symbol", "Current Value"]].copy()
+            top5_sum = top5["Current Value"].sum()
+            other_val = max(total_stocks - top5_sum, 0)
+            pie_df = pd.concat([
+                top5.rename(columns={"Symbol": "Name", "Current Value": "Value"}),
+                pd.DataFrame([{"Name": "Others", "Value": other_val}]),
+            ], ignore_index=True)
+            fig_t5 = px.pie(pie_df, values="Value", names="Name", hole=0.55,
+                            color_discrete_sequence=["#3b82f6", "#f59e0b", "#a855f7", "#ef4444", "#22c55e", "#64748b"])
+            fig_t5.update_traces(textposition="inside", textinfo="percent", textfont_size=11)
+            fig_t5.update_layout(margin=dict(t=5, b=5, l=5, r=5), height=220, showlegend=True,
+                                 legend=dict(orientation="h", y=-0.15, font=dict(size=10)),
+                                 paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font_color="#c2c9d6",
+                                 annotations=[dict(text=f"{top5_stock_pct:.0f}%<br>Top 5", x=0.5, y=0.5,
+                                                   font_size=14, showarrow=False, font_color="#e5e9f0")])
+            st.plotly_chart(fig_t5, use_container_width=True, key="chart_top5")
+        else:
+            st.caption("No stock holdings for concentration chart.")
+
+    with snap_r:
+        st.markdown(ui_section("Holdings snapshot · Gold"), unsafe_allow_html=True)
+        if not gold_valid.empty:
+            _g_cols = [c for c in ["Owner", "Symbol", "Quantity", "Invested", "Current Price", "Current Value", "P&L", "Return %"] if c in gold_valid.columns]
+            _g = gold_valid[_g_cols].copy()
+            _g_height = min(360, 48 + 28 * max(len(_g), 1))
+            st.dataframe(
+                style_money_df(_g),
+                column_config={
+                    "Quantity": st.column_config.NumberColumn(format="%g"),
+                    "Invested": st.column_config.NumberColumn(format="₹%d"),
+                    "Current Value": st.column_config.NumberColumn(format="₹%d"),
+                    "P&L": st.column_config.NumberColumn(format="₹%d"),
+                    "Return %": st.column_config.NumberColumn(format="%.1f%%"),
+                    "Current Price": st.column_config.NumberColumn(format="₹%.2f"),
+                },
+                use_container_width=True, height=_g_height, hide_index=True,
+            )
+            st.markdown(
+                f'<div class="t-caption">Total Gold {format_inr(total_gold)} · {gold_pct:.1f}% of net worth · SGB/ETF via Groww/Yahoo · FoFs via AMFI</div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            st.caption("No gold holdings identified.")
+
+
+with _t_intel:
+    st.caption("Intelligence layers are read-only: deterministic signals, "
+               "coverage and gateway cache status. No AI provider is "
+               "connected or triggered on page load.")
+
+    if _intel_briefing is not None:
+        with st.expander("Portfolio Intelligence · signals, coverage & look-through"):
+            try:
+                _sig_rows = [
+                    {
+                        "Level": s.level,
+                        "Rule": s.label,
+                        "What we know": s.message,
+                        "Invalidated by": s.invalidation,
+                    }
+                    for s in _intel_briefing.signals
+                    if s.level != "info"
+                ]
+                if _sig_rows:
+                    _sig_df = pd.DataFrame(_sig_rows)
+                    st.dataframe(
+                        _sig_df,
+                        hide_index=True,
+                        use_container_width=True,
+                        column_config={
+                            "Level": st.column_config.TextColumn("Level", width="small"),
+                            "Rule": st.column_config.TextColumn("Rule", width="medium"),
+                            "What we know": st.column_config.TextColumn("What we know", width="large"),
+                            "Invalidated by": st.column_config.TextColumn("Invalidated by", width="large"),
+                        },
                     )
-                    st.session_state["cc_live_refreshed_at"] = now_ist
-                st.rerun()
-            _live_result = st.session_state.get("cc_live_result")
-            if _live_result is not None and _live_result.refreshed_at is not None:
-                st.caption(f"Last explicit refresh: {_live_result.refreshed_at:%d %b %Y %H:%M} UTC · "
-                           f"status: {_live_result.status} · "
-                           f"{len(_live_result.failures)} failure(s)")
-                if _live_result.failures:
-                    with st.expander(f"Refresh failures ({len(_live_result.failures)})"):
-                        for _src, _reason in _live_result.failures:
-                            st.caption(f"· {_src}: {_reason}")
-            _dev_rows = intel_live.development_rows(
-                _live_cohort, index=_pm_index, now=now_ist)
-            if _dev_rows:
-                st.dataframe(
-                    pd.DataFrame(_dev_rows[:20]), hide_index=True,
-                    use_container_width=True,
-                    column_config={
-                        "Development": st.column_config.TextColumn(width="large"),
-                        "Affected": st.column_config.TextColumn(width="small"),
-                        "Category": st.column_config.TextColumn(width="small"),
-                        "Source": st.column_config.TextColumn(width="small"),
-                        "Published": st.column_config.TextColumn(width="small"),
-                        "Quality": st.column_config.NumberColumn(format="%.2f"),
-                        "Relevance": st.column_config.TextColumn(width="small"),
-                        "Link": st.column_config.TextColumn(width="small"),
-                    })
-                st.caption("Relevance = exact identifier matching only "
-                           "(lib.intelligence.sources.mapping), never fuzzy. Quality = "
-                           "deterministic evidence score (mapped first, fresh above stale). "
-                           "All records are OBSERVED FACT evidence from Google News RSS and "
-                           "the FRED/SEC gateway cache — they never alter the numbers above.")
-            else:
-                st.caption("No cached news/gateway records yet — press 'Refresh research "
-                           "evidence' to fetch. A network call happens only on that explicit "
-                           "action, never on page open.")
-            _st_rows = intel_live.live_status(now=now_ist)
-            if _st_rows:
-                st.markdown("**Live research cache status**")
-                st.dataframe(pd.DataFrame(_st_rows), hide_index=True,
-                             use_container_width=True)
-        except Exception as _live_render_err:
-            st.caption(f"Live research panel unavailable: {_live_render_err}")
+                else:
+                    st.caption("No elevated signal this run — the rules see nothing abnormal.")
+                st.caption("Signal rules are deterministic (lib.intelligence.signals); levels only "
+                           "ever reach info when their fact is missing (insufficient evidence).")
+
+                _cov = _intel_facts.coverage
+                _cov_pct = f"{_cov.coverage_pct:.0f}%" if _cov.coverage_pct is not None else "n/a"
+                st.markdown(
+                    f"**Holdings disclosure coverage {_cov_pct}** — "
+                    f"{_cov.covered_funds} of {_cov.covered_funds + _cov.missing_funds} fund(s) "
+                    f"disclose holdings; look-through uses disclosed market values ("
+                    f"{'market-value-derived' if 'market_value_derived' in _intel_facts.weight_basis else 'published weights'}).",
+                    unsafe_allow_html=False,
+                )
+                if _cov.missing_funds:
+                    st.caption("No disclosure (insufficient evidence): " + ", ".join(list(_cov.missing_names)[:5]))
+
+                _uds = intel_exposure.underlying_df(_intel_facts)
+                if not _uds.empty:
+                    _top = _uds.sort_values("value_inr", ascending=False).head(5)
+                    st.markdown(f"**Top underlying positions (through funds, top {len(_top)})**")
+                    st.dataframe(
+                        _top[["name", "value_inr", "pct_of_assets", "schemes", "confidence"]],
+                        hide_index=True,
+                        use_container_width=True,
+                        column_config={
+                            "name": st.column_config.TextColumn("Security"),
+                            "value_inr": st.column_config.NumberColumn("Value (INR)", format="₹%d"),
+                            "pct_of_assets": st.column_config.NumberColumn("% of assets", format="%.1f%%"),
+                            "schemes": st.column_config.TextColumn("Via funds"),
+                            "confidence": st.column_config.NumberColumn("Confidence", format="%.2f"),
+                        },
+                    )
+
+                _synth = _intel_briefing.synthesis
+                if _synth is not None:
+                    st.markdown(f"**Synthesis ({_synth.model})** — {_synth.summary}")
+                    if _synth.claims:
+                        for _c in _synth.claims:
+                            st.caption(("✓ " if _c.supported else "⚠ ") + _c.text)
+                if _intel_briefing.synthesis_reason:
+                    st.caption(f"Reason: {_intel_briefing.synthesis_reason}")
+                st.caption("Decision-support only: the numbers above come from this page's own "
+                           "calc (register/drivers/snapshots) and statutory disclosure caches. "
+                           "No AI provider is connected; nothing here is an order.")
+            except Exception as _intel_render_err:
+                st.caption(f"Portfolio Intelligence render skipped: {_intel_render_err}")
+
+
+    # ---- Intelligence data gateway: read-only provider status (no network) ----
+    try:
+        _gw_rows = intel_gateway_status()
+        st.session_state["cc_intel_gateway_status"] = _gw_rows
+        if _gw_rows:
+            with st.expander("Portfolio Intelligence · data gateway (external-provider status)"):
+                st.dataframe(pd.DataFrame(_gw_rows), hide_index=True, use_container_width=True)
+                st.caption("Read-only cache status; no external call happens on page open. "
+                           "FRED/SEC/MF evidence is normalized to observed FACT evidence by "
+                           "lib.intelligence.sources and never alters the numbers above.")
+    except Exception as _gw_err:
+        st.session_state["cc_intel_gateway_status"] = []
+        st.caption(f"Data gateway status unavailable: {_gw_err}")
+
+
+# ==================================================
+# VERIFICATION — reconciliation + data integrity + asset register
+# Total is only ever "verified" when the register agrees with the page and the
+# drivers explain the P&L within the documented rounding bound.
+# ==================================================
+st.markdown(ui_section("Verification · reconciliation & data conditions"),
+            unsafe_allow_html=True)
+for name, passed, detail in recon_tests:
+    mark = ui_badge("✓ PASS", "positive") if passed else ui_badge("✗ FAIL", "negative")
+    st.markdown(f"{mark} — {name} ({detail})", unsafe_allow_html=True)
+
+if integrity_issues:
+    sev_order = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3}
+    integrity_issues.sort(key=lambda x: sev_order.get(x[0], 9))
+    with st.expander(f"Data integrity check — {len(integrity_issues)} issue(s) found"):
+        for sev, msg in integrity_issues:
+            st.markdown(f"**{sev}** — {msg}")
+
+# PHASE 1A — additive asset-register view by canonical class.
+# Display-only; totals mirror the reconciliation entries above. No re-valuation here.
+if register_classes is not None and not register_classes.empty:
+    with st.expander("Asset register · by canonical class"):
+        _class_view = register_classes.copy()
+        _class_view["Current (INR)"] = _class_view.apply(
+            lambda r: pd.NA if not r["Data Backed"] else r["Current Value"], axis=1
+        )
+        _class_view["Invested (INR)"] = _class_view.apply(
+            lambda r: pd.NA if not r["Data Backed"] else r["Invested"], axis=1
+        )
+        st.dataframe(
+            _class_view[["Asset Class", "Current (INR)", "Invested (INR)", "Data Backed"]],
+            hide_index=True, use_container_width=True,
+            column_config={
+                "Current (INR)": st.column_config.NumberColumn(
+                    "Current (INR)", format="₹ %,d",
+                ),
+                "Invested (INR)": st.column_config.NumberColumn(
+                    "Invested (INR)", format="₹ %,d",
+                ),
+            },
+        )
+        st.caption("No-data classes (Retirement / Real Estate / Savings/Cash / Liabilities) have no workbook source and are never summed.")
+
 
 st.markdown("---")
 src = "AMFI live" if (len(amfi_navs) and not amfi_cache_date) else (f"AMFI cache {amfi_cache_date}" if amfi_cache_date else "AMFI offline")
@@ -2463,5 +2439,41 @@ try:
                 "Scheme Code": scheme_code,
             })
         st.session_state["mf_holdings_for_health"] = records
+except Exception:
+    pass
+
+# ----- Read-only handoffs for Asset Detail (drill-down dossier) -----
+# Books / totals / live cohort are exported as session data so the detail page
+# renders the exact same numbers this page computed — never re-valued there.
+try:
+    st.session_state["cc_books"] = {
+        "mf": mf_valid if "mf_valid" in dir() else None,
+        "stocks": stocks_valid if "stocks_valid" in dir() else None,
+        "gold": gold_valid if "gold_valid" in dir() else None,
+        "fd": fd_valid if "fd_valid" in dir() else None,
+    }
+    st.session_state["cc_assets"] = {
+        "total_assets": float(total_networth),
+        "total_invested": float(total_invested),
+        "total_pnl": float(total_pnl),
+        "equity_pct": float(equity_pct),
+        "fcnr_pct": float(fcnr_pct),
+        "inr_fd_pct": float(inr_fd_pct),
+        "liquid_mf_pct": float(liquid_mf_pct),
+        "gold_pct": float(gold_pct),
+        "health_score": float(health_score),
+    }
+    st.session_state["cc_live_cohort"] = (
+        _live_cohort if "_live_cohort" in dir() and _live_cohort is not None else None
+    )
+except Exception:
+    pass
+try:
+    if news_items:
+        st.session_state["cc_news_items"] = [
+            {"title": g["asset"], "sentiment": g["sentiment"], "count": len(g["items"])}
+            for g in groups
+        ]
+        st.session_state["cc_news_items_full"] = list(news_items)
 except Exception:
     pass

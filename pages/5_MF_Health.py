@@ -4,51 +4,25 @@ import numpy as np
 import plotly.graph_objects as go
 from collections import defaultdict
 from datetime import datetime
-from lib.mf_health import analyze_fund, get_news_flags, get_holdings_for_funds
+from lib.mf_health import analyze_fund, get_holdings_for_funds
+from lib.theme import inject_css
+from lib.ui import (
+    page_header_html,
+    section_header_html,
+    pill,
+    kpi_cards,
+    empty_state,
+    caption,
+    banner,
+    footnote,
+)
 
-st.set_page_config(page_title="MF Health Check", page_icon="🛡️", layout="wide")
+st.set_page_config(page_title="MF Health", page_icon="🛡️", layout="wide")
 
 # ==================================================
-# INSTITUTIONAL DARK THEME
+# INSTITUTIONAL DARK THEME — one shared stylesheet (lib.theme)
 # ==================================================
-st.markdown("""
-<style>
-.stApp { background: #0a0e17; }
-p, span, label, .stMarkdown, div[data-testid="stMarkdownContainer"] { color: #c2c9d6 !important; }
-.block-container { padding-top: 1.4rem; max-width: 1500px; }
-
-.mfh-card {
-    background: linear-gradient(155deg, #12182a 0%, #0e1420 100%);
-    border: 1px solid #1c2333; border-radius: 14px; padding: 16px 18px;
-}
-.mfh-kpi-label { font-size: 0.68rem; font-weight: 700; color: #6b7688;
-                  text-transform: uppercase; letter-spacing: 0.06em; }
-.mfh-kpi-val { font-size: 1.55rem; font-weight: 800; color: #f8fafc; margin: 4px 0 2px 0; }
-.mfh-kpi-sub { font-size: 0.72rem; color: #6b7688; }
-.mfh-badge { display:inline-block; padding:2px 9px; border-radius:999px; font-size:0.68rem; font-weight:700; }
-.badge-low    { background: rgba(34,197,94,0.14);  color:#4ade80; }
-.badge-mod    { background: rgba(245,158,11,0.14); color:#fbbf24; }
-.badge-high   { background: rgba(239,68,68,0.14);  color:#f87171; }
-.badge-vhigh  { background: rgba(239,68,68,0.22);  color:#fca5a5; }
-
-.score-circle {
-    display:inline-flex; align-items:center; justify-content:center;
-    width:38px; height:38px; border-radius:50%; font-weight:800; font-size:0.82rem;
-    border: 3px solid;
-}
-.sc-excellent { border-color:#22c55e; color:#4ade80; }
-.sc-good      { border-color:#eab308; color:#fbbf24; }
-.sc-average   { border-color:#f97316; color:#fb923c; }
-.sc-poor      { border-color:#ef4444; color:#f87171; }
-
-.fund-row { border-bottom: 1px solid #1c2333; padding: 10px 4px; }
-.fund-name { color:#f1f5f9 !important; font-weight:600; font-size:0.86rem; }
-.fund-amc  { color:#6b7688 !important; font-size:0.72rem; }
-.cat-dot { display:inline-block; width:7px; height:7px; border-radius:50%; background:#3b82f6; margin-right:6px; }
-.section-header { font-size:0.78rem; font-weight:700; color:#8b95a8; text-transform:uppercase;
-                   letter-spacing:0.07em; margin: 18px 0 8px 0; }
-</style>
-""", unsafe_allow_html=True)
+inject_css()
 
 # ==================================================
 # LOAD FUNDS FROM COMMAND CENTER (unchanged data path)
@@ -57,7 +31,11 @@ st.page_link("pages/1_Command_Center.py", label="← Command Center", icon="📊
 
 mf_list = st.session_state.get("mf_holdings_for_health", [])
 if not mf_list:
-    st.info("Open **Command Center** once so your funds + scheme codes are loaded here.")
+    st.markdown(empty_state(
+        "Nothing to analyze yet",
+        "Open the Command Center once so your funds and scheme codes are loaded here.",
+        hint="Command Center → Intelligence → Refresh holdings",
+    ), unsafe_allow_html=True)
     st.stop()
 
 raw_results = []
@@ -83,7 +61,8 @@ for r in raw_results:
 
 ok_results = [r for r in by_code.values() if r["status"] == "ok"]
 if not ok_results:
-    st.warning("No funds with usable data yet.")
+    st.markdown(banner("No funds with usable data yet — scheme codes or cached values are missing.", "warning"),
+                unsafe_allow_html=True)
     st.stop()
 
 total_value = sum(r["current_value"] for r in ok_results)
@@ -291,46 +270,49 @@ def conc_bucket(top5):
 conc_label, conc_color = conc_bucket(top5_weight)
 
 # ==================================================
-# HEADER + KPI ROW
+# HEADER — portfolio health first
 # ==================================================
+st.markdown(page_header_html(
+    "Mutual fund portfolio health",
+    "MF Health",
+    "Portfolio-level health first — score, overlap, concentration — then fund-level "
+    "detail · every pillar traces to a disclosed or observed number",
+), unsafe_allow_html=True)
+
 c_title, c_export = st.columns([5, 1])
-with c_title:
-    st.markdown("## 🛡️ MF Health Check")
-    st.caption("Mutual fund portfolio quality, performance, overlap and concentration")
 with c_export:
     st.download_button("⬇ Export", df.drop(columns=[c for c in df.columns if c.startswith("_")]).to_csv(index=False),
-                        "mf_health.csv", "text/csv", use_container_width=True)
+                        "mf_health.csv", "text/csv", width="stretch")
 
-st.caption(f"Data as of {datetime.now().strftime('%d %b %Y')} · Based on {len(df)} unique funds")
+st.markdown(
+    '<div class="t-meta-row">'
+    + pill(f"{len(df)} funds", "info")
+    + pill(f"{df['AMC'].nunique()} fund families", "neutral")
+    + pill("cost not scored — no free expense-ratio source", "stale")
+    + '</div>',
+    unsafe_allow_html=True,
+)
+st.caption(f"Data as of {datetime.now().strftime('%d %b %Y')} · Based on {len(df)} unique funds "
+           f"· loaded from the Command Center run")
 st.markdown("---")
 
-k1, k2, k3, k4, k5 = st.columns(5)
-with k1:
-    st.markdown(f"""<div class="mfh-card"><div class="mfh-kpi-label">MF Portfolio Value</div>
-    <div class="mfh-kpi-val">₹{total_value/1e7:.2f} Cr</div>
-    <div class="mfh-kpi-sub">of total net worth</div></div>""", unsafe_allow_html=True)
-with k2:
-    st.markdown(f"""<div class="mfh-card"><div class="mfh-kpi-label">No. of Funds</div>
-    <div class="mfh-kpi-val">{len(df)}</div>
-    <div class="mfh-kpi-sub">{df['AMC'].nunique()} fund families</div></div>""", unsafe_allow_html=True)
-with k3:
-    b_label, _ = score_bucket(overall_health)
-    st.markdown(f"""<div class="mfh-card" style="text-align:center">
-    <div class="mfh-kpi-label">MF Health Score</div>
-    <div class="mfh-kpi-val" style="color:#4ade80 !important">{overall_health}<span style="font-size:0.9rem;color:#6b7688">/100</span></div>
-    <div class="mfh-kpi-sub" style="color:#4ade80 !important">{b_label}</div></div>""", unsafe_allow_html=True)
-with k4:
-    ov_txt = f"{portfolio_overlap_pct:.0f}%" if portfolio_overlap_pct is not None else "N/A"
-    ov_lbl, ov_cls = overlap_badge(portfolio_overlap_pct)
-    st.markdown(f"""<div class="mfh-card"><div class="mfh-kpi-label">Portfolio Overlap</div>
-    <div class="mfh-kpi-val">{ov_txt}</div>
-    <span class="mfh-badge {ov_cls}">{ov_lbl}</span></div>""", unsafe_allow_html=True)
-with k5:
-    st.markdown(f"""<div class="mfh-card"><div class="mfh-kpi-label">Concentration Risk</div>
-    <div class="mfh-kpi-val" style="color:{conc_color} !important">{conc_label}</div>
-    <div class="mfh-kpi-sub">Top 5 funds: {top5_weight:.1f}%</div></div>""", unsafe_allow_html=True)
+st.markdown(section_header_html("Health at a glance", "portfolio"), unsafe_allow_html=True)
 
-st.markdown("<br>", unsafe_allow_html=True)
+b_label, _ = score_bucket(overall_health)
+ov_txt = f"{portfolio_overlap_pct:.0f}%" if portfolio_overlap_pct is not None else "N/A"
+ov_lbl, ov_cls = overlap_badge(portfolio_overlap_pct)
+_ov_tone = {"": "", "badge-low": "up", "badge-mod": "", "badge-high": "warn", "badge-vhigh": "warn"}.get(ov_cls, "")
+_conc_tone = {"Low": "up", "Moderate": "warn", "High": "down"}.get(conc_label, "")
+k_cards = [
+    {"label": "MF Portfolio Value", "value": f"₹{total_value/1e7:.2f} Cr", "sub": "of total net worth"},
+    {"label": "No. of Funds", "value": f"{len(df)}", "sub": f"{df['AMC'].nunique()} fund families"},
+    {"label": "MF Health Score", "value": f"{overall_health}/100", "sub": b_label,
+     "tone": "up" if b_label == "Excellent" else ("warn" if b_label == "Good" else "down")},
+    {"label": "Portfolio Overlap", "value": ov_txt, "sub": ov_lbl, "tone": _ov_tone},
+    {"label": "Concentration Risk", "value": conc_label, "sub": f"Top 5 funds: {top5_weight:.1f}%",
+     "tone": _conc_tone},
+]
+st.markdown(kpi_cards(k_cards, cols=5), unsafe_allow_html=True)
 
 # ==================================================
 # BREAKDOWN RADAR + OVERLAP DONUT + TOP OVERLAPPED STOCKS
@@ -338,8 +320,8 @@ st.markdown("<br>", unsafe_allow_html=True)
 c1, c2, c3 = st.columns([1.1, 0.9, 1.3])
 
 with c1:
-    st.markdown('<div class="mfh-card">', unsafe_allow_html=True)
-    st.markdown("**MF Portfolio Health Breakdown**")
+    st.markdown(section_header_html("Health breakdown", meta="pillar averages across funds"),
+                unsafe_allow_html=True)
     pillars = ["Performance\n(25)", "Consistency\n(20)", "Concentration\n(15)", "Risk Adjusted\n(10)"]
     vals = [df["_perf"].mean(), df["_cons"].mean(), df["_conc"].mean(), df["_risk"].mean()]
     if df["_ov"].notna().any():
@@ -353,15 +335,14 @@ with c1:
         showlegend=False, height=280, margin=dict(t=20, b=20, l=40, r=40),
         paper_bgcolor="rgba(0,0,0,0)",
     )
-    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+    st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
     if not df["_ov"].notna().any():
-        st.caption("Overlap pillar excluded — holdings data unavailable this run.")
-    st.caption("Cost pillar not shown — no free source for per-fund expense ratio.")
-    st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown(caption("Overlap pillar excluded — holdings data unavailable this run."), unsafe_allow_html=True)
+    st.markdown(caption("Cost pillar not shown — no free source for per-fund expense ratio."), unsafe_allow_html=True)
 
 with c2:
-    st.markdown('<div class="mfh-card">', unsafe_allow_html=True)
-    st.markdown("**Portfolio Overlap**")
+    st.markdown(section_header_html("Portfolio overlap", meta="across disclosed holdings"),
+                unsafe_allow_html=True)
     if portfolio_overlap_pct is not None:
         fig2 = go.Figure(go.Pie(
             values=[portfolio_overlap_pct, 100 - portfolio_overlap_pct],
@@ -374,14 +355,18 @@ with c2:
             annotations=[dict(text=f"{portfolio_overlap_pct:.0f}%<br>Overlap", x=0.5, y=0.5,
                                font_size=15, showarrow=False, font_color="#f8fafc")],
         )
-        st.plotly_chart(fig2, use_container_width=True, config={"displayModeBar": False})
+        st.plotly_chart(fig2, width="stretch", config={"displayModeBar": False})
     else:
-        st.info("No holdings data cached yet — click 'Refresh holdings' below.")
-    st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown(empty_state(
+            "No holdings data cached",
+            "Holdings come from the holdings refresh on the Command Center.",
+            hint="Command Center → Intelligence → Refresh holdings",
+        ), unsafe_allow_html=True)
 
 with c3:
-    st.markdown('<div class="mfh-card">', unsafe_allow_html=True)
-    st.markdown("**Top Overlapped Stocks (Equity Only)**")
+    st.markdown(section_header_html("Top overlapped stocks · equity only",
+                                    meta=f"{df['AMC'].nunique()} fund families · disclosed holdings"),
+                unsafe_allow_html=True)
     if overlap_available:
         rows2 = []
         for key, apps in stock_exposure.items():
@@ -398,25 +383,26 @@ with c3:
             ).head(5)
             for _, rr in top_df.iterrows():
                 st.markdown(
-                    f"<div class='fund-row' style='display:flex;justify-content:space-between'>"
-                    f"<span class='fund-name'>{rr['Stock']}</span>"
-                    f"<span>{rr['In Funds']} funds · ₹{rr['Total Exposure']/1e5:.1f}L · {rr['% of MF Portfolio']:.1f}%</span>"
+                    f"<div class='t-list-row'>"
+                    f"<span class='t-list-name'>{rr['Stock']}</span>"
+                    f"<span class='t-list-meta'>{rr['In Funds']} funds · ₹{rr['Total Exposure']/1e5:.1f}L · {rr['% of MF Portfolio']:.1f}%</span>"
                     f"</div>", unsafe_allow_html=True)
         else:
-            st.caption("No stock appears in more than one fund yet.")
+            st.markdown(caption("No stock appears in more than one fund yet."), unsafe_allow_html=True)
     else:
-        st.caption("Holdings data unavailable — cache is empty and mfdata.in hasn't returned data. "
-                    "As a manual check meanwhile, try overlapiq.in with your fund list.")
-    force = st.button("🔄 Refresh holdings now (may be slow)", use_container_width=True)
+        st.markdown(caption("Holdings data unavailable — cache is empty and mfdata.in hasn't returned data. "
+                       "As a manual check meanwhile, try overlapiq.in with your fund list."), unsafe_allow_html=True)
+    force = st.button("🔄 Refresh holdings now (may be slow)", width="stretch")
     if force:
         get_holdings_for_funds(codes, force_refresh=True)
         st.rerun()
-    st.markdown("</div>", unsafe_allow_html=True)
 
 # ==================================================
 # SEARCHABLE / FILTERABLE FUND TABLE
 # ==================================================
-st.markdown('<div class="section-header">Fund Details</div>', unsafe_allow_html=True)
+st.markdown(section_header_html("Fund details — secondary analysis",
+                                meta="searchable · category/AMC filter · list or family view"),
+            unsafe_allow_html=True)
 
 fc1, fc2, fc3, fc4 = st.columns([2, 1, 1, 1])
 with fc1:
@@ -440,24 +426,32 @@ if amc_filter != "All AMCs":
     fdf = fdf[fdf["AMC"] == amc_filter]
 
 def render_table(data):
-    hdr = st.columns([3, 1.1, 0.8, 0.8, 0.8, 1, 1.3])
-    for col, label in zip(hdr, ["Fund / AMC", "Category", "1Y", "3Y", "5Y", "Health Score", "Overlap Impact"]):
-        col.markdown(f"<span style='color:#6b7688;font-size:0.72rem;font-weight:700;text-transform:uppercase'>{label}</span>", unsafe_allow_html=True)
-    for _, r in data.iterrows():
-        c = st.columns([3, 1.1, 0.8, 0.8, 0.8, 1, 1.3])
-        c[0].markdown(f"<div class='fund-name'>{r['Fund']}</div><div class='fund-amc'>{r['AMC']} Mutual Fund</div>", unsafe_allow_html=True)
-        c[1].markdown(f"<span class='cat-dot'></span>{r['Category']}", unsafe_allow_html=True)
-        def pct(v): return f"{v*100:.1f}%" if v is not None else "—"
-        for col, key in zip(c[2:5], ["1Y", "3Y", "5Y"]):
-            v = r[key]
-            color = "#4ade80" if (v or 0) >= 0 else "#f87171"
-            col.markdown(f"<span style='color:{color}'>{pct(v)}</span>", unsafe_allow_html=True)
-        _, cls = score_bucket(r["Score"])
-        c[5].markdown(f"<div class='score-circle {cls}'>{r['Score']}</div>", unsafe_allow_html=True)
-        ov_pct_disp = f"{r['OverlapPct']:.1f}%" if r["OverlapPct"] is not None else "—"
-        c[6].markdown(f"<span class='mfh-badge {r['OverlapCls']}'>{r['OverlapLabel']}</span><br>"
-                       f"<span style='font-size:0.7rem;color:#6b7688'>{ov_pct_disp}</span>", unsafe_allow_html=True)
-        st.markdown("<hr style='margin:2px 0;border-color:#1c2333'>", unsafe_allow_html=True)
+    def fmt(v):
+        return f"{v*100:.1f}%" if v is not None else "—"
+
+    disp = pd.DataFrame({
+        "Fund": data["Fund"],
+        "AMC": data["AMC"].map(lambda a: f"{a} Mutual Fund"),
+        "Category": data["Category"],
+        "1Y": data["1Y"].map(fmt),
+        "3Y": data["3Y"].map(fmt),
+        "5Y": data["5Y"].map(fmt),
+        "Health Score": data["Score"],
+        "Overlap": [
+            (f"{lbl} · {pct:.1f}%" if pct is not None else "—")
+            for lbl, pct in zip(data["OverlapLabel"], data["OverlapPct"])
+        ],
+    })
+    st.dataframe(
+        disp,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "Health Score": st.column_config.ProgressColumn(
+                "Health Score", min_value=0, max_value=100, format="%d",
+            ),
+        },
+    )
 
 if view == "List View":
     render_table(fdf)
@@ -469,10 +463,14 @@ else:
 st.markdown("---")
 lc1, lc2, lc3 = st.columns(3)
 lc1.markdown("**How we calculate MF Health Score**")
-lc1.caption("Performance (25) · Consistency (20) · Overlap (20, when available) · Concentration (15) · Risk Adjusted (10). "
-            "Cost (expense ratio) is not scored — no free per-fund data source found.")
+lc1.markdown(caption("Performance (25) · Consistency (20) · Overlap (20, when available) · Concentration (15) · Risk Adjusted (10). "
+                     "Cost (expense ratio) is not scored — no free per-fund data source found."), unsafe_allow_html=True)
 lc2.markdown("**Overlap Impact**")
-lc2.caption("Share of a fund's disclosed holdings that also appear in your other funds. Shown only when holdings data is available.")
-lc3.markdown("🟢 80–100 Excellent &nbsp; 🟡 60–79 Good &nbsp; 🟠 40–59 Average &nbsp; 🔴 0–39 Poor")
+lc2.markdown(caption("Share of a fund's disclosed holdings that also appear in your other funds. Shown only when holdings data is available."),
+             unsafe_allow_html=True)
+lc3.markdown("**Score scale**")
+lc3.markdown(caption("80–100 Excellent · 60–79 Good · 40–59 Average · 0–39 Poor — text labels are the signal; colour only repeats them."),
+             unsafe_allow_html=True)
 
-st.caption("Mutual fund investments are subject to market risks. Past performance is not indicative of future returns.")
+st.markdown(footnote("Mutual fund investments are subject to market risks. Past performance is not indicative of future returns."),
+            unsafe_allow_html=True)

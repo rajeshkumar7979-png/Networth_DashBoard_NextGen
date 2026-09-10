@@ -29,4 +29,9 @@ select = ["E", "F"]
 "lib/mf_holdings.py" = ["S110", "E501"]
 "lib/news.py" = ["S110", "E501"]
 "lib/history.py" = ["F401"]
+# The consolidated terminal CSS lives as one literal per rule + long HTML builder
+# f-strings; like the portfolio/news extraction files, these are intentionally kept
+# as single lines for faithful maintenance and are not "new" logic issues.
+"lib/theme.py" = ["E501"]
+"lib/ui/components.py" = ["E501"]
 "scripts/*.py" = ["F401", "S110", "E501"]
