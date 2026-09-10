@@ -29,11 +29,18 @@ def test_command_center_renders_without_exception():
     assert any("NOT a cash-flow measurement" in r for r in rendered), "cashflow label missing"
     # Phase 1B delta block present.
     assert any("Snapshot delta" in r or "snapshot delta" in r for r in rendered), "delta section missing"
+    # Level-structure gate (executive-brief hierarchy restructure): the three
+    # information-hierarchy sections must render as literal markdown. Empirical note:
+    # AppTest's at.markdown DOES surface st.markdown calls made inside expanders; only
+    # expander labels and st.caption are not surfaced, hence the session-state gate below
+    # for the research brief (whose full readout lives inside the Level-5 expander).
+    assert any("What deserves attention" in r for r in rendered), "attention section missing"
+    assert any("What changed this run" in r for r in rendered), "changed section missing"
+    assert any("Research brief · synthesis" in r for r in rendered), "research brief section missing"
     # Research & Synthesis + portfolio-aware live-research panel actually rendered.
     # cc_research_brief is set only on success inside the research try-block (which
     # derives the live plan + cached cohort), so a None here means the block was
-    # silently swallowed by its except. Expander-internal markup is not surfaced in
-    # AppTest's at.markdown, so we gate on session state instead.
+    # silently swallowed by its except.
     if "cc_research_brief" in at.session_state:
         research_brief = at.session_state["cc_research_brief"]
     else:

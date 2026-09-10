@@ -1257,37 +1257,6 @@ st.markdown(ui_page_header(
     f"Last updated {now_ist.strftime('%d %b %Y, %H:%M IST')} · all amounts in INR unless noted",
 ), unsafe_allow_html=True)
 
-# Data status pills
-amfi_dot = "dot-off" if len(amfi_navs) == 0 else ("dot-cache" if amfi_cache_date else "dot-live")
-amfi_lbl = "AMFI offline" if len(amfi_navs) == 0 else ("AMFI cache" if amfi_cache_date else "AMFI live")
-stocks_ok = (not stocks.empty and stocks["Current Price"].notna().any()) if not stocks.empty else False
-gold_ok = (not gold.empty and gold["Current Price"].notna().any()) if not gold.empty else False
-fx_ok = usd_inr is not None
-st.markdown(
-    '<div class="t-meta-row">'
-    + ui_pill(f"{amfi_lbl} · {len(amfi_navs)} schemes",
-              "off" if len(amfi_navs) == 0 else ("cache" if amfi_cache_date else "ok"))
-    + ui_pill(f"Stocks {'live' if stocks_ok else 'n/a'}", "ok" if stocks_ok else "off")
-    + ui_pill(f"Gold {'live' if gold_ok else 'n/a'}", "ok" if gold_ok else "off")
-    + ui_pill(f"USD/INR {'live' if fx_ok else 'n/a'}", "ok" if fx_ok else "off")
-    + ui_pill("Market pulse", "info")
-    + '</div>',
-    unsafe_allow_html=True,
-)
-
-if len(amfi_navs) == 0:
-    st.markdown(ui_banner(
-        "<b>AMFI data failed to load</b> this run and no disk cache found — "
-        "mutual fund values below are excluded.", "critical"), unsafe_allow_html=True)
-elif amfi_cache_date:
-    st.markdown(ui_banner(
-        f"<b>AMFI live fetch failed</b> — using disk cache from {amfi_cache_date} · "
-        f"{len(amfi_navs)} NAVs.", "warn"), unsafe_allow_html=True)
-elif mf_failed > 0:
-    st.markdown(ui_banner(
-        f"{mf_failed} fund(s) missing a live NAV · {len(amfi_navs)} AMFI NAVs OK.",
-        "warn"), unsafe_allow_html=True)
-
 # Optional vs prior history day (used by the hero cards below)
 _prev_nw = _prev_eq = None
 if history_df is not None and not history_df.empty and "net_worth" in history_df.columns:
@@ -1390,124 +1359,24 @@ st.markdown(
 )
 
 # ==================================================
-# WHAT CHANGED — P&L drivers (valuation attribution only)
+# LEVEL 1 (continued) — P&L drivers / FCNR / attention / pulse have moved:
+# compact briefs render as Level 2 & Level 3 after the intelligence compute;
+# full tables live in Level 5 (Evidence & technical details) at the bottom.
 # ==================================================
-st.markdown(ui_section("What changed · current P&L drivers"), unsafe_allow_html=True)
-if cc_drivers is not None:
-    _drv_rows = []
-    _fcnr_drivers = {"fcnr_interest", "fcnr_fx_principal"}
-    for _k in DRIVER_KEYS:
-        # When USD/INR is unavailable, FCNR interest / FX-on-principal slices are
-        # genuinely not measurable this run -> show n/a, never a fabricated 0.00.
-        if cc_drivers["missing_fx"] and _k in _fcnr_drivers:
-            _drv_rows.append({
-                "Driver": cc_drivers["driver_labels"].get(_k, _k),
-                "Amount (INR)": "n/a",
-                "% of P&L": "n/a",
-            })
-            continue
-        _dv = float(cc_drivers["drivers"].get(_k, 0.0))
-        _pct = (_dv / cc_drivers["total_pnl"] * 100) if cc_drivers["total_pnl"] else None
-        _drv_rows.append({
-            "Driver": cc_drivers["driver_labels"].get(_k, _k),
-            "Amount (INR)": round(_dv, 2),
-            "% of P&L": round(_pct, 2) if _pct is not None else None,
-        })
-    if cc_drivers["residual_bound"]:
-        _drv_rows.append({
-            "Driver": f"Rounded residual (documented bound \u20B9{cc_drivers['residual_bound']:.1f})",
-            "Amount (INR)": round(cc_drivers["residual"], 2),
-            "% of P&L": None,
-        })
-    st.dataframe(pd.DataFrame(_drv_rows), hide_index=True, use_container_width=True)
-    _dnote = (
-        f"Attributed {format_inr(cc_drivers['attributed'])} of "
-        f"Total P&L {format_inr(cc_drivers['total_pnl'])}. "
-    )
-    if cc_drivers["missing_fx"]:
-        _dnote += "USD/INR unavailable this run \u2014 FCNR interest/FX slices are n/a (never guessed). "
-    if not cc_drivers["residual_ok"]:
-        _dnote += "Residual exceeds the documented rounding bound \u2014 review source data. "
-    _dnote += "Valuation attribution only, not cash-flow events."
-    st.markdown(
-        f'<div class="t-caption">{_dnote} {NOT_A_CASHFLOW_LABEL}</div>',
-        unsafe_allow_html=True,
-    )
-else:
-    st.markdown(ui_empty(
-        "P&L drivers unavailable",
-        "The register did not build this run — see data integrity below.",
-    ), unsafe_allow_html=True)
 
 # ==================================================
-# FCNR RETURN ATTRIBUTION — interest + FX split (what changed · USD book)
+# FCNR RETURN ATTRIBUTION — interest + FX split (moved: compact → L3, full → L5)
 # ==================================================
-if not fd_valid.empty and (fd_valid["Currency"] == "USD").any():
-    st.markdown(ui_section("FCNR return · USD FD attribution (interest + FX)"),
-                unsafe_allow_html=True)
-    st.caption(
-        "NRI FCNR-style USD deposits: INR return = interest accrued on principal + FX from USD/INR move "
-        "since each deposit's own date (cost basis at deposit-date FX, mark-to-market at today's FX)."
-    )
-    usd_fd = fd_valid[fd_valid["Currency"] == "USD"]
-    st.markdown(ui_kpi_cards([
-        {"label": "FCNR interest (INR)", "value": format_inr(usd_fd["Interest Return (INR)"].sum()),
-         "tone": "up", "sub": "interest accrued at current FX"},
-        {"label": "FCNR FX gain/(loss) (INR)", "value": format_inr(total_fx_gain),
-         "tone": "up" if total_fx_gain >= 0 else "down", "sub": "FX on principal vs deposit date"},
-        {"label": "Total FCNR return (INR)", "value": format_inr(usd_fd["Interest Return (INR)"].sum() + total_fx_gain),
-         "tone": "accent", "sub": "interest + FX"},
-    ]), unsafe_allow_html=True)
 
 # ==================================================
-# WHAT NEEDS MY ATTENTION — tagged tiles
+# WHAT NEEDS MY ATTENTION — replaced by LEVEL 2 (What deserves attention)
+# rendered after the intelligence/research compute, which fuses run flags with
+# evidence-backed risks and decision-support research needs.
 # ==================================================
-st.markdown(ui_section("What needs my attention"), unsafe_allow_html=True)
-if not flags:
-    st.markdown(ui_empty("Nothing flagged right now.", "No warning or review items on this run."),
-                unsafe_allow_html=True)
-else:
-    _tiles = []
-    for level, title, body in flags[:8]:
-        _tiles.append({"level": level, "title": title, "body": body})
-    st.markdown(ui_watch(_tiles), unsafe_allow_html=True)
-
-# Critical integrity banner (also surfaced as a flag tile above)
-crit = [m for sev, m in integrity_issues if sev == "CRITICAL"]
-if crit:
-    bullets = "".join(f"<div>• {c}</div>" for c in crit[:6])
-    st.markdown(ui_banner(f"<b>Critical data issues</b>{bullets}", "critical"),
-                unsafe_allow_html=True)
 
 # ==================================================
-# MARKET PULSE — card grid (Phase A)
+# MARKET PULSE — moved to LEVEL 5 (Evidence & technical details)
 # ==================================================
-st.markdown(ui_section("Market pulse"), unsafe_allow_html=True)
-pulse_rows = build_market_pulse_rows()
-pulse_cards = []
-for row in pulse_rows:
-    if row["Value"] is None:
-        val = "—"
-        chg = None
-        sub = "no quote this run"
-    else:
-        val = row["fmt"].format(row["Value"])
-        chg = row["Chg %"]
-        sub = None
-        if chg is not None:
-            sub = f"{'▲' if chg >= 0 else '▼'} {chg:+.2f}%"
-    ath = row.get("ATH %")
-    if ath is not None:
-        sub = f"{sub + ' · ' if sub else ''}{ath:.1f}% from ATH"
-    pulse_cards.append({
-        "label": row["Market"],
-        "value": val,
-        "sub": sub or "",
-        "tone": "up" if (chg is not None and chg >= 0)
-                else ("down" if (chg is not None and chg < 0) else ""),
-    })
-st.markdown(ui_kpi_cards(pulse_cards, cols=4), unsafe_allow_html=True)
-st.caption("Free delayed sources · Gold ₹/10g & Silver ₹/kg (INR) · day change vs prior close · ATH from Yahoo daily history")
 
 # ==================================================
 # COMPUTE — news + portfolio intelligence + research + gateway
@@ -1665,44 +1534,158 @@ except Exception as _research_err:
 
 
 
-# PHASE 1B — delta decomposition between the two most recent snapshots.
-# Shows per-class Invested-Basis Change vs Market/Valuation Change. A legacy
-# (pre-Phase 1B) prior snapshot cannot be decomposed and is flagged.
-st.markdown(ui_section("Snapshot delta \u00b7 change since prior snapshot"), unsafe_allow_html=True)
-if len(history_df) >= 2:
-    _hist_sorted = history_df.sort_values("date").reset_index(drop=True)
-    _delta = snapshot_delta(_hist_sorted.iloc[-2], _hist_sorted.iloc[-1])
-    if _delta["available"]:
-        _delta_rows = []
-        for _cls in ASSET_CLASSES:
-            _d = _delta["by_class"].get(_cls)
-            if _d is None:
-                _delta_rows.append({"Asset Class": _cls, "\u0394 Current Value": None,
-                                    "Invested-Basis Change (not cash flow)": None, "Market/Valuation Change": None})
-            else:
-                _delta_rows.append({"Asset Class": _cls,
-                                    "\u0394 Current Value": round(_d["delta_current"], 2),
-                                    "Invested-Basis Change (not cash flow)": round(_d["invested_basis_change"], 2),
-                                    "Market/Valuation Change": round(_d["market_valuation_change"], 2)})
-        _dt = _delta["totals"]
-        _delta_rows.append({"Asset Class": "TOTAL",
-                            "\u0394 Current Value": round(_dt["delta_current"], 2),
-                            "Invested-Basis Change (not cash flow)": round(_dt["invested_basis_change"], 2),
-                            "Market/Valuation Change": round(_dt["market_valuation_change"], 2)})
-        st.dataframe(pd.DataFrame(_delta_rows), hide_index=True, use_container_width=True)
-        _dcap = [NOT_A_CASHFLOW_LABEL]
-        if _delta["unattributed_abs"] > 1e-6:
-            _dcap.append(f"Unattributed / unavailable: \u20B9{_delta['unattributed_abs']:.2f}")
-        if _delta["fcnr"] is not None:
-            _dcap.append(
-                f"FCNR \u0394 interest {format_inr(_delta['fcnr']['delta_interest'])} \u00b7 "
-                f"\u0394 FX on principal {format_inr(_delta['fcnr']['delta_fx'])}"
-            )
-        st.caption(" \u00b7 ".join(_dcap))
-    else:
-        st.caption(f"{_delta['reason']} (|\u0394| \u2248 \u20B9{_delta['unattributed_abs']:,.0f})")
+# ==================================================
+# LEVEL 2 — WHAT DESERVES ATTENTION (evidence-backed observations)
+# Fuses this run's deterministic portfolio flags with the intelligence
+# research's evidence-backed risks and decision-support research needs. Every
+# item carries why-it-matters + invalidation; thin evidence surfaces as
+# info-level, never as fabricated. Decision-support only — not advice/orders.
+# ==================================================
+st.markdown(ui_section("What deserves attention"), unsafe_allow_html=True)
+_attention_items = []
+for _fl_level, _fl_title, _fl_body in flags[:6]:
+    _attention_items.append({"level": _fl_level, "title": _fl_title, "body": _fl_body})
+if _research_brief is not None:
+    for _r in _research_brief.risks[:3]:
+        _attention_items.append({
+            "level": "critical" if _r.strength == "strong" else "warning",
+            "title": _r.title,
+            "body": _r.statement + " · " + _r.invalidation,
+        })
+    for _n in _research_brief.research_needs[:2]:
+        _attention_items.append({
+            "level": "info",
+            "title": "Decide: " + _n.title,
+            "body": _n.statement,
+        })
+_seen_titles = set()
+_dedup_attention = []
+for _a in _attention_items:
+    _key = _a["title"].strip().lower()
+    if _key in _seen_titles:
+        continue
+    _seen_titles.add(_key)
+    _dedup_attention.append(_a)
+_flag_sev = {"critical": 0, "warning": 1, "info": 2}
+_dedup_attention.sort(key=lambda x: _flag_sev.get(x["level"], 3))
+if _dedup_attention:
+    st.markdown(ui_watch(_dedup_attention[:6]), unsafe_allow_html=True)
+    st.caption("Run flags first, then evidence-backed risks and decision-support research needs.")
 else:
-    st.caption("Add a second snapshot (next day\u2019s run) to see the \u0394 Current Value decomposition.")
+    st.markdown(ui_empty("Nothing flagged right now.",
+                         "No warning, risk or decision-support item this run."),
+                unsafe_allow_html=True)
+_drill_a, _drill_b, _drill_c, _drill_d = st.columns(4)
+with _drill_a:
+    st.page_link("pages/2_Deep_Health.py", label="Decide · maturing money", icon="\U0001F9ED")
+with _drill_b:
+    st.page_link("pages/3_Asset_Detail.py", label="Drill · holdings dossier", icon="\U0001F9FE")
+with _drill_c:
+    st.page_link("pages/5_MF_Health.py", label="Funds · MF Health", icon="\U0001F3E5")
+with _drill_d:
+    st.page_link("pages/4_News.py", label="Context · Intel & News", icon="\U0001F4F0")
+st.caption("Drill into a page for the full detail behind any item. Above items are "
+           "observed/calculated from this run's data — never invented.")
+
+# -------------------------------------------------
+# PHASE 1B — delta decomposition between the two most recent snapshots.
+# Computed here (shared by the Level 3 headline and Level 5 full table). A
+# legacy (pre-Phase 1B) prior snapshot cannot be decomposed and is flagged.
+# -------------------------------------------------
+_delta = None
+_delta_rows = []
+_dt = None
+_dcap = None
+if history_df is not None and len(history_df) >= 2:
+    _hist_sorted = history_df.sort_values("date").reset_index(drop=True)
+    try:
+        _delta = snapshot_delta(_hist_sorted.iloc[-2], _hist_sorted.iloc[-1])
+        if _delta["available"]:
+            _delta_rows = []
+            for _cls in ASSET_CLASSES:
+                _d = _delta["by_class"].get(_cls)
+                if _d is None:
+                    _delta_rows.append({"Asset Class": _cls, "\u0394 Current Value": None,
+                                        "Invested-Basis Change (not cash flow)": None,
+                                        "Market/Valuation Change": None})
+                else:
+                    _delta_rows.append({"Asset Class": _cls,
+                                        "\u0394 Current Value": round(_d["delta_current"], 2),
+                                        "Invested-Basis Change (not cash flow)": round(_d["invested_basis_change"], 2),
+                                        "Market/Valuation Change": round(_d["market_valuation_change"], 2)})
+            _dt = _delta["totals"]
+            _delta_rows.append({"Asset Class": "TOTAL",
+                                "\u0394 Current Value": round(_dt["delta_current"], 2),
+                                "Invested-Basis Change (not cash flow)": round(_dt["invested_basis_change"], 2),
+                                "Market/Valuation Change": round(_dt["market_valuation_change"], 2)})
+            _dcap = [NOT_A_CASHFLOW_LABEL]
+            if _delta["unattributed_abs"] > 1e-6:
+                _dcap.append(f"Unattributed / unavailable: \u20B9{_delta['unattributed_abs']:.2f}")
+            if _delta["fcnr"] is not None:
+                _dcap.append(
+                    f"FCNR \u0394 interest {format_inr(_delta['fcnr']['delta_interest'])} \u00b7 "
+                    f"\u0394 FX on principal {format_inr(_delta['fcnr']['delta_fx'])}"
+                )
+    except Exception:
+        _delta = None
+
+# ==================================================
+# LEVEL 3 — WHAT CHANGED THIS RUN (compact)
+# Valuation attribution only; the workbook has no cash-flow ledger, so the
+# invested diff between runs is never called a deposit/withdrawal/SIP.
+# ==================================================
+st.markdown(ui_section("What changed this run"), unsafe_allow_html=True)
+if _research_brief is not None and _research_brief.changes:
+    _chg_cards = [
+        {
+            "label": c.label,
+            "value": f"{c.amount:,.0f}" if c.amount is not None else "\u2014",
+            "sub": c.kind.replace("_", " ") + (" \u00b7 " + c.note if c.note else ""),
+            "tone": "up" if (c.amount is not None and c.amount >= 0)
+                    else ("down" if (c.amount is not None and c.amount < 0) else ""),
+        }
+        for c in _research_brief.changes[:6]
+    ]
+    st.markdown(ui_kpi_cards(_chg_cards, cols=3), unsafe_allow_html=True)
+elif cc_drivers is not None and cc_drivers["drivers"]:
+    _chg_cards = []
+    for _k, _v in cc_drivers["drivers"].items():
+        _chg_cards.append({
+            "label": cc_drivers["driver_labels"].get(_k, _k),
+            "value": f"{_v:,.0f}",
+            "sub": "valuation attribution",
+            "tone": "up" if _v >= 0 else "down",
+        })
+    st.markdown(ui_kpi_cards(_chg_cards[:6], cols=3), unsafe_allow_html=True)
+else:
+    st.markdown(ui_empty("Change breakdown unavailable",
+                         "The register or research layer did not build this run."),
+                unsafe_allow_html=True)
+
+if _dt is not None:
+    st.markdown(ui_kpi_cards([
+        {"label": "Snapshot delta \u00b7 \u0394 current value",
+         "value": f"{_dt['delta_current']:,.0f}",
+         "sub": "vs prior snapshot", "tone": "up" if _dt["delta_current"] >= 0 else "down"},
+        {"label": "Market / valuation change",
+         "value": f"{_dt['market_valuation_change']:,.0f}",
+         "sub": "market + valuation move",
+         "tone": "up" if _dt["market_valuation_change"] >= 0 else "down"},
+        {"label": "Invested-Basis Change",
+         "value": f"{_dt['invested_basis_change']:,.0f}",
+         "sub": "book-cost basis change between runs",
+         "tone": "up" if _dt["invested_basis_change"] >= 0 else "down"},
+    ]), unsafe_allow_html=True)
+    _delta_cap = ("Snapshot delta \u00b7 change since prior snapshot. " + NOT_A_CASHFLOW_LABEL
+                  + " Full per-class decomposition in the Evidence & technical details "
+                  "panel at the bottom.")
+elif _delta is not None and not _delta.get("available"):
+    _delta_cap = (f"{_delta['reason']} (|\u0394| \u2248 \u20B9{_delta['unattributed_abs']:,.0f}). "
+                  + NOT_A_CASHFLOW_LABEL)
+else:
+    _delta_cap = ("Add a second snapshot (a later run) to see the \u0394 Current Value vs "
+                  "prior snapshot. " + NOT_A_CASHFLOW_LABEL)
+st.markdown(ui_caption(_delta_cap), unsafe_allow_html=True)
 
 
 # ==================================================
@@ -1807,67 +1790,23 @@ st.markdown("---")
 
 
 # ==================================================
-# RESEARCH & SYNTHESIS — executive readout (deterministic, network-free)
+# LEVEL 4 — RESEARCH BRIEF · SYNTHESIS (compact, deterministic, network-free)
+# Top-of-brief summary; the full readout (changes table, risks with
+# invalidation, research needs, gaps, claims) lives in Level 5 below.
 # ==================================================
-st.markdown(ui_section("Research & Synthesis · decision readout"),
-            unsafe_allow_html=True)
+st.markdown(ui_section("Research brief · synthesis"), unsafe_allow_html=True)
 if _research_brief is not None:
     try:
         _rb = _research_brief
         st.markdown(
             f"**Research brief {_rb.as_of.strftime('%d %b %Y %H:%M')}** — "
             f"{len(_rb.changes)} change row(s) · {_rb.mapped_count} mapped external "
-            f"record(s) · {len(_rb.risks)} risk(s) · {len(_rb.gaps)} evidence gap(s).")
+            f"record(s) · {len(_rb.risks)} risk(s) · {len(_rb.gaps)} evidence gap(s). "
+            f"Top attention items are in the panel above.")
         if _rb.synthesis is not None:
             st.markdown(f"**Synthesis ({_rb.synthesis.model})** — {_rb.synthesis.summary}")
-
-        if _rb.changes:
-            st.markdown("**What changed this run**")
-            _ch = pd.DataFrame([
-                {
-                    "Kind": c.kind.replace("_", " "),
-                    "Item": c.label,
-                    "Amount (INR)": f"{c.amount:,.0f}" if c.amount is not None else "—",
-                    "Note": c.note,
-                }
-                for c in _rb.changes
-            ])
-            st.dataframe(_ch, hide_index=True, use_container_width=True,
-                         column_config={"Note": st.column_config.TextColumn(width="large")})
-            st.caption(_rb.not_a_cashflow_label)
-
-        if _rb.risks:
-            st.markdown("**Risks that deserve attention**")
-            _risk_items = [{
-                "level": "warning" if r.strength in ("weak", "moderate") else "critical",
-                "title": r.title,
-                "body": r.statement,
-                "what": "invalidated by: " + r.invalidation,
-            } for r in _rb.risks[:5]]
-            st.markdown(ui_watch(_risk_items), unsafe_allow_html=True)
-
-        if _rb.research_needs:
-            st.markdown("**Research needs (decision-support, not orders)**")
-            _needs = [ui_research_row(
-                title=n.title,
-                meta=f"strength {n.strength}",
-                body=n.statement,
-            ) for n in _rb.research_needs[:5]]
-            st.markdown(ui_research_grid(_needs), unsafe_allow_html=True)
-
-        if _rb.gaps:
-            st.markdown("**Where evidence is insufficient**")
-            st.markdown(ui_evidence(list(_rb.gaps[:6])), unsafe_allow_html=True)
-
-        if _rb.synthesis is not None and _rb.synthesis.claims:
-            st.markdown(f"**Claims ({_rb.synthesis.model})**")
-            for _c in _rb.synthesis.claims:
-                st.caption(("✓ " if _c.supported else "⚠ ") + _c.text)
-        if _rb.synthesis_reason:
-            st.caption(f"Reason: {_rb.synthesis_reason}")
-        st.caption("Synthesis is deterministic rule-based (no AI provider connected). "
-                   "Every number comes from this page's own calc or cached statutory "
-                   "disclosures; decision-support only — nothing here is an order.")
+        st.caption("Decision-support only; nothing here is an order. Full readout in "
+                   "the Evidence & technical details panel at the bottom.")
     except Exception as _research_render_err:
         st.caption(f"Research & Synthesis render skipped: {_research_render_err}")
 else:
@@ -1900,12 +1839,12 @@ if _research_brief is not None:
                     "credentials are never sent. The deterministic Research Brief above "
                     "is unaffected either way.")
             else:
-                st.warning(
-                    "No AI API key configured. Set `AI_API_KEY` in the environment/"
-                    "secrets (optionally `AI_PROVIDER`, `AI_MODEL`, `AI_BASE_URL`, "
-                    "`AI_TIMEOUT_SECONDS`) to enable the AI research provider. Until "
-                    "then the deterministic Research Brief is the only synthesis — "
-                    "unchanged.")
+                st.caption(
+                    "AI provider not configured – infrastructure state, not a portfolio "
+                    "warning. Set `AI_API_KEY` in the environment/secrets (optionally "
+                    "`AI_PROVIDER`, `AI_MODEL`, `AI_BASE_URL`, `AI_TIMEOUT_SECONDS`) to "
+                    "enable it. Until then the deterministic Research Brief is the only "
+                    "synthesis — unchanged.")
             _ai_fp = (
                 tuple(sorted(_research_brief.totals.items())),
                 _research_brief.evidence_count,
@@ -2063,6 +2002,52 @@ with _t_h:
             for asset, val, col in zip(alloc_df["Asset"], alloc_df["Value"], colors)
         )
         st.markdown(f'<ul class="t-alloc-legend">{legend_items}</ul>', unsafe_allow_html=True)
+
+with _t_hist:
+    st.markdown(ui_section("Net worth & health over snapshots"), unsafe_allow_html=True)
+    if history_df is None or history_df.empty:
+        st.caption("No saved snapshots yet. The Command Center appends one per run to "
+                   "data/history.csv (gitignored) — revisit after a few runs to see the trend.")
+    else:
+        _hd = history_df.copy()
+        if "date" in _hd.columns:
+            _hd["date"] = _hd["date"].astype(str)
+            _hd = _hd.sort_values("date")
+        _h1, _h2 = st.columns(2)
+        with _h1:
+            if "net_worth" in _hd.columns:
+                fig_nw = go.Figure(go.Scatter(
+                    x=_hd["date"], y=_hd["net_worth"],
+                    mode="lines+markers", name="Net Worth (INR)",
+                    line=dict(color="#22c55e")))
+                fig_nw.update_layout(height=260, margin=dict(t=5, b=5, l=5, r=5),
+                                     paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                                     font_color="#c2c9d6", yaxis_title="INR")
+                st.plotly_chart(fig_nw, use_container_width=True, key="chart_hist_nw")
+                st.caption("Net worth across snapshots. Today's row upserts on the same "
+                           "date; older rows are append-only (never rewritten).")
+            else:
+                st.caption("Net-worth history unavailable in this snapshot set.")
+        with _h2:
+            _h_traces = []
+            if "equity_pct" in _hd.columns:
+                _h_traces.append(go.Scatter(
+                    x=_hd["date"], y=_hd["equity_pct"], mode="lines+markers",
+                    name="Equity %", line=dict(color="#f59e0b")))
+            if "health_score" in _hd.columns:
+                _h_traces.append(go.Scatter(
+                    x=_hd["date"], y=_hd["health_score"], mode="lines+markers",
+                    name="Health score", line=dict(color="#3b82f6")))
+            if _h_traces:
+                fig_hx = go.Figure(_h_traces)
+                fig_hx.update_layout(height=260, margin=dict(t=5, b=5, l=5, r=5),
+                                     paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                                     font_color="#c2c9d6", yaxis_title="% / 0-100")
+                st.plotly_chart(fig_hx, use_container_width=True, key="chart_hist_health")
+                st.caption("Equity share and health score over time. Legacy pre-Phase 1B "
+                           "rows lack enriched columns and are skipped, never back-filled.")
+            else:
+                st.caption("Equity/health columns unavailable in this snapshot set.")
 
 with _t_hold:
     st.markdown(ui_section("Mutual funds"), unsafe_allow_html=True)
@@ -2343,27 +2328,196 @@ with _t_intel:
 
 
 # ==================================================
-# VERIFICATION — reconciliation + data integrity + asset register
-# Total is only ever "verified" when the register agrees with the page and the
-# drivers explain the P&L within the documented rounding bound.
+# LEVEL 5 — EVIDENCE & TECHNICAL DETAILS (secondary diagnostic panel)
+# Data status, full decompositions, the complete research readout and the
+# reconciliation/integrity/register checks sit behind ONE collapsed expander so
+# the first viewport stays an executive brief. Expanding never changes numbers.
 # ==================================================
-st.markdown(ui_section("Verification · reconciliation & data conditions"),
+with st.expander("Evidence & technical details", expanded=False):
+    st.markdown("**Data status & sources**")
+    amfi_dot = "dot-off" if len(amfi_navs) == 0 else ("dot-cache" if amfi_cache_date else "dot-live")
+    amfi_lbl = "AMFI offline" if len(amfi_navs) == 0 else ("AMFI cache" if amfi_cache_date else "AMFI live")
+    stocks_ok = (not stocks.empty and stocks["Current Price"].notna().any()) if not stocks.empty else False
+    gold_ok = (not gold.empty and gold["Current Price"].notna().any()) if not gold.empty else False
+    fx_ok = usd_inr is not None
+    st.markdown(
+        '<div class="t-meta-row">'
+        + ui_pill(f"{amfi_lbl} · {len(amfi_navs)} schemes",
+                  "off" if len(amfi_navs) == 0 else ("cache" if amfi_cache_date else "ok"))
+        + ui_pill(f"Stocks {'live' if stocks_ok else 'n/a'}", "ok" if stocks_ok else "off")
+        + ui_pill(f"Gold {'live' if gold_ok else 'n/a'}", "ok" if gold_ok else "off")
+        + ui_pill(f"USD/INR {'live' if fx_ok else 'n/a'}", "ok" if fx_ok else "off")
+        + '</div>',
+        unsafe_allow_html=True,
+    )
+    if len(amfi_navs) == 0:
+        st.markdown(ui_banner(
+            "<b>AMFI data failed to load</b> this run and no disk cache found — "
+            "mutual fund values below are excluded.", "critical"), unsafe_allow_html=True)
+    elif amfi_cache_date:
+        st.markdown(ui_banner(
+            f"<b>AMFI live fetch failed</b> — using disk cache from {amfi_cache_date} · "
+            f"{len(amfi_navs)} NAVs.", "warn"), unsafe_allow_html=True)
+    elif mf_failed > 0:
+        st.markdown(ui_banner(
+            f"{mf_failed} fund(s) missing a live NAV · {len(amfi_navs)} AMFI NAVs OK.",
+            "warn"), unsafe_allow_html=True)
+
+    st.markdown("**Portfolio change · full decomposition**")
+    if _dt is not None:
+        st.dataframe(pd.DataFrame(_delta_rows), hide_index=True, use_container_width=True)
+        if _dcap:
+            st.caption(" \u00b7 ".join(_dcap))
+    if cc_drivers is not None:
+        _drv_rows = []
+        _fcnr_drivers = {"fcnr_interest", "fcnr_fx_principal"}
+        for _k in DRIVER_KEYS:
+            # When USD/INR is unavailable, FCNR interest / FX-on-principal slices are
+            # genuinely not measurable this run -> show n/a, never a fabricated 0.00.
+            if cc_drivers["missing_fx"] and _k in _fcnr_drivers:
+                _drv_rows.append({
+                    "Driver": cc_drivers["driver_labels"].get(_k, _k),
+                    "Amount (INR)": "n/a",
+                    "% of P&L": "n/a",
+                })
+                continue
+            _dv = float(cc_drivers["drivers"].get(_k, 0.0))
+            _pct = (_dv / cc_drivers["total_pnl"] * 100) if cc_drivers["total_pnl"] else None
+            _drv_rows.append({
+                "Driver": cc_drivers["driver_labels"].get(_k, _k),
+                "Amount (INR)": round(_dv, 2),
+                "% of P&L": round(_pct, 2) if _pct is not None else None,
+            })
+        if cc_drivers["residual_bound"]:
+            _drv_rows.append({
+                "Driver": f"Rounded residual (documented bound \u20B9{cc_drivers['residual_bound']:.1f})",
+                "Amount (INR)": round(cc_drivers["residual"], 2),
+                "% of P&L": None,
+            })
+        st.dataframe(pd.DataFrame(_drv_rows), hide_index=True, use_container_width=True)
+        _dnote = (
+            f"Attributed {format_inr(cc_drivers['attributed'])} of "
+            f"Total P&L {format_inr(cc_drivers['total_pnl'])}. "
+        )
+        if cc_drivers["missing_fx"]:
+            _dnote += "USD/INR unavailable this run \u2014 FCNR interest/FX slices are n/a (never guessed). "
+        if not cc_drivers["residual_ok"]:
+            _dnote += "Residual exceeds the documented rounding bound \u2014 review source data. "
+        _dnote += "Valuation attribution only, not cash-flow events."
+        st.caption(_dnote + " " + NOT_A_CASHFLOW_LABEL)
+
+    if not fd_valid.empty and (fd_valid["Currency"] == "USD").any():
+        st.markdown("**FCNR return · USD FD attribution (interest + FX)**")
+        st.caption(
+            "NRI FCNR-style USD deposits: INR return = interest accrued on principal + FX from USD/INR move "
+            "since each deposit's own date (cost basis at deposit-date FX, mark-to-market at today's FX)."
+        )
+        usd_fd = fd_valid[fd_valid["Currency"] == "USD"]
+        st.markdown(ui_kpi_cards([
+            {"label": "FCNR interest (INR)", "value": format_inr(usd_fd["Interest Return (INR)"].sum()),
+             "tone": "up", "sub": "interest accrued at current FX"},
+            {"label": "FCNR FX gain/(loss) (INR)", "value": format_inr(total_fx_gain),
+             "tone": "up" if total_fx_gain >= 0 else "down", "sub": "FX on principal vs deposit date"},
+            {"label": "Total FCNR return (INR)", "value": format_inr(usd_fd["Interest Return (INR)"].sum() + total_fx_gain),
+             "tone": "accent", "sub": "interest + FX"},
+        ]), unsafe_allow_html=True)
+
+    st.markdown("**Research & Synthesis · full readout**")
+    if _research_brief is not None:
+        try:
+            _rb = _research_brief
+            if _rb.changes:
+                st.markdown("**What changed this run**")
+                _ch_full = pd.DataFrame([
+                    {
+                        "Kind": c.kind.replace("_", " "),
+                        "Item": c.label,
+                        "Amount (INR)": f"{c.amount:,.0f}" if c.amount is not None else "\u2014",
+                        "Note": c.note,
+                    }
+                    for c in _rb.changes
+                ])
+                st.dataframe(_ch_full, hide_index=True, use_container_width=True,
+                             column_config={"Note": st.column_config.TextColumn(width="large")})
+                st.caption(_rb.not_a_cashflow_label)
+            if _rb.risks:
+                st.markdown("**Risks that deserve attention**")
+                _risk_items = [{
+                    "level": "warning" if r.strength in ("weak", "moderate") else "critical",
+                    "title": r.title,
+                    "body": r.statement,
+                    "what": "invalidated by: " + r.invalidation,
+                } for r in _rb.risks]
+                st.markdown(ui_watch(_risk_items), unsafe_allow_html=True)
+            if _rb.research_needs:
+                st.markdown("**Research needs (decision-support, not orders)**")
+                _needs = [ui_research_row(
+                    title=n.title,
+                    meta=f"strength {n.strength}",
+                    body=n.statement,
+                ) for n in _rb.research_needs]
+                st.markdown(ui_research_grid(_needs), unsafe_allow_html=True)
+            if _rb.gaps:
+                st.markdown("**Where evidence is insufficient**")
+                st.markdown(ui_evidence(list(_rb.gaps)), unsafe_allow_html=True)
+            if _rb.synthesis is not None and _rb.synthesis.claims:
+                st.markdown(f"**Claims ({_rb.synthesis.model})**")
+                for _c in _rb.synthesis.claims:
+                    st.caption(("\u2713 " if _c.supported else "\u26a0 ") + _c.text)
+            if _rb.synthesis_reason:
+                st.caption(f"Reason: {_rb.synthesis_reason}")
+            st.caption("Synthesis is deterministic rule-based (no AI provider connected). "
+                       "Every number comes from this page's own calc or cached statutory "
+                       "disclosures; decision-support only — nothing here is an order.")
+        except Exception as _research_render_err:
+            st.caption(f"Research & Synthesis render skipped: {_research_render_err}")
+    else:
+        st.markdown(ui_unavailable(
+            "Research brief unavailable", "The research layer did not build this run."),
             unsafe_allow_html=True)
-for name, passed, detail in recon_tests:
-    mark = ui_badge("✓ PASS", "positive") if passed else ui_badge("✗ FAIL", "negative")
-    st.markdown(f"{mark} — {name} ({detail})", unsafe_allow_html=True)
 
-if integrity_issues:
-    sev_order = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3}
-    integrity_issues.sort(key=lambda x: sev_order.get(x[0], 9))
-    with st.expander(f"Data integrity check — {len(integrity_issues)} issue(s) found"):
-        for sev, msg in integrity_issues:
-            st.markdown(f"**{sev}** — {msg}")
+    st.markdown("**Market backdrop**")
+    pulse_rows = build_market_pulse_rows()
+    pulse_cards = []
+    for row in pulse_rows:
+        if row["Value"] is None:
+            val = "\u2014"
+            chg = None
+            sub = "no quote this run"
+        else:
+            val = row["fmt"].format(row["Value"])
+            chg = row["Chg %"]
+            sub = None
+            if chg is not None:
+                sub = f"{'▲' if chg >= 0 else '▼'} {chg:+.2f}%"
+        ath = row.get("ATH %")
+        if ath is not None:
+            sub = f"{sub + ' · ' if sub else ''}{ath:.1f}% from ATH"
+        pulse_cards.append({
+            "label": row["Market"],
+            "value": val,
+            "sub": sub or "",
+            "tone": "up" if (chg is not None and chg >= 0)
+                    else ("down" if (chg is not None and chg < 0) else ""),
+        })
+    st.markdown(ui_kpi_cards(pulse_cards, cols=4), unsafe_allow_html=True)
+    st.caption("Free delayed sources · Gold ₹/10g & Silver ₹/kg (INR) · day change vs prior close · ATH from Yahoo daily history")
 
-# PHASE 1A — additive asset-register view by canonical class.
-# Display-only; totals mirror the reconciliation entries above. No re-valuation here.
-if register_classes is not None and not register_classes.empty:
-    with st.expander("Asset register · by canonical class"):
+    st.markdown("**Verification · reconciliation & data conditions**")
+    for name, passed, detail in recon_tests:
+        mark = ui_badge("✓ PASS", "positive") if passed else ui_badge("✗ FAIL", "negative")
+        st.markdown(f"{mark} — {name} ({detail})", unsafe_allow_html=True)
+
+    if integrity_issues:
+        sev_order = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3}
+        integrity_issues.sort(key=lambda x: sev_order.get(x[0], 9))
+        with st.expander(f"Data integrity check — {len(integrity_issues)} issue(s) found"):
+            for sev, msg in integrity_issues:
+                st.markdown(f"**{sev}** — {msg}")
+
+    # PHASE 1A — additive asset-register view by canonical class.
+    # Display-only; totals mirror the reconciliation entries above. No re-valuation here.
+    if register_classes is not None and not register_classes.empty:
         _class_view = register_classes.copy()
         _class_view["Current (INR)"] = _class_view.apply(
             lambda r: pd.NA if not r["Data Backed"] else r["Current Value"], axis=1
