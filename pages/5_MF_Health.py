@@ -18,8 +18,6 @@ from lib.ui import (
     nav_shell,
 )
 
-st.set_page_config(page_title="Funds", page_icon="🛡️", layout="wide")
-
 # ==================================================
 # INSTITUTIONAL DARK THEME — one shared stylesheet (lib.theme)
 # ==================================================

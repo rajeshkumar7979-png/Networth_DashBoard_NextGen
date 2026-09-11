@@ -1,7 +1,7 @@
 import html
 import streamlit as st
 
-from lib.news import get_portfolio_news, get_sentiment, time_ago
+from lib.news import get_sentiment, time_ago
 from lib.theme import inject_css
 from lib.ui import (page_header_html, section_header_html, pill, sentiment_mark, empty_state,
                     research_row, research_grid, footnote, nav_shell, kpi_cards)
@@ -37,17 +37,6 @@ ORDER = [
 
 _sess_items = st.session_state.get("cc_news_items_full")
 news_items = list(_sess_items) if _sess_items else None
-source_is_session = bool(news_items)
-
-if not news_items:
-    try:
-        news_items = get_portfolio_news(
-            stock_symbols=st.session_state.get("stock_syms", []),
-            fund_names=st.session_state.get("fund_names", []),
-            gold_symbols=st.session_state.get("gold_syms", []),
-        )
-    except Exception:
-        news_items = []
 
 # Dedupe by normalized title (exact string, case-insensitive).
 seen, items = set(), []
@@ -60,16 +49,17 @@ for item in news_items or []:
 
 if not items:
     st.markdown(empty_state(
-        "No recent news found this run",
-        "Refresh research evidence in the Command Center or come back later.",
+        "No news in this session yet",
+        "The Command Center gathers the feed when it runs; this page never calls "
+        "the network itself.",
+        hint="Open Command Center, or press 'Refresh research evidence' there.",
     ), unsafe_allow_html=True)
     st.stop()
 
 st.markdown(
     '<div class="t-meta-row">'
     + pill(f"{len(items)} items", "info")
-    + pill("from Command Center run" if source_is_session else "live fetch",
-           "stale" if source_is_session else "live")
+    + pill("from last Command Center run", "stale")
     + '</div>',
     unsafe_allow_html=True,
 )
@@ -98,9 +88,9 @@ for cat, label, meta in ORDER:
 
 st.markdown("---")
 st.markdown(footnote(
-    "Feed: Google News RSS queried on the holdings and NRI/tax/market terms. "
-    "Sentiment is a keyword heuristic (▲ Positive / ▼ Negative / • Neutral) — a tone, "
-    "not an investment conclusion. The Command Center maps these stories to portfolio "
-    "identifiers by exact match only."), unsafe_allow_html=True)
-st.caption("Pulse reads this session's Command Center run when available; otherwise it "
-           "falls back to a live fetch of the same news terms.")
+    "Feed: Google News RSS gathered by the Command Center's refresh action, on the holdings "
+    "and NRI/tax/market terms. Sentiment is a keyword heuristic (▲ Positive / ▼ Negative / "
+    "• Neutral) — a tone, not an investment conclusion. The Command Center maps these stories "
+    "to portfolio identifiers by exact match only."), unsafe_allow_html=True)
+st.caption("Pulse re-renders this session's Command Center feed; it never fetches news itself — "
+           "a network call happens only on 'Refresh research evidence'.")

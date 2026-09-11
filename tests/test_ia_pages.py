@@ -8,6 +8,9 @@
 # ==================================================
 from pathlib import Path
 
+import posixpath
+import re
+
 import pytest
 
 from lib.ui import NAV_GROUPS, nav_shell
@@ -45,7 +48,7 @@ def test_nav_groups_cover_all_pages():
 def test_nav_shell_contains_every_slug_and_groups():
     html = nav_shell("command")
     for slug in _all_slugs():
-        assert f'href="{slug}"' in html, slug
+        assert f'href="../{slug}"' in html, slug
     assert html.count('class="nb-rail"') == 1
     assert html.count('class="nb-topbar"') == 1
     assert html.count('class="nb-bar"') == 1
@@ -54,6 +57,30 @@ def test_nav_shell_contains_every_slug_and_groups():
     assert html.count('class="nb-bar-item nb-active"') == 1
     for group, _items in NAV_GROUPS:
         assert f'class="nb-group-label">{group}</div>' in html
+
+
+def test_nav_hrefs_are_route_relative_and_resolve_from_any_page():
+    """Navigation hrefs must be route-relative, one level up ('../slug').
+
+    Regression: bare 'href="slug"' compounded from a slug route ('/holdings'
+    + 'command' -> '/holdings/command', a 404). Each st.navigation page lives
+    exactly one segment under the base path, so '..' always lands in the
+    sibling-page directory — with or without a sub-path deployment.
+    """
+    html = nav_shell("holdings")
+    hrefs = re.findall(r'href="([^"]+)"', html)
+    assert len(hrefs) == 16, hrefs  # 8 rail + 8 bottom-bar
+    bare = [h for h in hrefs if not h.startswith("../")]
+    absolute_to_origin = [h for h in hrefs if h.startswith("/")]
+    assert not bare, bare
+    assert not absolute_to_origin, absolute_to_origin
+
+    for route in ("command", "holdings", "decisions"):
+        for slug in _all_slugs():
+            assert posixpath.normpath(posixpath.join(f"/{route}", "../", slug)) == f"/{slug}", (route, slug)
+        # sub-path deployment: base path preserved, still one segment up
+        for slug in _all_slugs():
+            assert posixpath.normpath(posixpath.join("/sub/holdings", "../", slug)) == f"/sub/{slug}", (route, slug)
 
 
 def test_nav_shell_escapes_current_slug():
@@ -81,7 +108,7 @@ def test_pages_render_empty_state_without_network(page_name, slug):
     assert not at.exception, f"{page_name} raised: {at.exception}"
     rendered = [m.value for m in at.markdown]
     assert any("nb-rail" in r for r in rendered), f"{page_name} missing nav rail"
-    assert any(f'href="{slug}"' in r for r in rendered)
+    assert any(f'href="../{slug}"' in r for r in rendered)
 
 
 def test_pulse_avoids_live_news_fetch_without_session():
@@ -104,3 +131,6 @@ def test_pulse_avoids_live_news_fetch_without_session():
     finally:
         _news.get_portfolio_news = _orig
     assert not at.exception, f"Pulse raised: {at.exception}"
+    rendered = [m.value for m in at.markdown]
+    assert any("No news in this session yet" in r for r in rendered), \
+        "Pulse must show its empty state without a session feed"

@@ -12,7 +12,7 @@ import pandas as pd
 from lib.theme import inject_css
 from lib.portfolio import load_excel
 from lib.register import canonical_instrument_key, assign_asset_class
-from lib.roster import build_roster, instrument_summary
+from lib.roster import build_roster, instrument_summary, member_filter_options
 from lib.formatters import format_inr
 from lib.ui import (
     caption,
@@ -133,7 +133,7 @@ if _total_assets is None:
 st.markdown(section_header_html("Books", "four sleeves"), unsafe_allow_html=True)
 st.markdown(caption(f"Source: {source_txt}"), unsafe_allow_html=True)
 
-_members = sorted({str(m).strip() for m in roster["Member"].tolist() if str(m).strip()})
+_members = member_filter_options(roster)
 _owners = st.multiselect("Member filter", _members, default=_members,
                          help="Everything below is scoped to the selected family member(s).")
 _show = roster[roster["Member"].isin(_owners)] if _owners else roster

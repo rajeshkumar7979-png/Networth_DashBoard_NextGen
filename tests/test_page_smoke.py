@@ -37,6 +37,10 @@ def test_command_center_renders_without_exception():
     assert any("What deserves attention" in r for r in rendered), "attention section missing"
     assert any("What changed this run" in r for r in rendered), "changed section missing"
     assert any("Research brief · synthesis" in r for r in rendered), "research brief section missing"
+    # Audit fix gate: every cross-page drill link is route-relative (../slug), so a
+    # click from any page never compounds into a page/route 404.
+    assert any('href="../holdings"' in r for r in rendered), "Command Center drill row must use route-relative hrefs"
+    assert any('href="../decisions"' in r for r in rendered), "Command Center drill row must use route-relative hrefs"
     # Research & Synthesis + portfolio-aware live-research panel actually rendered.
     # cc_research_brief is set only on success inside the research try-block (which
     # derives the live plan + cached cohort), so a None here means the block was
@@ -79,5 +83,18 @@ def test_all_pages_render_after_command_center_run():
         rendered = [m.value for m in at.markdown]
         # every page renders the shared nav shell with its own active slug
         assert any("nb-rail" in r for r in rendered), f"{label} missing nav rail"
-        assert any(f'href="{slug}"' in r for r in rendered), f"{label} missing active slug {slug}"
+        assert any(f'href="../{slug}"' in r for r in rendered), f"{label} missing active slug {slug}"
         assert any("Northline · Family desk" in r for r in rendered), f"{label} missing page header"
+        # Desktop reconciliation gate (register rebuilt from the same books): with the
+        # Command Center's session state present the gate must run and PASS (fix: the
+        # register total key is total_assets, not "Current Value"). Match the CSS class
+        # token, not the literal "✗ FAIL", because the page's own explanatory caption
+        # quotes that phrase.
+        if slug == "desk":
+            assert any('class="recon-pass"' in r for r in rendered), \
+                "Desk reconciliation must PASS after a Command Center run"
+            assert any("register total" in r for r in rendered), "Desk reconciliation block missing"
+            assert not any('class="recon-fail"' in r for r in rendered), "Desk reconciliation FAILED on live run"
+        # Outlook's cross-page drill link must be route-relative too (same 404 class).
+        if slug == "outlook":
+            assert any('href="../decisions"' in r for r in rendered), "Outlook drill link must use ../decisions"

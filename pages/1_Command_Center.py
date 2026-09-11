@@ -1463,10 +1463,6 @@ _gold_syms = []
 if not gold_valid.empty and "Symbol" in gold_valid.columns:
     _gold_syms = gold_valid["Symbol"].dropna().astype(str).head(3).tolist()
 
-st.session_state["stock_syms"] = _stock_syms
-st.session_state["fund_names"] = _fund_names
-st.session_state["gold_syms"] = _gold_syms
-
 try:
     news_items = get_portfolio_news(
         stock_symbols=_stock_syms,
@@ -1644,11 +1640,11 @@ else:
                          "No warning, risk or decision-support item this run."),
                 unsafe_allow_html=True)
 _drill = " · ".join([
-    '<a class="t-drill" href="decisions">Decide · maturing money</a>',
-    '<a class="t-drill" href="holdings">Drill · holdings dossier</a>',
-    '<a class="t-drill" href="funds">Funds · quality, overlap</a>',
-    '<a class="t-drill" href="pulse">Context · pulse feed</a>',
-    '<a class="t-drill" href="outlook">Outlook · maturity ladder</a>',
+    '<a class="t-drill" href="../decisions">Decide · maturing money</a>',
+    '<a class="t-drill" href="../holdings">Drill · holdings dossier</a>',
+    '<a class="t-drill" href="../funds">Funds · quality, overlap</a>',
+    '<a class="t-drill" href="../pulse">Context · pulse feed</a>',
+    '<a class="t-drill" href="../outlook">Outlook · maturity ladder</a>',
 ])
 st.markdown(f'<div class="t-drill-row">{_drill}</div>', unsafe_allow_html=True)
 st.caption("Drill into a page for the full detail behind any item. Above items are "
@@ -1840,7 +1836,7 @@ else:
                     for g in groups)
                 st.markdown(f'<div class="t-caption">News by asset: {_news_chips}</div>',
                             unsafe_allow_html=True)
-            st.markdown('<a class="t-drill" href="pulse">Open Pulse feed →</a>',
+            st.markdown('<a class="t-drill" href="../pulse">Open Pulse feed →</a>',
                         unsafe_allow_html=True)
         else:
             st.caption("No cached news/gateway records yet — press 'Refresh research "

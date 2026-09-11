@@ -5,7 +5,7 @@
 # -------------------------------------------------
 import pandas as pd
 
-from lib.roster import build_roster, lookup_roster, instrument_summary
+from lib.roster import build_roster, lookup_roster, instrument_summary, member_filter_options
 
 from tests.frozen_baseline import FROZEN_BOOKS, FROZEN_TOTALS
 
@@ -106,3 +106,30 @@ def test_instrument_summary_never_invents():
     summary = instrument_summary(row)
     assert summary["Key"] == row["Key"]
     assert summary["Return %"] in ("0.00%", "n/a") or summary["Return %"].endswith("%")
+
+
+def test_member_filter_options_excludes_non_name_tokens():
+    """Regression: the workbook's FD 'Holder Name' column carries non-name
+    tokens (numeric principal strings) that must never surface in the member
+    filter — they are not family members."""
+    roster = pd.DataFrame({
+        "Member": ["Mrs. KAVITA KHANDELWAL", "Mr. RAJESH KUMAR", "3562870",
+                   "4203971", "475000", None, pd.NaT, "NaT", ""],
+    })
+    opts = member_filter_options(roster)
+    assert opts == ["Mr. RAJESH KUMAR", "Mrs. KAVITA KHANDELWAL"]
+    assert all(any(c.isalpha() for c in m) for m in opts)
+
+
+def test_member_filter_options_on_frozen_books_is_clean_and_sorted():
+    roster = build_roster(**_books())
+    opts = member_filter_options(roster)
+    assert opts == sorted(opts)
+    assert set(opts) <= {"Mr. RAJESH KUMAR", "Mrs. KAVITA KHANDELWAL",
+                         "Mr. SATYANARAYAN SHARMA", "Mr. Janak Khandelwal"}
+    assert set(opts), "filter must not be empty on the frozen books"
+
+
+def test_member_filter_options_handles_empty_inputs():
+    assert member_filter_options(None) == []
+    assert member_filter_options(pd.DataFrame(columns=["Member"])) == []

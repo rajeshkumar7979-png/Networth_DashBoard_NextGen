@@ -213,7 +213,7 @@ st.markdown(ui_caption(
 # --------------------------------------------------
 st.markdown("---")
 st.markdown("**Money that frees up has a decision to make.**")
-st.markdown('<a class="t-drill" href="decisions" style="font-size:0.95rem;">Open Decision Desk →</a>',
+st.markdown('<a class="t-drill" href="../decisions" style="font-size:0.95rem;">Open Decision Desk →</a>',
             unsafe_allow_html=True)
 st.caption(f"Outlook as-of {NOW_IST:%d %b %Y, %H:%M IST} · weeks and months from the workbook's own "
            "maturity dates; nothing else is projected.")

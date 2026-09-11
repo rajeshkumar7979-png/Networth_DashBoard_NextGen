@@ -19,9 +19,13 @@ from lib.formatters import safe_float
 
 def _s(row, column):
     value = row.get(column)
-    if value is None or (isinstance(value, float) and pd.isna(value)):
+    if value is None or pd.isna(value):
         return ""
     return str(value).strip()
+
+
+# Stringized missing/empty tokens that must never be treated as member names.
+_MISSING_TOKENS = {"", "nan", "nat", "none", "n/a", "na"}
 
 
 def _name_of(row, kind):
@@ -36,6 +40,32 @@ def _member_of(row, kind):
     if kind == "FD":
         return _s(row, "Holder Name")
     return _s(row, "Owner")
+
+
+def member_filter_options(roster):
+    """Distinct, name-like member labels for the drill-down member filter.
+
+    Person fields (Owner / Holder Name) are assumed to hold names, but a source
+    workbook row can carry non-name tokens there (the sample workbook has
+    numeric strings in some FD "Holder Name" rows). Those are never member
+    identifiers and would pollute a filter with dates/IDs — drop any token that
+    contains no alphabetic character. Pure UI hygiene: roster "Member" values
+    and all financial records are untouched.
+    """
+    if roster is None or len(roster) == 0:
+        return []
+    seen = set()
+    out = []
+    for member in roster["Member"].tolist():
+        if pd.isna(member):
+            continue
+        member = str(member).strip()
+        if not member or member.lower() in _MISSING_TOKENS or member in seen \
+                or not any(ch.isalpha() for ch in member):
+            continue
+        seen.add(member)
+        out.append(member)
+    return sorted(out)
 
 
 def _current_of(row, kind):

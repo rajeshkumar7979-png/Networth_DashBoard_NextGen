@@ -107,7 +107,7 @@ try:
                                 _books.get("gold"), _books.get("fd"))
     _classes = aggregate_by_class(_reg)
     _family = family_level_sum(_reg)
-    _reg_total = float(_family.get("Current Value") or 0.0) if _family is not None else 0.0
+    _reg_total = float(_family.get("total_assets") or 0.0) if _family is not None else 0.0
     _page_total = float(_assets.get("total_assets") or 0.0)
     _diff = abs(_reg_total - _page_total)
     _ok = _diff <= 1.0
