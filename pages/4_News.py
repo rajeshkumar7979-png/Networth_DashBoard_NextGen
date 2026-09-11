@@ -4,17 +4,29 @@ import streamlit as st
 from lib.news import get_portfolio_news, get_sentiment, time_ago
 from lib.theme import inject_css
 from lib.ui import (page_header_html, section_header_html, pill, sentiment_mark, empty_state,
-                    research_row, research_grid, footnote)
+                    research_row, research_grid, footnote, nav_shell, kpi_cards)
 
 inject_css()
 
+st.markdown(nav_shell("pulse"), unsafe_allow_html=True)
 st.markdown(page_header_html(
-    "Research & market intelligence",
-    "News",
-    "Relevance-first briefing · your holdings first, then NRI/tax and market context · "
-    "headlines are observations, not verified portfolio facts",
+    "Northline · Family desk",
+    "Pulse",
+    "Holdings + NRI / tax — an editorial feed of what is moving around your portfolio. "
+    "Headlines are observations, never verified portfolio facts.",
 ), unsafe_allow_html=True)
-st.page_link("pages/1_Command_Center.py", label="Command Center", icon="📊")
+
+_rates = st.session_state.get("cc_rates") or {}
+if _rates.get("usd_inr") is not None or _rates.get("gold_10g_inr") is not None:
+    _rate_cards = []
+    if _rates.get("usd_inr") is not None:
+        _rate_cards.append({"label": "USD/INR", "value": f"{_rates['usd_inr']:.2f}",
+                            "sub": "Command Center reference", "tone": "accent"})
+    if _rates.get("gold_10g_inr") is not None:
+        _rate_cards.append({"label": "Gold ₹/10g", "value": f"{_rates['gold_10g_inr']:,.0f}",
+                            "sub": "India spot reference", "tone": "accent"})
+    if _rate_cards:
+        st.markdown(kpi_cards(_rate_cards, cols=4), unsafe_allow_html=True)
 
 CATEGORY_LABELS = {"holding": "Holding", "nri_tax": "NRI / Tax", "macro": "Market"}
 ORDER = [
@@ -90,3 +102,5 @@ st.markdown(footnote(
     "Sentiment is a keyword heuristic (▲ Positive / ▼ Negative / • Neutral) — a tone, "
     "not an investment conclusion. The Command Center maps these stories to portfolio "
     "identifiers by exact match only."), unsafe_allow_html=True)
+st.caption("Pulse reads this session's Command Center run when available; otherwise it "
+           "falls back to a live fetch of the same news terms.")

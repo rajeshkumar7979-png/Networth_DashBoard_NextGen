@@ -1,32 +1,40 @@
+# ==================================================
+# HOLDINGS — every line, one book.
+#
+# Sleeve-based view of the four validated books the Command Center publishes
+# (mf / stocks / gold / fd): an Overview plus one tab per sleeve, a member
+# filter, an exact-identifier search, and a single-instrument dossier. This
+# page re-presents the Command Center's numbers and never re-values.
+# ==================================================
 import streamlit as st
 import pandas as pd
 
 from lib.theme import inject_css
 from lib.portfolio import load_excel
 from lib.register import canonical_instrument_key, assign_asset_class
-from lib.roster import build_roster
+from lib.roster import build_roster, instrument_summary
 from lib.formatters import format_inr
 from lib.ui import (
-    page_header_html,
-    section_header_html,
-    kpi_cards,
-    pill,
-    tone_for,
     caption,
-    footnote,
     empty_state,
+    kpi_cards,
+    nav_shell,
+    page_header_html,
+    pill,
+    section_header_html,
+    tone_for,
 )
 from lib.intelligence.live import development_rows
 
 inject_css()
 
+st.markdown(nav_shell("holdings"), unsafe_allow_html=True)
 st.markdown(page_header_html(
-    "Instrument dossier",
-    "Asset Detail",
-    "One holding, one view · identity, value, basis and the evidence around it — "
-    "this page re-presents the Command Center's numbers, never re-values",
+    "Northline · Family desk",
+    "Holdings",
+    "Every line, one book — the four sleeves the Command Center routes from the workbook, "
+    "with a dossier for any single instrument.",
 ), unsafe_allow_html=True)
-st.page_link("pages/1_Command_Center.py", label="Command Center", icon="📊")
 
 BOOK_KIND = {"MF": "mf", "Stocks": "stocks", "Gold": "gold", "FD": "fd"}
 
@@ -40,8 +48,7 @@ def _num(value):
 
 
 def _raw_records_for(books, kind, key):
-    """Original book row(s) behind a canonical key — the page only *shows* what
-    the books already contain; nothing is derived or invented here."""
+    """Original book row(s) behind a canonical key — only shown, never derived."""
     book = (books or {}).get(BOOK_KIND.get(kind))
     if book is None or book.empty:
         return []
@@ -55,8 +62,7 @@ def _raw_records_for(books, kind, key):
 
 def _fallback_roster():
     """Degraded path (no session data): workbook rows only — identity without
-    invented valuation. A gold row keeps its workbook kind; the class label
-    still reflects Command Center routing rules."""
+    invented valuation."""
     try:
         fd, mf, stocks = load_excel()
     except Exception:
@@ -86,8 +92,11 @@ def _fallback_roster():
                 "Invested": None,
                 "P&L": None,
                 "Return %": None,
+                "Match Terms": [key.upper()],
             })
-    return pd.DataFrame(rows) if rows else pd.DataFrame()
+    return pd.DataFrame(rows) if rows else pd.DataFrame(
+        columns=["Key", "Name", "Kind", "Class", "Member",
+                 "Current Value", "Invested", "P&L", "Return %", "Match Terms"])
 
 
 books = st.session_state.get("cc_books")
@@ -113,14 +122,95 @@ if roster.empty:
     ), unsafe_allow_html=True)
     st.stop()
 
+_total_assets = _num((assets.get("total_assets")) if isinstance(assets, dict) else None)
+if _total_assets is None:
+    _total_assets = _num(pd.to_numeric(roster["Current Value"], errors="coerce").sum())
+
+
 # ---------------------------------------------------------------------------
-# SELECTOR
+# OVERVIEW + SLEEVE TABS
 # ---------------------------------------------------------------------------
-st.markdown(section_header_html("Find the instrument", "selector"),
-            unsafe_allow_html=True)
+st.markdown(section_header_html("Books", "four sleeves"), unsafe_allow_html=True)
 st.markdown(caption(f"Source: {source_txt}"), unsafe_allow_html=True)
 
+_members = sorted({str(m).strip() for m in roster["Member"].tolist() if str(m).strip()})
+_owners = st.multiselect("Member filter", _members, default=_members,
+                         help="Everything below is scoped to the selected family member(s).")
+_show = roster[roster["Member"].isin(_owners)] if _owners else roster
+
+tabs = st.tabs(["Overview", "Mutual funds", "Stocks", "Gold", "FDs"])
+
+with tabs[0]:
+    class_totals = {}
+    for _cls in roster["Class"].unique():
+        _sub = _show[_show["Class"] == _cls]
+        class_totals[_cls] = float(pd.to_numeric(_sub["Current Value"], errors="coerce").sum() or 0)
+    if class_totals:
+        _cards = [{"label": _c, "value": format_inr(_v), "sub": "current value (INR)",
+                   "tone": "accent"} for _c, _v in class_totals.items()]
+        st.markdown(kpi_cards(_cards, cols=4), unsafe_allow_html=True)
+        st.markdown(caption("Class labels follow the Command Center routing rules "
+                            "(gold is routed out of stocks/MF; FCNR ≠ INR FD); no-data classes "
+                            "don't appear because they have no workbook source."), unsafe_allow_html=True)
+    st.dataframe(
+        _show[["Name", "Member", "Kind", "Class", "Current Value", "Invested", "P&L", "Return %"]]
+        .sort_values("Current Value", ascending=False),
+        hide_index=True, use_container_width=True,
+        column_config={
+            "Name": st.column_config.TextColumn("Instrument", width="medium"),
+            "Member": st.column_config.TextColumn("Member", width="small"),
+            "Kind": st.column_config.TextColumn("Sleeve", width="small"),
+            "Class": st.column_config.TextColumn("Class", width="small"),
+            "Current Value": st.column_config.NumberColumn("Current (INR)", format="₹%d"),
+            "Invested": st.column_config.NumberColumn("Invested (INR)", format="₹%d"),
+            "P&L": st.column_config.NumberColumn("P&L", format="₹%d"),
+            "Return %": st.column_config.NumberColumn("Return %", format="%.2f%%"),
+        },
+    )
+
+_map = {"Mutual funds": "MF", "Stocks": "Stocks", "Gold": "Gold", "FDs": "FD"}
+
+
+def _render_sleeve(kind):
+    sub = _show[_show["Kind"] == kind]
+    if sub.empty:
+        st.markdown(caption("Nothing in this sleeve for the selected member(s)."),
+                    unsafe_allow_html=True)
+        return
+    cols = ["Name", "Member", "Current Value", "Invested", "P&L", "Return %"]
+    if kind == "FD":
+        cols = ["Name", "Member", "Maturity", "Current Value", "Invested", "P&L", "Return %"]
+    df = sub.copy()
+    if kind == "FD":
+        df["Maturity"] = "—"
+    st.dataframe(df[cols].sort_values("Current Value", ascending=False),
+                 hide_index=True, use_container_width=True,
+                 column_config={
+                     "Name": st.column_config.TextColumn("Instrument", width="medium"),
+                     "Member": st.column_config.TextColumn("Member", width="small"),
+                     "Maturity": st.column_config.TextColumn("Maturity", width="small"),
+                     "Current Value": st.column_config.NumberColumn("Current (INR)", format="₹%d"),
+                     "Invested": st.column_config.NumberColumn("Invested (INR)", format="₹%d"),
+                     "P&L": st.column_config.NumberColumn("P&L", format="₹%d"),
+                     "Return %": st.column_config.NumberColumn("Return %", format="%.2f%%"),
+                 })
+
+
+for _tab_name, _tab in zip(("Mutual funds", "Stocks", "Gold", "FDs"), tabs[1:]):
+    with _tab:
+        _render_sleeve(_map[_tab_name])
+
+st.markdown("---")
+
+
+# ---------------------------------------------------------------------------
+# DOSSIER — one instrument at a time
+# ---------------------------------------------------------------------------
+st.markdown(section_header_html("Dossier", "one instrument, whole record"), unsafe_allow_html=True)
+
 _options = roster["Key"].tolist()
+if len(_options) > 60:
+    _options = sorted(_options, key=lambda k: str(roster[roster["Key"] == k].iloc[0]["Name"]))
 _default = 0
 _q_symbol = (st.query_params.get("symbol") or "").strip()
 if _q_symbol:
@@ -136,11 +226,6 @@ choice = st.selectbox(
                           f"{roster[roster['Key'] == k].iloc[0]['Kind']}",
 )
 
-_total_assets = _num((assets.get("total_assets")) if isinstance(assets, dict) else None)
-if _total_assets is None:
-    _tot_sum = roster["Current Value"].sum()
-    _total_assets = _num(_tot_sum)
-
 _positions = roster[roster["Key"] == choice]
 if len(_positions) > 1:
     st.markdown(caption(
@@ -148,15 +233,11 @@ if len(_positions) > 1:
         "shown separately, never merged."), unsafe_allow_html=True)
 
 for _idx, (__, row) in enumerate(_positions.iterrows()):
-    st.markdown("---")
     if len(_positions) > 1:
-        st.markdown(
-            section_header_html(f"{row['Name']} · position {_idx + 1} of "
-                                f"{len(_positions)}", "position"),
-            unsafe_allow_html=True)
+        st.markdown(section_header_html(f"{row['Name']} · position {_idx + 1} of "
+                                        f"{len(_positions)}", "position"), unsafe_allow_html=True)
     else:
-        st.markdown(section_header_html(f"{row['Name']}", "dossier"),
-                    unsafe_allow_html=True)
+        st.markdown(section_header_html(f"{row['Name']}", "dossier"), unsafe_allow_html=True)
 
     cur = _num(row["Current Value"])
     inv = _num(row["Invested"])
@@ -164,15 +245,15 @@ for _idx, (__, row) in enumerate(_positions.iterrows()):
     ret = _num(row.get("Return %"))
     contrib = (cur / _total_assets * 100.0) if (cur is not None and _total_assets) else None
 
-    chip_row = (
+    st.markdown(
         '<div class="t-meta-row">'
         + pill(str(row["Kind"]), "info")
         + pill(str(row["Class"]), "neutral")
-        + pill(str(row["Member"]) if len(row["Member"]) > 0 else "member n/a", "neutral")
+        + pill(str(row["Member"]) if len(str(row["Member"])) > 0 else "member n/a", "neutral")
         + (pill(f"{contrib:.1f}% of assets", "positive") if contrib is not None else "")
-        + '</div>'
+        + '</div>',
+        unsafe_allow_html=True,
     )
-    st.markdown(chip_row, unsafe_allow_html=True)
 
     st.markdown(kpi_cards([
         {"label": "Current Value (INR)", "value": format_inr(cur) if cur is not None else "n/a",
@@ -184,9 +265,7 @@ for _idx, (__, row) in enumerate(_positions.iterrows()):
          "sub": f"{ret:.2f}%" if ret is not None else "no return basis"},
     ]), unsafe_allow_html=True)
 
-    # ------------------------------------------------------------------
-    # IDENTITY — from the book rows the Command Center published
-    # ------------------------------------------------------------------
+    # Identity — from the book rows the Command Center published
     recs = _raw_records_for(books, str(row["Kind"]), str(row["Key"]))
     identity = []
     if recs:
@@ -211,16 +290,11 @@ for _idx, (__, row) in enumerate(_positions.iterrows()):
                 identity.append({"Field": label, "Value": str(value)})
     identity.append({"Field": "Register key", "Value": str(row["Key"])})
     identity.append({"Field": "Asset class", "Value": str(row["Class"])})
-    if len(identity):
+    if identity:
         st.markdown(section_header_html("Identity", "record"), unsafe_allow_html=True)
-        st.dataframe(
-            pd.DataFrame(identity)[["Field", "Value"]],
-            hide_index=True, width="stretch",
-        )
+        st.dataframe(pd.DataFrame(identity)[["Field", "Value"]],
+                     hide_index=True, use_container_width=True)
 
-    # ------------------------------------------------------------------
-    # WHAT IS NOT RECORDED — explicit, never guessed
-    # ------------------------------------------------------------------
     st.markdown(section_header_html("Not recorded for this position", "no-data"),
                 unsafe_allow_html=True)
     st.markdown(
@@ -233,9 +307,6 @@ for _idx, (__, row) in enumerate(_positions.iterrows()):
         unsafe_allow_html=True,
     )
 
-    # ------------------------------------------------------------------
-    # EXTERNAL DEVELOPMENTS MAPPED TO THIS EXACT IDENTIFIER
-    # ------------------------------------------------------------------
     related = []
     if cohort is not None:
         try:
@@ -255,7 +326,7 @@ for _idx, (__, row) in enumerate(_positions.iterrows()):
     if related:
         rel_cols = ["Development", "Source", "Published", "Category", "Link"]
         st.dataframe(pd.DataFrame(related[:6]),
-                     hide_index=True, width="stretch",
+                     hide_index=True, use_container_width=True,
                      column_config={"Link": st.column_config.LinkColumn("Link")})
     else:
         st.markdown(caption(
@@ -264,7 +335,9 @@ for _idx, (__, row) in enumerate(_positions.iterrows()):
             unsafe_allow_html=True)
 
 st.markdown("---")
-st.markdown(footnote(
-    "Figures come from the Command Center's register — this page re-presents them and never "
-    "re-values. Valuation basis: AMFI NAVs / exchange closes / USD-INR at the last Command "
-    "Center run."), unsafe_allow_html=True)
+st.markdown(
+    '<div class="t-footnote">Figures come from the Command Center register — this page '
+    're-presents them and never re-values. Valuation basis: AMFI NAVs / exchange closes / '
+    'USD-INR at the last Command Center run.</div>',
+    unsafe_allow_html=True,
+)

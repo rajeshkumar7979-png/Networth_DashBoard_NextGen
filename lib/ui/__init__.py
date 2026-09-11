@@ -28,8 +28,10 @@ from lib.ui.components import (
     unavailable,
     watchlist,
 )
+from lib.ui.nav import NAV_GROUPS, nav_shell
 
 __all__ = [
+    "NAV_GROUPS",
     "attention_tiles",
     "banner",
     "caption",
@@ -40,6 +42,7 @@ __all__ = [
     "footnote",
     "hero_metrics",
     "kpi_cards",
+    "nav_shell",
     "page_header_html",
     "pill",
     "research_grid",

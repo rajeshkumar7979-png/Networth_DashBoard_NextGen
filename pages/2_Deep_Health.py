@@ -2,18 +2,17 @@ import streamlit as st
 import pandas as pd
 
 from lib.theme import inject_css
-from lib.ui import page_header_html, section_header_html, banner, footnote
+from lib.ui import page_header_html, section_header_html, banner, footnote, nav_shell, pill
 
 inject_css()
 
+st.markdown(nav_shell("decisions"), unsafe_allow_html=True)
 st.markdown(page_header_html(
-    "Allocation & decision analysis",
-    "Deep Health",
-    "Decision desk for maturing money and allocation choices · deterministic, "
-    "not investment advice",
+    "Northline · Family desk",
+    "Decision Desk",
+    "Test a move before you make it — a deterministic sandbox for maturing money "
+    "and allocation choices. Not investment advice.",
 ), unsafe_allow_html=True)
-
-st.page_link("pages/1_Command_Center.py", label="Command Center", icon="📊")
 
 default_amount = float(st.session_state.get("matured_fd_amount", 0) or 0)
 if default_amount > 0:
@@ -25,7 +24,7 @@ if default_amount > 0:
 # ---------------------------------------------------------------------------
 # 01 · MONEY THAT NEEDS A DECISION
 # ---------------------------------------------------------------------------
-st.markdown(section_header_html("Money that needs a decision", "01"),
+st.markdown(section_header_html("Money to move", "01"),
             unsafe_allow_html=True)
 
 col1, col2 = st.columns(2)
@@ -46,7 +45,7 @@ with col2:
 # ---------------------------------------------------------------------------
 # 02 · INITIAL DIRECTION
 # ---------------------------------------------------------------------------
-st.markdown(section_header_html("Initial direction", "02"), unsafe_allow_html=True)
+st.markdown(section_header_html("Time horizon", "02"), unsafe_allow_html=True)
 
 _sugg = {
     "0–3 months": (
@@ -97,7 +96,7 @@ else:
 # ---------------------------------------------------------------------------
 # 03 · ASSUMPTIONS — current weights (prefer Command Center numbers)
 # ---------------------------------------------------------------------------
-st.markdown(section_header_html("Assumptions · current portfolio weights", "03"),
+st.markdown(section_header_html("Current allocation & net worth", "03"),
             unsafe_allow_html=True)
 
 _def_eq = float(st.session_state.get("cc_equity_pct", 17.0) or 17.0)
@@ -312,6 +311,15 @@ else:
                 "to see the impact of each scenario.</div>", unsafe_allow_html=True)
 
 st.markdown("---")
+st.markdown(section_header_html("Caveats", "05"), unsafe_allow_html=True)
+st.markdown(
+    '<div class="t-meta-row">'
+    + pill("deterministic, not investment advice", "stale")
+    + pill("reallocation keeps net worth flat", "info")
+    + pill("weights are your inputs", "neutral")
+    + '</div>',
+    unsafe_allow_html=True,
+)
 st.markdown(
     footnote("This is only a decision helper. Final choice depends on your cash needs, "
              "risk comfort and tax situation."),

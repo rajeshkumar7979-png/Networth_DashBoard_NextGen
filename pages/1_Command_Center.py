@@ -12,6 +12,7 @@ from plotly.subplots import make_subplots
 import os
 import re
 import time
+import html as _html
 from lib.formatters import safe_float, format_inr_indian, format_inr, format_inr_compact
 from lib.portfolio import load_excel as load_data
 from lib.valuation import _safe_maturity_amount, compute_fd_current_native, compute_fcnr_attribution
@@ -74,6 +75,7 @@ from lib.ui import (
     research_grid as ui_research_grid,
     unavailable as ui_unavailable,
     evidence_trail as ui_evidence,
+    nav_shell as ui_nav,
 )
 IST = pytz.timezone("Asia/Kolkata")
 now_ist = datetime.now(IST)
@@ -442,9 +444,11 @@ def get_sgb_price(raw_ticker: str):
 
 
 # -------------------------------------------------
-# SIDEBAR
+# RUN CONTROLS & EXPORTS — one shared expander (the Streamlit sidebar is
+# replaced by the custom rail; these controls now live in the page body).
 # -------------------------------------------------
-with st.sidebar:
+_controls_exp = st.expander("Run controls & exports", expanded=False)
+with _controls_exp:
     st.markdown("### Controls")
     uploaded = st.file_uploader("Upload new Excel", type=["xlsx", "xls"])
     if st.button("Force Recalculate", use_container_width=True, type="primary"):
@@ -1217,8 +1221,8 @@ if log_snapshot and not history_df.empty:
     except Exception:
         pass
 
-# Quick exports (sidebar)
-with st.sidebar:
+# Quick exports — appended into the shared "Run controls & exports" expander
+with _controls_exp:
     st.markdown("### Quick actions")
     if history_df is not None and not history_df.empty:
         st.download_button(
@@ -1251,10 +1255,12 @@ with st.sidebar:
 # ==================================================
 # HEADER — command center
 # ==================================================
+st.markdown(ui_nav("command"), unsafe_allow_html=True)
 st.markdown(ui_page_header(
-    "Portfolio intelligence terminal",
+    "Northline · Family desk",
     "Command Center",
-    f"Last updated {now_ist.strftime('%d %b %Y, %H:%M IST')} · all amounts in INR unless noted",
+    "Where the books stand — "
+    f"last updated {now_ist.strftime('%d %b %Y, %H:%M IST')} · all amounts in INR unless noted",
 ), unsafe_allow_html=True)
 
 # Optional vs prior history day (used by the hero cards below)
@@ -1357,6 +1363,68 @@ st.markdown(
     f'<div class="t-caption">{" · ".join(_posture_bits)} — a descriptive readout, not advice.</div>',
     unsafe_allow_html=True,
 )
+
+# ==================================================
+# CASH & MATURITIES — next 90-day FD calendar (strike-readiness)
+# Uses only workbook maturity dates + this run's computed values; no invention.
+# ==================================================
+if (
+    "fd_valid" in dir() and fd_valid is not None and not fd_valid.empty
+    and "Days to Maturity" in fd_valid.columns
+):
+    _mat = fd_valid.copy()
+    _mat["_days"] = _mat["Days to Maturity"]
+    _due_buckets = [
+        ("Due now", _mat[_mat["_days"] < 0]),
+        ("Next 30 days", _mat[_mat["_days"].between(0, 30)]),
+        ("31–60 days", _mat[_mat["_days"].between(31, 60)]),
+        ("61–90 days", _mat[_mat["_days"].between(61, 90)]),
+    ]
+    _nonempty = [b for b in _due_buckets if not b[1].empty]
+    if _nonempty:
+        st.markdown(ui_section("Maturities · next 90 days"), unsafe_allow_html=True)
+        _mat_cards = []
+        for _label, _df in _due_buckets:
+            if _df.empty:
+                continue
+            _tot = float(_df["Current Value (INR)"].dropna().sum() or 0)
+            _mat_cards.append({
+                "label": _label,
+                "value": format_inr_compact(_tot) if _tot else "—",
+                "sub": f"{len(_df)} FD{'s' if len(_df) > 1 else ''}",
+            })
+        if _mat_cards:
+            st.markdown(ui_kpi_cards(_mat_cards, cols=4), unsafe_allow_html=True)
+        _top_mat = _nonempty[0][1].sort_values("_days", ascending=True).head(6)
+        _mat_rows = "<div class='t-list'><div class='t-list-title' style='padding:0 0 6px 0;font-size:0.68rem;color:#6b7688;'>CLOSEST TO MATURITY</div>"
+        for __, _r in _top_mat.iterrows():
+            _d = int(_r["_days"]) if pd.notna(_r["_days"]) else None
+            if _d is None:
+                _days_txt = "no date"
+            elif _d == 0:
+                _days_txt = "matures today"
+            elif _d < 0:
+                _days_txt = f"matured {-_d}d ago"
+            else:
+                _days_txt = f"{_d}d"
+            _amt = _r.get("Current Value (INR)")
+            _amt_txt = format_inr_compact(float(_amt)) if pd.notna(_amt) and float(_amt) else "—"
+            _cur = str(_r.get("Currency") or "").strip().upper()
+            if _cur == "USD":
+                _native = _r.get("Maturity Amount (Native)")
+                _native_txt = (f"{float(_native):,.0f} USD" if pd.notna(_native) and float(_native) else "_")
+                _meta = f"FCNR · {_native_txt} · {_amt_txt} at current FX"
+            else:
+                _meta = f"INR {_amt_txt}"
+            _holder = _html.escape(str(_r.get("Holder Name") or ""))
+            _mat_rows += (
+                "<div class='t-list-row' style='border-bottom:1px solid #141a28;'>"
+                f"<span class='t-list-name'>{_holder} · {_days_txt}</span>"
+                f"<span class='t-list-meta'>{_meta}</span></div>"
+            )
+        _mat_rows += "</div>"
+        st.markdown(_mat_rows, unsafe_allow_html=True)
+        st.caption("Values are this run's INR current value; FCNR proceeds land in USD and the INR amount depends on the settlement rate.")
 
 # ==================================================
 # LEVEL 1 (continued) — P&L drivers / FCNR / attention / pulse have moved:
@@ -1575,15 +1643,14 @@ else:
     st.markdown(ui_empty("Nothing flagged right now.",
                          "No warning, risk or decision-support item this run."),
                 unsafe_allow_html=True)
-_drill_a, _drill_b, _drill_c, _drill_d = st.columns(4)
-with _drill_a:
-    st.page_link("pages/2_Deep_Health.py", label="Decide · maturing money", icon="\U0001F9ED")
-with _drill_b:
-    st.page_link("pages/3_Asset_Detail.py", label="Drill · holdings dossier", icon="\U0001F9FE")
-with _drill_c:
-    st.page_link("pages/5_MF_Health.py", label="Funds · MF Health", icon="\U0001F3E5")
-with _drill_d:
-    st.page_link("pages/4_News.py", label="Context · Intel & News", icon="\U0001F4F0")
+_drill = " · ".join([
+    '<a class="t-drill" href="decisions">Decide · maturing money</a>',
+    '<a class="t-drill" href="holdings">Drill · holdings dossier</a>',
+    '<a class="t-drill" href="funds">Funds · quality, overlap</a>',
+    '<a class="t-drill" href="pulse">Context · pulse feed</a>',
+    '<a class="t-drill" href="outlook">Outlook · maturity ladder</a>',
+])
+st.markdown(f'<div class="t-drill-row">{_drill}</div>', unsafe_allow_html=True)
 st.caption("Drill into a page for the full detail behind any item. Above items are "
            "observed/calculated from this run's data — never invented.")
 
@@ -1773,7 +1840,8 @@ else:
                     for g in groups)
                 st.markdown(f'<div class="t-caption">News by asset: {_news_chips}</div>',
                             unsafe_allow_html=True)
-            st.page_link("pages/4_News.py", label="Open Intel & News →", icon="📰")
+            st.markdown('<a class="t-drill" href="pulse">Open Pulse feed →</a>',
+                        unsafe_allow_html=True)
         else:
             st.caption("No cached news/gateway records yet — press 'Refresh research "
                        "evidence' to fetch. A network call happens only on that explicit "
@@ -2620,6 +2688,56 @@ try:
     st.session_state["cc_live_cohort"] = (
         _live_cohort if "_live_cohort" in dir() and _live_cohort is not None else None
     )
+except Exception:
+    pass
+# ----- Read-only handoff: market rates strip (Pulse / Outlook / Desk) -----
+try:
+    _gold10g = None
+    if "pulse_rows" in dir():
+        for _p in pulse_rows:
+            if str(_p.get("Market")) == "GOLD ₹/10g" and _p.get("Value") is not None:
+                _gold10g = float(_p["Value"])
+                break
+    st.session_state["cc_rates"] = {
+        "usd_inr": float(usd_inr) if usd_inr else None,
+        "gold_10g_inr": _gold10g,
+        "as_of": now_ist.isoformat(),
+    }
+except Exception:
+    pass
+# ----- Read-only handoff: compact intelligence snapshot (Intelligence page) -----
+# Everything here is a fact/provenance summary the Command Center already
+# computed; the Intelligence page is a read-only render, never a re-compute.
+try:
+    _snap = {"as_of": now_ist.isoformat()}
+    if "_intel_facts" in dir() and _intel_facts is not None:
+        _cov = _intel_facts.coverage
+        _snap.update({
+            "coverage_pct": float(_cov.coverage_pct) if getattr(_cov, "coverage_pct", None) is not None else None,
+            "covered_funds": list(getattr(_cov, "covered_funds", []) or ()),
+            "missing_funds": list(getattr(_cov, "missing_funds", []) or ()),
+            "weight_basis": sorted(str(b) for b in (_intel_facts.weight_basis or ())),
+        })
+        _snap["underlyings"] = []
+        try:
+            _uds = intel_exposure.underlying_df(_intel_facts)
+            if _uds is not None and not _uds.empty:
+                for __, _u in _uds.sort_values("value_inr", ascending=False).head(8).iterrows():
+                    _snap["underlyings"].append({
+                        "name": str(_u.get("name") or ""),
+                        "value_inr": float(_u.get("value_inr") or 0.0),
+                        "pct": float(_u.get("pct_of_assets") or 0.0),
+                        "schemes": str(_u.get("schemes") or ""),
+                        "confidence": float(_u.get("confidence") or 0.0),
+                    })
+        except Exception:
+            pass
+    if "_intel_briefing" in dir() and _intel_briefing is not None:
+        _lvl = {}
+        for _s in getattr(_intel_briefing, "signals", ()) or ():
+            _lvl[str(getattr(_s, "level", "info"))] = _lvl.get(str(getattr(_s, "level", "info")), 0) + 1
+        _snap["signal_levels"] = _lvl
+    st.session_state["cc_intel_snapshot"] = _snap
 except Exception:
     pass
 try:

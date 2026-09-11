@@ -51,3 +51,33 @@ def test_command_center_renders_without_exception():
     else:
         ai_outcome = None
     assert ai_outcome is None, "AI research must not auto-run on page load"
+
+
+def test_all_pages_render_after_command_center_run():
+    """Owning the full product shell: after one Command Center run, every page
+    in the custom navigation must render without exception from the same
+    session (no page re-runs that computation or the network)."""
+    from streamlit.testing.v1 import AppTest
+
+    at = AppTest.from_file(str(APP))
+    at.run(timeout=300)
+    assert not at.exception, f"Command Center raised: {at.exception}"
+    assert "cc_books" in at.session_state, "Command Center did not publish books"
+
+    orders = [
+        ("pages/2_Deep_Health.py", "decisions", "Decision Desk"),
+        ("pages/3_Asset_Detail.py", "holdings", "Holdings"),
+        ("pages/4_News.py", "pulse", "Pulse"),
+        ("pages/5_MF_Health.py", "funds", "Funds"),
+        ("pages/6_Intelligence.py", "intelligence", "Intelligence"),
+        ("pages/7_Outlook.py", "outlook", "Outlook"),
+        ("pages/8_Desk.py", "desk", "Desk"),
+    ]
+    for page, slug, label in orders:
+        at.switch_page(page).run(timeout=180)
+        assert not at.exception, f"{label} ({page}) raised: {at.exception}"
+        rendered = [m.value for m in at.markdown]
+        # every page renders the shared nav shell with its own active slug
+        assert any("nb-rail" in r for r in rendered), f"{label} missing nav rail"
+        assert any(f'href="{slug}"' in r for r in rendered), f"{label} missing active slug {slug}"
+        assert any("Northline · Family desk" in r for r in rendered), f"{label} missing page header"

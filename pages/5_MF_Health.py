@@ -15,19 +15,24 @@ from lib.ui import (
     caption,
     banner,
     footnote,
+    nav_shell,
 )
 
-st.set_page_config(page_title="MF Health", page_icon="🛡️", layout="wide")
+st.set_page_config(page_title="Funds", page_icon="🛡️", layout="wide")
 
 # ==================================================
 # INSTITUTIONAL DARK THEME — one shared stylesheet (lib.theme)
 # ==================================================
 inject_css()
 
-# ==================================================
-# LOAD FUNDS FROM COMMAND CENTER (unchanged data path)
-# ==================================================
-st.page_link("pages/1_Command_Center.py", label="← Command Center", icon="📊")
+st.markdown(nav_shell("funds"), unsafe_allow_html=True)
+st.markdown(page_header_html(
+    "Northline · Family desk",
+    "Funds",
+    "Quality, overlap, concentration — the mutual-fund book, portfolio-first. Every pillar "
+    "traces to a disclosed or observed number; cost stays un-scored (no free expense-ratio "
+    "source).",
+), unsafe_allow_html=True)
 
 mf_list = st.session_state.get("mf_holdings_for_health", [])
 if not mf_list:
@@ -270,32 +275,8 @@ def conc_bucket(top5):
 conc_label, conc_color = conc_bucket(top5_weight)
 
 # ==================================================
-# HEADER — portfolio health first
+# HEALTH AT A GLANCE (portfolio-first)
 # ==================================================
-st.markdown(page_header_html(
-    "Mutual fund portfolio health",
-    "MF Health",
-    "Portfolio-level health first — score, overlap, concentration — then fund-level "
-    "detail · every pillar traces to a disclosed or observed number",
-), unsafe_allow_html=True)
-
-c_title, c_export = st.columns([5, 1])
-with c_export:
-    st.download_button("⬇ Export", df.drop(columns=[c for c in df.columns if c.startswith("_")]).to_csv(index=False),
-                        "mf_health.csv", "text/csv", width="stretch")
-
-st.markdown(
-    '<div class="t-meta-row">'
-    + pill(f"{len(df)} funds", "info")
-    + pill(f"{df['AMC'].nunique()} fund families", "neutral")
-    + pill("cost not scored — no free expense-ratio source", "stale")
-    + '</div>',
-    unsafe_allow_html=True,
-)
-st.caption(f"Data as of {datetime.now().strftime('%d %b %Y')} · Based on {len(df)} unique funds "
-           f"· loaded from the Command Center run")
-st.markdown("---")
-
 st.markdown(section_header_html("Health at a glance", "portfolio"), unsafe_allow_html=True)
 
 b_label, _ = score_bucket(overall_health)
@@ -313,6 +294,14 @@ k_cards = [
      "tone": _conc_tone},
 ]
 st.markdown(kpi_cards(k_cards, cols=5), unsafe_allow_html=True)
+st.markdown(
+    '<div class="t-meta-row">'
+    + pill(f"Data as of {datetime.now().strftime('%d %b %Y')}", "info")
+    + pill(f"{len(df)} funds · {df['AMC'].nunique()} fund families", "neutral")
+    + pill("cost not scored — no free expense-ratio source", "stale")
+    + '</div>',
+    unsafe_allow_html=True,
+)
 
 # ==================================================
 # BREAKDOWN RADAR + OVERLAP DONUT + TOP OVERLAPPED STOCKS
@@ -403,6 +392,12 @@ with c3:
 st.markdown(section_header_html("Fund details — secondary analysis",
                                 meta="searchable · category/AMC filter · list or family view"),
             unsafe_allow_html=True)
+
+_exp, _btn = st.columns([5, 1])
+with _btn:
+    st.download_button("Export CSV",
+                       df.drop(columns=[c for c in df.columns if c.startswith("_")]).to_csv(index=False),
+                       "mf_health.csv", "text/csv")
 
 fc1, fc2, fc3, fc4 = st.columns([2, 1, 1, 1])
 with fc1:
