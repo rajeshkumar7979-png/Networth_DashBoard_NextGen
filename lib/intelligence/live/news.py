@@ -41,7 +41,7 @@ from lib.intelligence.sources.record import (
 
 NEWS_PROVIDER = "gnews"
 NEWS_BASE_URL = "https://news.google.com/rss/search"
-NEWS_TTL_SECONDS = 30 * 60
+NEWS_TTL_SECONDS = 60 * 60  # 1 hour: live news is consulted at most hourly
 NEWS_MAX_PER_QUERY = 8
 NEWS_COHORT_CAP = 40
 LIVE_CACHE_DIR = Path(DATA_DIR) / "live_research_cache"
@@ -184,7 +184,18 @@ def fetch_gnews(query, category, *, identifiers=(), now=None, limit=NEWS_MAX_PER
     entry = cache.load(key)
     decoded = cached_result(NEWS_PROVIDER, entry) if entry is not None else None
     if decoded is not None and cache.is_fresh(key, NEWS_TTL_SECONDS, now=now):
-        return decoded
+        age_min = 0
+        if decoded.retrieved_at is not None:
+            age_min = max(0, int((now - to_naive_utc(decoded.retrieved_at)).total_seconds() // 60))
+        return SourceResult(
+            provider=NEWS_PROVIDER,
+            status="ok",
+            records=decoded.records,
+            retrieved_at=decoded.retrieved_at,
+            cache_hit=True,
+            reason=f"Cache fresh ({age_min} min old) - skipping network call",
+            metadata=decoded.metadata,
+        )
 
     try:
         qparams = dict(params or _NEWS_PARAMS)

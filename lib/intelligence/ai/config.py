@@ -1,12 +1,15 @@
-# AI Research Provider v1 — environment-driven configuration.
+# AI Research Provider v1 — configuration from Streamlit native secrets or the
+# environment.
 #
-# All provider credentials come from the environment / secrets. Nothing is
-# hard-coded; nothing is ever written to logs, caches, the UI, or error
-# messages. `redact()` is the single choke point used to scrub an API key from
-# any text we surface.
+# Inside a running Streamlit script, values are first looked up in the [ai]
+# table of .streamlit/secrets.toml (st.secrets["ai"]); everything else falls
+# back to OS environment variables. Nothing is hard-coded; nothing is ever
+# written to logs, caches, the UI, or error messages. `redact()` is the single
+# choke point used to scrub an API key from any text we surface.
 from __future__ import annotations
 
 import os
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Optional
 
@@ -20,19 +23,58 @@ ENV_AI_TEMPERATURE = "AI_TEMPERATURE"
 ENV_AI_STRUCTURED_OUTPUT = "AI_STRUCTURED_OUTPUT"
 ENV_AI_MAX_EVIDENCE_CATALOG = "AI_MAX_EVIDENCE_CATALOG"
 
-# Default provider: Groq — genuine free/developer tier (no credit card), a
-# stable OpenAI-compatible chat/completions API, and strict Structured Outputs
-# (json_schema) on openai/gpt-oss-120b. The AB layer is provider-neutral:
-# these values are only defaults and can be overridden for any OpenAI-compatible
-# endpoint (OpenAI, Groq, OpenRouter, Together, LM Studio, vLLM, ...).
+# All keys handled by load_ai_config(). The same names are expected inside the
+# `[ai]` section of Streamlit's native secrets (st.secrets["ai"][KEY]).
+_AI_ENV_KEYS = (
+    ENV_AI_API_KEY,
+    ENV_AI_PROVIDER,
+    ENV_AI_BASE_URL,
+    ENV_AI_MODEL,
+    ENV_AI_TIMEOUT_SECONDS,
+    ENV_AI_MAX_TOKENS,
+    ENV_AI_TEMPERATURE,
+    ENV_AI_STRUCTURED_OUTPUT,
+    ENV_AI_MAX_EVIDENCE_CATALOG,
+)
+
+# Default provider: Groq — genuine free/developer tier (no credit card) and a
+# stable OpenAI-compatible chat/completions API. Default model is Groq's
+# mixtral-8x7b-32768 (32768-token context; llama-3.1-70b-versatile was
+# discontinued by Groq). Note: Groq's `json_schema` Structured Outputs are
+# supported only on a few models (gpt-oss variants and qwen3.8-27b); mixtral
+# rejects json_schema with a 400, so the client's existing single 400-degrade
+# retry runs it in `json_object` mode instead (the prompts already spell out the
+# JSON shape, so the tolerant parser still recovers the fields).
+# openai/gpt-oss-120b remains selectable via AI_MODEL when true json_schema is
+# wanted (its scalar fields can drift and return objects — parse.py recovers
+# those). The AI layer is provider-neutral: these values are only defaults and
+# can be overridden for any OpenAI-compatible endpoint (OpenAI, Groq,
+# OpenRouter, Together, LM Studio, vLLM, ...).
 DEFAULT_PROVIDER = "groq"
 DEFAULT_BASE_URL = "https://api.groq.com/openai/v1"
-DEFAULT_MODEL = "openai/gpt-oss-120b"
+DEFAULT_MODEL = "mixtral-8x7b-32768"
 DEFAULT_TIMEOUT_SECONDS = 30.0
 DEFAULT_MAX_TOKENS = 1200
 DEFAULT_TEMPERATURE = 0.0
 DEFAULT_STRUCTURED_OUTPUT = True
-DEFAULT_MAX_EVIDENCE_CATALOG = 12
+DEFAULT_MAX_EVIDENCE_CATALOG = 20
+
+# Ollama local fallback — a local inference server that needs no API key.
+OLLAMA_LOCAL_PROVIDER = "ollama_local"
+OLLAMA_BASE_URL = "http://localhost:11434/v1"
+OLLAMA_MODEL = "llama3.1:8b"
+OLLAMA_TIMEOUT_SECONDS = 120.0
+
+# Providers that require no API key (local inference servers).
+_KEYLESS_PROVIDERS = frozenset({OLLAMA_LOCAL_PROVIDER})
+
+# Cascade: when the primary provider fails with a retriable network error
+# (timeout, connection refused) and no explicit client was injected, try the
+# fallback. Only wired for Groq → Ollama; other providers have no fallback.
+_FALLBACK_PROVIDER: dict[str, str] = {
+    "groq": OLLAMA_LOCAL_PROVIDER,
+    "openai_compat": OLLAMA_LOCAL_PROVIDER,
+}
 
 
 @dataclass(frozen=True)
@@ -72,9 +114,60 @@ def _env_bool(value, default: bool) -> bool:
     return str(value).strip().lower() in ("1", "true", "yes", "on")
 
 
+def provider_requires_key(provider: str) -> bool:
+    """True when the provider needs an API key; False for keyless local servers."""
+    return provider not in _KEYLESS_PROVIDERS
+
+
+def provider_is_configured(config: AIConfig) -> bool:
+    """True when the config is usable — key present, or keyless local provider."""
+    if config.api_key.strip():
+        return True
+    return not provider_requires_key(config.provider)
+
+
+def _streamlit_secret(key_name: str) -> Optional[str]:
+    """Read one `[ai]` value from Streamlit's native secrets.
+
+    Returns None (never raises) when not running inside a Streamlit script run,
+    when no `[ai]` section exists, or when the value is missing/empty — the
+    caller then falls back to the environment. The secret value itself is never
+    echoed anywhere by this module.
+    """
+    try:
+        import streamlit as st
+    except ImportError:  # scripts, pytest, plain module imports
+        return None
+    runtime = getattr(st, "runtime", None)
+    try:
+        if runtime is None or not runtime.exists():
+            return None
+        section = st.secrets.get("ai", {})
+    except Exception:
+        return None
+    # Streamlit returns an AttrDict (a Mapping, not a dict subclass).
+    if not isinstance(section, Mapping):
+        return None
+    value = section.get(key_name)
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
 def load_ai_config(env=None) -> AIConfig:
-    """Build AIConfig from an environment mapping (defaults to os.environ)."""
+    """Build AIConfig from an environment mapping (defaults to os.environ).
+
+    Precedence inside a running Streamlit script run:
+        st.secrets["ai"][KEY]  >  explicit `env` mapping  >  os.environ.
+    Outside a Streamlit runtime, secrets are never read (no accidental key use
+    in scripts/tests, and no error when Streamlit is not installed).
+    """
     env = dict(os.environ if env is None else env)
+    for _key in _AI_ENV_KEYS:
+        _secret = _streamlit_secret(_key)
+        if _secret is not None:
+            env[_key] = _secret
     return AIConfig(
         api_key=str(env.get(ENV_AI_API_KEY, "") or "").strip(),
         provider=str(env.get(ENV_AI_PROVIDER, "") or "").strip() or DEFAULT_PROVIDER,
@@ -106,13 +199,14 @@ def redact(text: str, secret: Optional[str]) -> str:
 def ai_config_status(config: Optional[AIConfig] = None) -> dict:
     """Read-only provider metadata for the UI. Never includes the key."""
     cfg = config if config is not None else load_ai_config()
+    is_configured = provider_is_configured(cfg)
     return {
-        "configured": cfg.configured,
+        "configured": is_configured,
         "provider": cfg.provider,
         "model": cfg.model,
         "base_url": cfg.base_url,
         "timeout_seconds": cfg.timeout_seconds,
         "structured_output": cfg.structured_output,
         "max_evidence_catalog": cfg.max_evidence_catalog,
-        "key_masked": "***" if cfg.configured else "",
+        "key_masked": "***" if cfg.api_key.strip() else "",
     }

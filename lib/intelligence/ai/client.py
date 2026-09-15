@@ -14,7 +14,7 @@ from typing import Optional, Protocol
 
 import requests
 
-from lib.intelligence.ai.config import AIConfig, redact
+from lib.intelligence.ai.config import AIConfig, _KEYLESS_PROVIDERS, redact
 from lib.intelligence.ai.schema import OUTPUT_SCHEMA, OUTPUT_NAME
 
 # Requests-style timeout tuple: (connect, read).
@@ -153,7 +153,7 @@ class OpenAICompatClient:
 
     def complete(self, request: AIRequest, api_key: str = "") -> AIResponse:
         key = api_key or self._config.api_key
-        if not key:
+        if not key and self.provider not in _KEYLESS_PROVIDERS:
             raise AIProviderError("AI API key is empty.")
         url = self._config.base_url.rstrip("/") + "/chat/completions"
         headers = {
@@ -231,3 +231,7 @@ class OpenAICompatClient:
 # provider name, so AI_PROVIDER=groq (or =openai_compat) resolves here by default.
 register_ai_provider("openai_compat", OpenAICompatClient)
 register_ai_provider("groq", OpenAICompatClient)
+
+# Ollama local uses the same OpenAI-compatible transport (localhost:11434/v1).
+from lib.intelligence.ai.config import OLLAMA_LOCAL_PROVIDER  # noqa: E402
+register_ai_provider(OLLAMA_LOCAL_PROVIDER, OpenAICompatClient)

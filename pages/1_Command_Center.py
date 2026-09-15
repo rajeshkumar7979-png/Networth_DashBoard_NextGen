@@ -58,6 +58,7 @@ from lib.intelligence.provider import DeterministicProvider as DeterministicInte
 from lib.intelligence.sources import gateway_status as intel_gateway_status
 from lib.intelligence.sources import mapping as intel_mapping
 from lib.intelligence.sources import mf as intel_mf
+from lib.intelligence.sources import macro_cascade as intel_macro
 from lib import theme
 from lib.ui import (
     page_header_html as ui_page_header,
@@ -76,6 +77,7 @@ from lib.ui import (
     unavailable as ui_unavailable,
     evidence_trail as ui_evidence,
     nav_shell as ui_nav,
+    safe_page_link,
 )
 IST = pytz.timezone("Asia/Kolkata")
 now_ist = datetime.now(IST)
@@ -1255,12 +1257,18 @@ with _controls_exp:
 # ==================================================
 # HEADER — command center
 # ==================================================
-st.markdown(ui_nav("command"), unsafe_allow_html=True)
+ui_nav("command")
+_usd_lbl_hdr = f"USD/INR {usd_inr:.2f}" if usd_inr else "USD/INR n/a"
 st.markdown(ui_page_header(
     "Northline · Family desk",
     "Command Center",
-    "Where the books stand — "
-    f"last updated {now_ist.strftime('%d %b %Y, %H:%M IST')} · all amounts in INR unless noted",
+    "Where the books stand, attributed, and investigated — the morning view.",
+    meta=[
+        f"AS OF {now_ist.strftime('%d %b %Y, %H:%M IST')}",
+        _usd_lbl_hdr,
+        "ALL AMOUNTS INR UNLESS NOTED",
+        "NRI-AWARE",
+    ],
 ), unsafe_allow_html=True)
 
 # Optional vs prior history day (used by the hero cards below)
@@ -1339,7 +1347,7 @@ with _lcols[1]:
 # ==================================================
 # PORTFOLIO POSTURE — allocation readout
 # ==================================================
-st.markdown(ui_section("Portfolio posture"), unsafe_allow_html=True)
+st.markdown(ui_section("Portfolio posture", index="01"), unsafe_allow_html=True)
 st.markdown(ui_alloc_bar([
     {"label": "Equity (stocks + non-liquid MF)", "value": total_equity, "color": "#f59e0b"},
     {"label": "Liquid MF", "value": total_liquid_mf, "color": "#22c55e"},
@@ -1396,7 +1404,7 @@ if (
         if _mat_cards:
             st.markdown(ui_kpi_cards(_mat_cards, cols=4), unsafe_allow_html=True)
         _top_mat = _nonempty[0][1].sort_values("_days", ascending=True).head(6)
-        _mat_rows = "<div class='t-list'><div class='t-list-title' style='padding:0 0 6px 0;font-size:0.68rem;color:#6b7688;'>CLOSEST TO MATURITY</div>"
+        _mat_rows = "<div class='t-list'><div class='t-list-title' style='padding:0 0 6px 0;'>CLOSEST TO MATURITY</div>"
         for __, _r in _top_mat.iterrows():
             _d = int(_r["_days"]) if pd.notna(_r["_days"]) else None
             if _d is None:
@@ -1418,7 +1426,7 @@ if (
                 _meta = f"INR {_amt_txt}"
             _holder = _html.escape(str(_r.get("Holder Name") or ""))
             _mat_rows += (
-                "<div class='t-list-row' style='border-bottom:1px solid #141a28;'>"
+                "<div class='t-list-row' style='border-bottom:1px solid var(--c-border-subtle);'>"
                 f"<span class='t-list-name'>{_holder} · {_days_txt}</span>"
                 f"<span class='t-list-meta'>{_meta}</span></div>"
             )
@@ -1462,6 +1470,40 @@ if not mf_valid.empty and "Fund Name" in mf_valid.columns:
 _gold_syms = []
 if not gold_valid.empty and "Symbol" in gold_valid.columns:
     _gold_syms = gold_valid["Symbol"].dropna().astype(str).head(3).tolist()
+
+
+def _weighted_holdings(df, name_col, value_col="Current Value", limit=8):
+    """(name, current value) pairs, highest value first, for weight-prioritized
+    research queries. Numeric-coerced; missing/blank/zero/non-finite degrade."""
+    if df is None or df.empty or name_col not in df.columns or value_col not in df.columns:
+        return []
+    try:
+        values = pd.to_numeric(df[value_col], errors="coerce")
+        base = pd.DataFrame({
+            "name": df[name_col].astype(str).str.strip(),
+            "value": values,
+        })
+        base = base[base["name"].notna()
+                    & base["name"].ne("")
+                    & base["name"].ne("nan")
+                    & base["value"].notna()
+                    & base["value"].gt(0)]
+        agg = (base.groupby("name", as_index=False)["value"].sum()
+                   .sort_values("value", ascending=False).head(limit))
+    except Exception:
+        return []
+    pairs = []
+    for _, row in agg.iterrows():
+        try:
+            pairs.append((str(row["name"]).strip(), float(row["value"])))
+        except (TypeError, ValueError):
+            continue
+    return pairs
+
+
+_stock_holdings = _weighted_holdings(stocks_valid, "Symbol")
+_fund_holdings = _weighted_holdings(mf_valid, "Fund Name")
+_gold_holdings = _weighted_holdings(gold_valid, "Symbol")
 
 try:
     news_items = get_portfolio_news(
@@ -1560,14 +1602,24 @@ try:
         # OBSERVED FACT evidence labeled with exact-identifier relevance and can
         # never alter any number on this page.
         _live_plan = intel_live.build_live_plan(
-            stock_symbols=list(_stock_syms or ()),
-            fund_names=list(_fund_names or ()),
-            gold_symbols=list(_gold_syms or ()),
+            stock_symbols=_stock_holdings,
+            fund_names=_fund_holdings,
+            gold_symbols=_gold_holdings,
             has_usd_book=bool(intel_live.usd_book_present(_intel_facts)),
+            equity_pct=float(equity_pct) if "equity_pct" in dir() else None,
+            asset_class_weights={
+                "gold": float(total_gold or 0.0) if "total_gold" in dir() else 0.0,
+                "fcnr": float(total_fcnr or 0.0) if "total_fcnr" in dir() else 0.0,
+                "equity": float(total_equity or 0.0) if "total_equity" in dir() else 0.0,
+            },
             now=now_ist,
         )
         _live_cohort = intel_live.load_live_cohort(plan=_live_plan, now=now_ist)
         _cohort_evs = _live_cohort.to_evidence() if _live_cohort.has_records else ()
+        # ---- macro cascade — USD/INR & US 10Y (network-free cache read) ----
+        # The live cascade (FRED -> Yahoo -> cache) runs only inside the
+        # explicit refresh button below; page load reads persisted cache only.
+        _macro_snap = intel_macro.load_macro_snapshot(now=now_ist)
         # The cache-backed cohort replaces the generic page-news feed items in the
         # base evidence AND becomes the gateway-scored external developments, so
         # deterministic research ranks portfolio-mapped stories first.
@@ -1605,7 +1657,7 @@ except Exception as _research_err:
 # item carries why-it-matters + invalidation; thin evidence surfaces as
 # info-level, never as fabricated. Decision-support only — not advice/orders.
 # ==================================================
-st.markdown(ui_section("What deserves attention"), unsafe_allow_html=True)
+st.markdown(ui_section("What deserves attention", index="02"), unsafe_allow_html=True)
 _attention_items = []
 for _fl_level, _fl_title, _fl_body in flags[:6]:
     _attention_items.append({"level": _fl_level, "title": _fl_title, "body": _fl_body})
@@ -1639,14 +1691,20 @@ else:
     st.markdown(ui_empty("Nothing flagged right now.",
                          "No warning, risk or decision-support item this run."),
                 unsafe_allow_html=True)
-_drill = " · ".join([
-    '<a class="t-drill" href="../decisions">Decide · maturing money</a>',
-    '<a class="t-drill" href="../holdings">Drill · holdings dossier</a>',
-    '<a class="t-drill" href="../funds">Funds · quality, overlap</a>',
-    '<a class="t-drill" href="../pulse">Context · pulse feed</a>',
-    '<a class="t-drill" href="../outlook">Outlook · maturity ladder</a>',
-])
-st.markdown(f'<div class="t-drill-row">{_drill}</div>', unsafe_allow_html=True)
+# Cross-page drill hooks. These MUST be st.page_link elements (not HTML
+# anchors): Streamlit rewrites markdown anchors to target="_blank", opening a
+# fresh session tab that drops this page's cc_* context. page_link routes inside
+# the same session.
+_drills = [
+    ("pages/2_Deep_Health.py", "Decide · maturing money"),
+    ("pages/3_Asset_Detail.py", "Drill · holdings dossier"),
+    ("pages/5_MF_Health.py", "Funds · quality, overlap"),
+    ("pages/4_News.py", "Context · pulse feed"),
+    ("pages/7_Outlook.py", "Outlook · maturity ladder"),
+]
+with st.container(key="nb_drill_links"):
+    for _page, _label in _drills:
+        safe_page_link(_page, label=_label)
 st.caption("Drill into a page for the full detail behind any item. Above items are "
            "observed/calculated from this run's data — never invented.")
 
@@ -1697,7 +1755,7 @@ if history_df is not None and len(history_df) >= 2:
 # Valuation attribution only; the workbook has no cash-flow ledger, so the
 # invested diff between runs is never called a deposit/withdrawal/SIP.
 # ==================================================
-st.markdown(ui_section("What changed this run"), unsafe_allow_html=True)
+st.markdown(ui_section("What changed this run", index="03"), unsafe_allow_html=True)
 if _research_brief is not None and _research_brief.changes:
     _chg_cards = [
         {
@@ -1757,7 +1815,7 @@ st.markdown(ui_caption(_delta_cap), unsafe_allow_html=True)
 # button. Records stay OBSERVED FACT evidence labelled by exact-identifier
 # relevance and never change the numbers computed above.
 # ==================================================
-st.markdown(ui_section("Current external developments · portfolio-aware"),
+st.markdown(ui_section("Current external developments · portfolio-aware", index="04"),
             unsafe_allow_html=True)
 if "_live_cohort" not in dir() or _live_cohort is None:
     st.markdown(ui_empty(
@@ -1783,6 +1841,11 @@ else:
                         facts=_intel_facts, now=now_ist, plan=_live_plan,
                     )
                     st.session_state["cc_live_refreshed_at"] = now_ist
+                    # Live macro cascade: FRED -> Yahoo -> cache; this is the
+                    # ONLY place get_macro_fx_snapshot() runs.
+                    st.session_state["cc_macro_snapshot"] = intel_macro.get_macro_fx_snapshot(
+                        now=now_ist,
+                    )
                 st.rerun()
         with _row_b:
             _live_result = st.session_state.get("cc_live_result")
@@ -1836,8 +1899,7 @@ else:
                     for g in groups)
                 st.markdown(f'<div class="t-caption">News by asset: {_news_chips}</div>',
                             unsafe_allow_html=True)
-            st.markdown('<a class="t-drill" href="../pulse">Open Pulse feed →</a>',
-                        unsafe_allow_html=True)
+            safe_page_link("pages/4_News.py", label="Open Pulse feed →")
         else:
             st.caption("No cached news/gateway records yet — press 'Refresh research "
                        "evidence' to fetch. A network call happens only on that explicit "
@@ -1850,6 +1912,75 @@ else:
     except Exception as _live_render_err:
         st.caption(f"Live research panel unavailable: {_live_render_err}")
 
+
+# ==================================================
+# MACRO INDICATORS — USD/INR, India 10Y & US 10Y via the macro cascade
+# Page load shows the persisted cache only (load_macro_snapshot, network-free).
+# Fresh data appears here after the explicit 'Refresh research evidence'
+# action, which is the only place get_macro_fx_snapshot() runs. No invented
+# numbers: provenance and timestamps are shown per record, and the India-US
+# carry spread is a calculated fact over those observed records.
+# ==================================================
+_macro_disp = _macro_snap if "_macro_snap" in dir() else None
+_PROV_UI = {
+    "FRED_API":           ("FRED · authoritative", "positive"),
+    "YAHOO_FINANCE_FALLBACK": ("Yahoo · fallback", "warning"),
+    "STALE_CACHE":        ("Cache · stale", "warning"),
+}
+with st.expander("Macro Indicators · USD/INR, India 10Y & US 10Y"):
+    if _macro_disp is None:
+        st.markdown(ui_unavailable(
+            "Macro indicators unavailable",
+            "The macro cascade did not produce a snapshot this run."),
+            unsafe_allow_html=True)
+    elif _macro_disp.status != "ok" or not _macro_disp.records:
+        st.caption("No cached macro indicators yet — press 'Refresh research "
+                   "evidence' to fetch USD/INR and the India 10Y / US 10Y "
+                   "yields. A network call happens only on that explicit action, "
+                   "never on page open.")
+    else:
+        _macro_ts = max((r.retrieved_at for r in _macro_disp.records
+                         if r.retrieved_at is not None), default=None)
+        if _macro_disp.is_stale:
+            _macro_note = ("**Last updated:** stale — press 'Refresh research "
+                           "evidence' to update")
+        elif _macro_ts is not None:
+            _macro_note = (f"**Last updated:** {_macro_ts:%d %b %Y %H:%M} UTC "
+                           "· cached read, refreshed only via the explicit button")
+        else:
+            _macro_note = "Cached read, refreshed only via the explicit button."
+        st.caption(_macro_note)
+        for _rec in _macro_disp.records:
+            _p = _rec.payload or {}
+            _prov = str(_p.get("provenance") or "unknown")
+            _badge, _tone = _PROV_UI.get(_prov, (_prov, "neutral"))
+            _raw = _p.get("value")
+            _val_s = (f"{float(_raw):,.4f}".rstrip("0").rstrip(".")
+                      if isinstance(_raw, (int, float)) else str(_raw or "–"))
+            _units = str(_p.get("units") or "")
+            st.markdown(
+                f"**{_rec.title or _rec.entity}** — {_val_s}"
+                f"{' ' + _units if _units else ''}  "
+                f"{ui_badge(_badge, _tone)}",
+                unsafe_allow_html=True)
+        _ys = (_macro_disp.metadata or {}).get("yield_spread") or {}
+        if _ys.get("available"):
+            _spread_txt = (f"{float(_ys['spread_pp']):+,.2f} pp · "
+                           f"{_ys['spread_bps']:,.1f} bps")
+            st.markdown(
+                f"**India − US 10Y carry spread** — {_spread_txt}  "
+                f"{ui_badge('calculated', 'neutral')}",
+                unsafe_allow_html=True)
+        elif _ys:
+            st.caption("India − US 10Y spread unavailable: "
+                       f"{_ys.get('basis') or 'insufficient evidence'}.")
+        st.caption("Provenance: FRED (authoritative gateway) · Yahoo Finance "
+                   "(on-demand fallback) · Cache (last successful fetch). USD/INR "
+                   "and the 10Y yields are OBSERVED FACT inputs — they never alter "
+                   "portfolio valuation on this page. The carry spread is a "
+                   "calculated fact (India 10Y − US 10Y) from those records, "
+                   "decision-support only, never advice.")
+
 st.markdown("---")
 
 
@@ -1858,7 +1989,7 @@ st.markdown("---")
 # Top-of-brief summary; the full readout (changes table, risks with
 # invalidation, research needs, gaps, claims) lives in Level 5 below.
 # ==================================================
-st.markdown(ui_section("Research brief · synthesis"), unsafe_allow_html=True)
+st.markdown(ui_section("Research brief · synthesis", index="05"), unsafe_allow_html=True)
 if _research_brief is not None:
     try:
         _rb = _research_brief
@@ -1887,9 +2018,21 @@ st.markdown("---")
 # Deterministic facts + the existing ResearchBrief stay the source of truth.
 # ==================================================
 if _research_brief is not None:
-    with st.expander("AI Research · provider-grounded interpretation (opt-in)"):
+    _ai_cfg = intel_ai.ai_config_status()
+    _AI_DISPLAY = {"groq": "Groq", "ollama_local": "Ollama local"}
+    _ai_outcome_ui = st.session_state.get("cc_ai_outcome")
+    if _ai_outcome_ui is not None and _ai_outcome_ui.status == intel_ai.STATUS_OK \
+            and _ai_outcome_ui.provider:
+        _ai_active_label = _AI_DISPLAY.get(_ai_outcome_ui.provider, _ai_outcome_ui.provider)
+    elif _ai_outcome_ui is not None and _ai_outcome_ui.status in (
+            intel_ai.STATUS_FAILED, intel_ai.STATUS_MALFORMED):
+        _ai_active_label = "Unavailable"
+    elif _ai_cfg["configured"]:
+        _ai_active_label = _AI_DISPLAY.get(_ai_cfg["provider"], _ai_cfg["provider"])
+    else:
+        _ai_active_label = "Not configured"
+    with st.expander(f"AI Research · Active: **{_ai_active_label}** (opt-in)"):
         try:
-            _ai_cfg = intel_ai.ai_config_status()
             st.caption(
                 f"Provider: **{_ai_cfg['provider']}** · Model: **{_ai_cfg['model']}** · "
                 f"Structured output: {'on' if _ai_cfg['structured_output'] else 'off'} · "

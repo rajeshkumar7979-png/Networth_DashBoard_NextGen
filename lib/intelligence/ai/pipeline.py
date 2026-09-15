@@ -11,6 +11,7 @@
 # the unchanged deterministic ResearchBrief.synthesis.
 from __future__ import annotations
 
+import logging
 import time
 from datetime import datetime
 from typing import Optional
@@ -26,7 +27,12 @@ from lib.intelligence.ai.client import (
 from lib.intelligence.ai.config import (
     ENV_AI_API_KEY,
     AIConfig,
+    _FALLBACK_PROVIDER,
+    OLLAMA_BASE_URL,
+    OLLAMA_MODEL,
+    OLLAMA_TIMEOUT_SECONDS,
     load_ai_config,
+    provider_is_configured,
     redact,
 )
 from lib.intelligence.ai.model import (
@@ -47,6 +53,19 @@ from lib.intelligence.ai.validator import (
     validate_assessment_claims,
 )
 
+logger = logging.getLogger(__name__)
+
+# Bounded raw-response excerpt for the DEBUG log — never the full reply, and
+# always redacted so a stray key echo can never reach the logs (§8).
+_RAW_EXCERPT_LIMIT = 1500
+
+
+def _log_excerpt(text: str, config) -> str:
+    excerpt = redact(str(text or ""), config.api_key)
+    if len(excerpt) > _RAW_EXCERPT_LIMIT:
+        excerpt = excerpt[:_RAW_EXCERPT_LIMIT] + "…"
+    return excerpt
+
 
 def _has_research_content(brief) -> bool:
     return bool(
@@ -56,6 +75,28 @@ def _has_research_content(brief) -> bool:
         or (getattr(brief, "research_needs", ()) or ())
         or (getattr(brief, "gaps", ()) or ())
         or getattr(brief, "evidence_count", 0)
+    )
+
+
+def _fallback_config(primary_config: AIConfig) -> Optional[AIConfig]:
+    """Build an AIConfig for the local fallback provider, if one exists.
+
+    Returns None when the primary provider has no wired fallback or is already
+    the fallback (no cascading beyond one level).
+    """
+    fallback_name = _FALLBACK_PROVIDER.get(primary_config.provider)
+    if not fallback_name or fallback_name == primary_config.provider:
+        return None
+    return AIConfig(
+        api_key="",  # keyless local server
+        provider=fallback_name,
+        base_url=OLLAMA_BASE_URL,
+        model=OLLAMA_MODEL,
+        timeout_seconds=OLLAMA_TIMEOUT_SECONDS,
+        max_tokens=primary_config.max_tokens,
+        temperature=primary_config.temperature,
+        structured_output=primary_config.structured_output,
+        max_evidence_catalog=primary_config.max_evidence_catalog,
     )
 
 
@@ -73,12 +114,18 @@ def run_ai_research(
     `facts`/`evidence` are the deterministic facts and evidence the page has
     already built (exposure facts + EvidenceBag items); they are used only to
     construct the Briefing for validate_claims — never sent to the provider.
+
+    Cascade: when the primary provider fails with a retriable network error
+    (timeout / connection refused) and no explicit client was injected, the
+    pipeline tries the wired fallback provider (Groq → Ollama local → "AI
+    unavailable"). An explicit ``client=`` override disables the cascade so
+    callers own the full failure path.
     """
     if now is None:
         now = getattr(brief, "as_of", None) or datetime.now()
     config = config if config is not None else load_ai_config()
 
-    if not config.configured:
+    if not provider_is_configured(config):
         return AIOutcome(
             status=STATUS_NOT_CONFIGURED,
             created_at=now,
@@ -117,9 +164,35 @@ def run_ai_research(
     )
 
     start = time.perf_counter()
+    response = None
+
+    # --- primary provider --------------------------------------------------
     try:
         response = cli.complete(request, api_key=config.api_key)
-    except (AIProviderTimeout, AIProviderUnavailable, AIProviderError) as exc:
+    except (AIProviderTimeout, AIProviderUnavailable) as exc:
+        # Retriable network error: try the wired fallback when no explicit
+        # client was injected (the CC button path uses client=None).
+        if client is None:
+            fb_cfg = _fallback_config(config)
+            if fb_cfg is not None:
+                logger.debug(
+                    "AI research cascading %s -> %s after retriable "
+                    "failure", config.provider, fb_cfg.provider)
+                try:
+                    fb_cli = build_client(fb_cfg)
+                    response = fb_cli.complete(request, api_key="")
+                except Exception:  # fallback also failed — fall through
+                    pass
+        if response is None:
+            return AIOutcome(
+                status=STATUS_FAILED,
+                created_at=now,
+                reason=redact(str(exc), config.api_key),
+                provider=config.provider,
+                model=config.model,
+                fallback_used=True,
+            )
+    except AIProviderError as exc:
         return AIOutcome(
             status=STATUS_FAILED,
             created_at=now,
@@ -143,6 +216,11 @@ def run_ai_research(
     latency_ms = (time.perf_counter() - start) * 1000.0
     mode = (response.meta or {}).get("format", "json_object")
 
+    logger.debug(
+        "AI research raw response (provider=%s model=%s mode=%s len=%d): %s",
+        response.provider, response.model, mode, len(response.text),
+        _log_excerpt(response.text, config))
+
     try:
         assessment = parse_assessment(
             response.text,
@@ -153,6 +231,9 @@ def run_ai_research(
             requested_format=mode,
         )
     except AIOutputError as exc:
+        logger.debug(
+            "AI research parse failed (provider=%s model=%s): %s",
+            response.provider, response.model, redact(str(exc), config.api_key))
         return AIOutcome(
             status=STATUS_MALFORMED,
             created_at=now,

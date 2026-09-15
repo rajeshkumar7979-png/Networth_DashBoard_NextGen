@@ -25,27 +25,34 @@ def _esc(value):
 # ---------------------------------------------------------------------------
 # Typography / page shell
 # ---------------------------------------------------------------------------
-def page_header_html(kicker, title, sub=""):
+def page_header_html(kicker, title, sub="", meta=()):
     parts = ["<div>"]
     if kicker:
         parts.append(f'<div class="t-kicker">{_esc(kicker)}</div>')
     parts.append(f'<div class="t-title">{_esc(title)}</div>')
     if sub:
         parts.append(f'<div class="t-sub">{_esc(sub)}</div>')
+    if meta:
+        pills = "".join(f'<span class="t-meta-pill">{_esc(m)}</span>' for m in meta if m)
+        if pills:
+            parts.append(f'<div class="t-meta-row">{pills}</div>')
     parts.append("</div>")
     return "".join(parts)
 
 
-def section_header_html(label, meta="", index=None):
+def section_header_html(label, meta="", index=None, desc=""):
     """Section title with a hairline rule and never-concatenated meta.
     A short numeric meta (e.g. step numbering "01") is rendered as a leading
-    index chip; any other meta sits on the right, separated by the rule."""
+    index chip; any other meta sits on the right, separated by the rule.
+    An optional `desc` becomes a muted sentence under the title."""
     if index is None and str(meta).strip().isdigit():
         index, meta = str(meta).strip(), ""
     idx_html = f'<span class="t-section-index">{_esc(index)}</span>' if index else ""
     meta_html = f'<span class="t-section-meta">{_esc(meta)}</span>' if meta else ""
-    return (f'<div class="t-section-title">{idx_html}'
+    head = (f'<div class="t-section-title">{idx_html}'
             f'<span class="t-section-lbl">{_esc(label)}</span>{meta_html}</div>')
+    desc_html = f'<div class="t-section-desc">{_esc(desc)}</div>' if desc else ""
+    return head + desc_html
 
 
 def caption(text, tone=""):
@@ -137,11 +144,12 @@ def kpi_cards(cards, cols=None):
                     "warn": "t-kpi-tone-warn", "accent": "t-kpi-tone-accent"}.get(
                         c.get("tone"), "")
         sub_html = f'<div class="t-kpi-sub">{_esc(c.get("sub", ""))}</div>' if c.get("sub") else ""
+        foot_html = f'<div class="t-kpi-foot">{_esc(c.get("foot", ""))}</div>' if c.get("foot") else ""
         items.append(
             f'<div class="t-kpi {tone_cls}">'
             f'<div class="t-kpi-label">{_esc(c.get("label", ""))}</div>'
             f'<div class="t-kpi-value">{_esc(c.get("value", ""))}</div>'
-            f'{sub_html}'
+            f'{sub_html}{foot_html}'
             f'</div>'
         )
     grid_cls = f" t-kpi-grid-{int(cols)}" if cols else ""
@@ -331,3 +339,60 @@ def evidence_meta(source, retrieved_at="", class_label="", method=""):
         _esc(method) if method else "",
     ]
     return source_tag(" · ".join(b for b in bits if b))
+
+
+# ---------------------------------------------------------------------------
+# Data sheet — two-column labelled dossier rows (Asset Detail, Deep Health)
+# ---------------------------------------------------------------------------
+def data_sheet(rows):
+    """rows: list of dict(label, value, tone=None). tone: up|down|dim|accent.
+    Two-column labelled rows; long values wrap, labels are the uppercase set."""
+    cells = []
+    for r in rows:
+        label = _esc(r.get("label", ""))
+        tone_cls = {"up": "up", "down": "down", "dim": "dim", "accent": "accent"}.get(r.get("tone"), "")
+        val = f'<div class="t-sheet-value {tone_cls}">{_esc(r.get("value", ""))}</div>'
+        cells.append(
+            f'<div class="t-sheet-cell"><div class="t-sheet-label">{label}</div>{val}</div>'
+        )
+    if not cells:
+        return '<div class="t-empty">No details to display.</div>'
+    return f'<div class="t-sheet">{"".join(cells)}</div>'
+
+
+# ---------------------------------------------------------------------------
+# Outlook ladder — vertical month bars (Outlook)
+# ---------------------------------------------------------------------------
+def ladder_rows(rows):
+    """rows: list of dict(label, value, meta=""). Bar widths are derived from the
+    given values only (max value scales to 100%); missing values never render."""
+    numeric = []
+    for r in rows:
+        try:
+            numeric.append((r, max(0.0, float(r.get("value") or 0.0))))
+        except (TypeError, ValueError):
+            continue
+    peak = max((v for _, v in numeric), default=0.0)
+    if peak <= 0:
+        return '<div class="t-empty">Nothing matures in this window.</div>'
+    out = []
+    for r, v in numeric:
+        width = max(1.0, v / peak * 100) if v > 0 else 0.0
+        meta = f'<div class="ladder-meta">{_esc(r.get("meta", ""))}</div>' if r.get("meta") else ""
+        out.append(
+            f'<div class="ladder-row"><div class="ladder-ym">{_esc(r.get("label", ""))}</div>'
+            f'<div class="ladder-bar-wrap"><div class="ladder-bar" style="width:{width:.1f}%"></div></div>'
+            f'<div class="ladder-val">{_fmt_compact(r.get("value"))}</div></div>'
+            + (f'<div class="ladder-meta-row">{meta}</div>' if meta else "")
+        )
+    return '<div class="ladder">' + "".join(out) + "</div>"
+
+
+def _fmt_compact(value):
+    """INR compact formatting; delegates to the app's shared formatter so ladder
+    values display identically everywhere (₹2.34 Cr)."""
+    from lib.formatters import format_inr_compact
+    try:
+        return format_inr_compact(float(value))
+    except (TypeError, ValueError):
+        return "" if value in (None, "") else str(value)

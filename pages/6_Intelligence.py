@@ -39,12 +39,17 @@ theme.inject_css()
 IST = pytz.timezone("Asia/Kolkata")
 NOW_IST = datetime.now(IST)
 
-st.markdown(ui_nav("intelligence"), unsafe_allow_html=True)
+ui_nav("intelligence")
 st.markdown(ui_page_header(
     "Northline · Family desk",
     "Intelligence",
     "What matters now — the fixed, evidence-backed signals your portfolio throws, "
     "read in one sitting. Everything here is read-only synthesis of the Command Center's run.",
+    meta=[
+        f"AS OF {NOW_IST.strftime('%d %b %Y, %H:%M IST')}",
+        "READ-ONLY SYNTHESIS",
+        "NO NETWORK THIS RUN",
+    ],
 ), unsafe_allow_html=True)
 
 _briefing = st.session_state.get("cc_intel_briefing")
@@ -199,7 +204,7 @@ if _research is not None and _research.changes:
             "tone": "neutral",
         })
     _changes_grid = "".join(
-        f'<div class="t-kpi t-kpi-tone-{_c.get("tone", "neutral")}" style="min-height:96px;">'
+        f'<div class="t-kpi t-kpi-tall t-kpi-tone-{_c.get("tone", "neutral")}">'
         f'<div class="t-kpi-label">{_c["label"]}</div>'
         f'<div class="t-kpi-value">{_c["value"]}</div>'
         f'<div class="t-kpi-sub">{_c.get("sub", "")}</div></div>' for _c in _chg_cards[:8])
@@ -266,7 +271,7 @@ if _research is not None:
     _synth = _research.synthesis
 if _synth is not None:
     st.markdown(ui_section("Research synthesis", str(_synth.model)), unsafe_allow_html=True)
-    st.markdown(f'<div class="t-card" style="font-size:0.9rem;color:#e5e9f0;">{_synth.summary}</div>',
+    st.markdown(f'<div class="t-card t-card-summary">{_synth.summary}</div>',
                 unsafe_allow_html=True)
     if _synth.claims:
         for _cl in _synth.claims:

@@ -8,12 +8,17 @@ from lib.ui import (page_header_html, section_header_html, pill, sentiment_mark,
 
 inject_css()
 
-st.markdown(nav_shell("pulse"), unsafe_allow_html=True)
+nav_shell("pulse")
 st.markdown(page_header_html(
     "Northline · Family desk",
     "Pulse",
     "Holdings + NRI / tax — an editorial feed of what is moving around your portfolio. "
     "Headlines are observations, never verified portfolio facts.",
+    meta=[
+        "EDITORIAL FEED",
+        "OBSERVATIONS, NOT VERIFIED FACTS",
+        "PORTFOLIO + NRI / TAX",
+    ],
 ), unsafe_allow_html=True)
 
 _rates = st.session_state.get("cc_rates") or {}

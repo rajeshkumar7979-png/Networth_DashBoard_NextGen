@@ -13,6 +13,7 @@
 # -------------------------------------------------
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
@@ -23,7 +24,9 @@ from lib.intelligence.sources.record import SourceResult, unavailable_result, ut
 
 from .cohort import LiveCohort, assemble_cohort
 from .news import LIVE_CACHE_DIR, NEWS_PROVIDER, fetch_gnews, scrub_error, to_naive_utc
-from .planner import ResearchPlan, build_live_plan
+from .planner import NewsQuery, ResearchPlan, build_live_plan, simplify_query
+
+logger = logging.getLogger(__name__)
 
 STATUS_OK = "ok"
 STATUS_DEGRADED = "degraded"
@@ -88,12 +91,12 @@ def run_live_research(*, stock_symbols=(), fund_names=(), gold_symbols=(),
 
     results: list[SourceResult] = []
     failures: list[tuple[str, str]] = []
+    effective_queries = list(plan.queries)
 
-    for query in plan.queries:
-        identifiers = [(query.identifier, query.identifier_key)] if query.is_identified() else []
+    def fetch_news(query, category, identifiers, *, is_fallback: bool) -> SourceResult:
         try:
             result = fetch_gnews(
-                query.query, query.category,
+                query, category,
                 identifiers=identifiers,
                 now=now,
                 cache=news_cache,
@@ -102,9 +105,48 @@ def run_live_research(*, stock_symbols=(), fund_names=(), gold_symbols=(),
         except Exception as exc:  # defensive: fetch_gnews already guards, never raise
             result = unavailable_result(NEWS_PROVIDER, scrub_error(
                 f"refresh failed: {type(exc).__name__}: {exc}"))
+        if is_fallback:
+            logger.debug("gnews fallback fetch (query=%r category=%r) status=%s "
+                         "records=%d", query, category, result.status,
+                         len(result.records))
+        return result
+
+    for query in plan.queries:
+        identifiers = [(query.identifier, query.identifier_key)] if query.is_identified() else []
+        result = fetch_news(query.query, query.category, identifiers, is_fallback=False)
         results.append(result)
         if result.status != "ok":
             failures.append((query.query, scrub_error(result.reason or "unavailable")))
+            continue
+        if result.records:
+            continue
+        # Zero records: retry once with a simplified, higher-recall query and
+        # log the miss for debugging. The fallback bucket joins the cohort.
+        simplified = simplify_query(query.query, kind=query.kind)
+        if not simplified or simplified.lower() == query.query.lower():
+            logger.info(
+                "gnews query returned 0 records (query=%r category=%r kind=%r) "
+                "- no simpler form available", query.query, query.category,
+                query.kind)
+            continue
+        logger.info(
+            "gnews query returned 0 records (query=%r category=%r kind=%r) - "
+            "retrying simplified: %r", query.query, query.category, query.kind,
+            simplified)
+        fb = fetch_news(simplified, query.category, identifiers, is_fallback=True)
+        results.append(fb)
+        if fb.status == "ok":
+            if not fb.records:
+                logger.info(
+                    "gnews simplified query also returned 0 records "
+                    "(query=%r)", simplified)
+            effective_queries.append(NewsQuery(
+                query=simplified,
+                category=query.category,
+                kind=query.kind,
+                identifier=query.identifier,
+                identifier_key=query.identifier_key,
+            ))
 
     for series in plan.fred_targets:
         try:
@@ -118,7 +160,9 @@ def run_live_research(*, stock_symbols=(), fund_names=(), gold_symbols=(),
 
     gateway_used = gateway_cache if gateway_cache.base_dir != Cache().base_dir else None
     cohort = assemble_cohort(
-        plan=plan,
+        plan=ResearchPlan(queries=tuple(effective_queries),
+                          fred_targets=plan.fred_targets,
+                          generated_at=plan.generated_at),
         now=now,
         cache=news_cache,
         gateway_cache_dir=gateway_used.base_dir if gateway_used is not None else None,

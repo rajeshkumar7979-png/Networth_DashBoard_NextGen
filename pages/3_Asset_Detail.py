@@ -10,12 +10,12 @@ import streamlit as st
 import pandas as pd
 
 from lib.theme import inject_css
-from lib.portfolio import load_excel
-from lib.register import canonical_instrument_key, assign_asset_class
+from lib.register import canonical_instrument_key
 from lib.roster import build_roster, instrument_summary, member_filter_options
 from lib.formatters import format_inr
 from lib.ui import (
     caption,
+    data_sheet,
     empty_state,
     kpi_cards,
     nav_shell,
@@ -28,7 +28,7 @@ from lib.intelligence.live import development_rows
 
 inject_css()
 
-st.markdown(nav_shell("holdings"), unsafe_allow_html=True)
+nav_shell("holdings")
 st.markdown(page_header_html(
     "Northline · Family desk",
     "Holdings",
@@ -60,45 +60,6 @@ def _raw_records_for(books, kind, key):
     return out
 
 
-def _fallback_roster():
-    """Degraded path (no session data): workbook rows only — identity without
-    invented valuation."""
-    try:
-        fd, mf, stocks = load_excel()
-    except Exception:
-        return pd.DataFrame()
-    rows = []
-    for df, kind, name_col, member_col in (
-        (mf, "MF", "Fund Name", "Owner"),
-        (stocks, "Stocks", "Company Name", "Owner"),
-        (fd, "FD", "Account Number", "Holder Name"),
-    ):
-        if df is None or df.empty:
-            continue
-        for _, r in df.iterrows():
-            rec = r.to_dict()
-            key = canonical_instrument_key(kind, rec)
-            if not key:
-                continue
-            nm = rec.get(name_col) or (rec.get("ISIN") if kind == "MF" else
-                                       (rec.get("Symbol") if kind == "Stocks" else ""))
-            rows.append({
-                "Key": key,
-                "Name": str(nm).strip() or key,
-                "Kind": kind,
-                "Class": assign_asset_class(kind, rec),
-                "Member": str(rec.get(member_col) or "").strip(),
-                "Current Value": None,
-                "Invested": None,
-                "P&L": None,
-                "Return %": None,
-                "Match Terms": [key.upper()],
-            })
-    return pd.DataFrame(rows) if rows else pd.DataFrame(
-        columns=["Key", "Name", "Kind", "Class", "Member",
-                 "Current Value", "Invested", "P&L", "Return %", "Match Terms"])
-
-
 books = st.session_state.get("cc_books")
 assets = st.session_state.get("cc_assets")
 cohort = st.session_state.get("cc_live_cohort")
@@ -107,15 +68,16 @@ source_txt = "Command Center session data"
 roster = None
 if isinstance(books, dict):
     try:
-        roster = build_roster(**books)
+        roster = build_roster(
+            mf_valid=books.get("mf"),
+            stocks_valid=books.get("stocks"),
+            gold_valid=books.get("gold"),
+            fd_valid=books.get("fd"),
+        )
     except Exception:
         roster = None
-if roster is None or len(roster) == 0:
-    roster = _fallback_roster()
-    if not roster.empty:
-        source_txt = "workbook rows only — open Command Center for live valuation"
 
-if roster.empty:
+if roster is None or len(roster) == 0:
     st.markdown(empty_state(
         "No holdings to drill into",
         "Open the Command Center first — it publishes the validated books this page reads.",
@@ -292,8 +254,9 @@ for _idx, (__, row) in enumerate(_positions.iterrows()):
     identity.append({"Field": "Asset class", "Value": str(row["Class"])})
     if identity:
         st.markdown(section_header_html("Identity", "record"), unsafe_allow_html=True)
-        st.dataframe(pd.DataFrame(identity)[["Field", "Value"]],
-                     hide_index=True, use_container_width=True)
+        st.markdown(data_sheet(
+            [{"label": r["Field"], "value": r["Value"]} for r in identity]),
+            unsafe_allow_html=True)
 
     st.markdown(section_header_html("Not recorded for this position", "no-data"),
                 unsafe_allow_html=True)

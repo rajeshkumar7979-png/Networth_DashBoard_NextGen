@@ -1,14 +1,17 @@
 # -------------------------------------------------
 # Intelligence Data Gateway — FRED (Federal Reserve Economic Data).
 #
-# Provider: config-driven (FRED_API_KEY env var; never hard-coded, never
-# logged, never stored in cache). Normalizes raw observations only: missing
-# "." points are skipped, real zero values are kept, and NO computed deltas or
-# derived macro signals are produced here.
+# Provider: config-driven (FRED_API_KEY from Streamlit-native secrets
+# `st.secrets["fred"]["FRED_API_KEY"]` inside a running Streamlit script, else
+# the FRED_API_KEY env var; never hard-coded, never logged, never stored in
+# cache). Normalizes raw observations only: missing "." points are skipped,
+# real zero values are kept, and NO computed deltas or derived macro signals
+# are produced here.
 # -------------------------------------------------
 from __future__ import annotations
 
 import os
+from collections.abc import Mapping
 from datetime import datetime
 from typing import Optional
 
@@ -32,10 +35,43 @@ FRED_DEFAULT_TTL = 12 * 3600
 _MISSING = {"", ".", "n/a"}
 
 
+def _streamlit_fred_key() -> Optional[str]:
+    """Read `[fred]` FRED_API_KEY from Streamlit's native secrets.
+
+    Returns None (never raises) outside a running Streamlit script run, when no
+    `[fred]` section exists, or when the value is missing/empty — the caller
+    then falls back to the environment. Scripts and pytest never touch the
+    secrets file. The key is never echoed anywhere by this module.
+    """
+    try:
+        import streamlit as st
+    except ImportError:  # scripts, pytest, plain module imports
+        return None
+    runtime = getattr(st, "runtime", None)
+    try:
+        if runtime is None or not runtime.exists():
+            return None
+        section = st.secrets.get("fred", {})
+    except Exception:
+        return None
+    # Streamlit returns an AttrDict (a Mapping, not a dict subclass).
+    if not isinstance(section, Mapping):
+        return None
+    value = section.get("FRED_API_KEY")
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
 def _api_key() -> str:
-    key = os.environ.get("FRED_API_KEY", "").strip()
+    key = _streamlit_fred_key()
     if not key:
-        raise ProviderConfigMissing("FRED_API_KEY is not set; FRED is unavailable")
+        key = os.environ.get("FRED_API_KEY", "").strip()
+    if not key:
+        raise ProviderConfigMissing(
+            "FRED_API_KEY is not set (expected in `st.secrets['fred']` or the "
+            "`FRED_API_KEY` environment variable); FRED is unavailable")
     return key
 
 
@@ -63,13 +99,16 @@ def _series_meta(series_id: str) -> dict:
 
 def _observations(series_id: str, max_observations: int) -> list[dict]:
     key = _api_key()
+    # NOTE: FRED applies `limit` to the sorted window, so sort_order="asc" with
+    # a limit returns the OLDEST N observations (not the latest N). We ask for
+    # desc to get the most recent window, then _normalize sorts back ascending.
     response = _http._http_get(
         f"{FRED_BASE}/series/observations",
         params={
             "series_id": series_id,
             "api_key": key,
             "file_type": "json",
-            "sort_order": "asc",
+            "sort_order": "desc",
             "limit": int(max_observations),
         },
     )
@@ -123,7 +162,12 @@ def _normalize(series_id: str, meta: dict, observations: list[dict], now) -> tup
                 "observation_end": meta.get("observation_end"),
             },
         ))
-    return dedupe_records(records)
+    # FRED is queried newest-first (sort_order=desc&limit=N) so we always hold
+    # the most recent N observations, never the oldest N. Normalize back to
+    # ascending so records[-1] is genuinely the latest observation.
+    records = list(dedupe_records(records))
+    records.sort(key=lambda r: (r.published_at is None, r.published_at or datetime.min))
+    return tuple(records)
 
 
 def _fetch_live(series_id: str, max_observations: int):

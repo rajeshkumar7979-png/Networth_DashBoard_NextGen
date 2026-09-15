@@ -20,12 +20,17 @@ from lib.intelligence.live.news import (
     to_naive_utc,
 )
 from lib.intelligence.live.planner import (
+    ASSET_CLASS_QUERIES,
     MAX_FUND_QUERIES,
+    MAX_PORTFOLIO_QUERIES,
     MAX_STOCK_QUERIES,
     FRED_USD_INR_TARGET,
     NewsQuery,
     ResearchPlan,
     build_live_plan,
+    rank_by_weight,
+    sanitize_query,
+    simplify_query,
 )
 from lib.intelligence.live.cohort import (
     GATEWAY_PROVIDERS,
@@ -46,12 +51,14 @@ from lib.intelligence.live.pipeline import (
 )
 
 __all__ = [
+    "ASSET_CLASS_QUERIES",
     "FRED_USD_INR_TARGET",
     "GATEWAY_PROVIDERS",
     "LIVE_CACHE_DIR",
     "LiveCohort",
     "LiveResult",
     "MAX_FUND_QUERIES",
+    "MAX_PORTFOLIO_QUERIES",
     "MAX_STOCK_QUERIES",
     "NEWS_COHORT_CAP",
     "NEWS_MAX_PER_QUERY",
@@ -70,8 +77,11 @@ __all__ = [
     "live_status",
     "load_live_cohort",
     "news_cache_key",
+    "rank_by_weight",
     "run_live_research",
+    "sanitize_query",
     "scrub_error",
+    "simplify_query",
     "to_naive_utc",
     "usd_book_present",
 ]

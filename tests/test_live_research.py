@@ -34,7 +34,7 @@ from lib.intelligence.sources.mapping import PortfolioIndex, assess_relevance
 from lib.intelligence.sources.record import SourceRecord
 
 NOW = datetime.datetime.fromisoformat("2026-09-08T13:38:00")
-OLD = NOW - datetime.timedelta(minutes=40)
+OLD = NOW - datetime.timedelta(minutes=90)  # older than the 1-hour news TTL
 
 
 class _FeedEntry(dict):
@@ -169,6 +169,122 @@ def test_build_live_plan_has_usd_book_controls_fred():
     assert plan.fred_targets == (intel_live.FRED_USD_INR_TARGET,)
 
 
+def test_derives_queries_from_top_holdings():
+    plan = intel_live.build_live_plan(
+        stock_symbols=[("SMALLCO", 5.0), ("BIGCO", 100.0), ("MIDCO", 40.0)],
+        fund_names=[("PARAM MOMENTUM FUND - Direct - Growth", 200.0)],
+        gold_symbols=["GOLDBEES"],
+        has_usd_book=True,
+        equity_pct=55.0,
+        asset_class_weights={"gold": 10.0, "fcnr": 3.0},
+        now=NOW)
+    portfolio = [q for q in plan.queries
+                 if q.category == "holding" or q.kind == "asset_class"]
+    assert len(portfolio) == intel_live.MAX_PORTFOLIO_QUERIES  # bounded, by weight
+    queries = [q.query for q in portfolio]
+    assert queries[0] == "PARAM MOMENTUM"          # highest portfolio weight first
+    assert queries.index("BIGCO") < queries.index("MIDCO")
+    assert "SMALLCO" not in queries                # lowest weight crowded out
+    assert "Nifty 50 valuation PE ratio" in queries
+    assert "gold price INR forecast" in queries
+    equity = next(q for q in portfolio if q.query == "Nifty 50 valuation PE ratio")
+    assert equity.category == "macro" and equity.kind == "asset_class"
+    assert plan.fred_targets == (intel_live.FRED_USD_INR_TARGET,)
+
+    # equity contextual query is gated on a >30% equity share
+    low = intel_live.build_live_plan(equity_pct=20.0, now=NOW)
+    assert "Nifty 50 valuation PE ratio" not in {q.query for q in low.queries}
+
+
+def test_fcnr_contextual_query_when_usd_book():
+    plan = intel_live.build_live_plan(
+        stock_symbols=[("TINY", 1.0)], has_usd_book=True,
+        asset_class_weights={"fcnr": 50.0}, now=NOW)
+    named = {q.query: q for q in plan.queries}
+    assert "USD INR forecast RBI policy" in named
+    assert named["USD INR forecast RBI policy"].kind == "asset_class"
+    assert named["USD INR forecast RBI policy"].category == "macro"
+
+
+def test_rank_by_weight_is_stable_and_pure():
+    holdings = [("A", 10.0), ("B", 10.0), ("C", 5.0), "D", ("A", 20.0), ("", 99.0)]
+    ranked = intel_live.rank_by_weight(holdings)
+    assert ranked == [("A", 20.0), ("B", 10.0), ("C", 5.0), ("D", 0.0)]
+    assert intel_live.rank_by_weight([]) == []
+
+
+# ---------------- query sanitization + zero-record fallback ----------------
+def test_sanitize_query_strips_news_breaking_characters():
+    # underscores/special chars suppress Google News recall (0-record queries)
+    assert intel_live.sanitize_query("GOLD_GOLDFEED") == "GOLD GOLDFEED"
+    assert intel_live.sanitize_query("HDFC_MID_CAP") == "HDFC MID CAP"
+    assert intel_live.sanitize_query("SGBSEP31II-GB") == "SGBSEP31II GB"
+    assert intel_live.sanitize_query("ICICI+Prudential, (Direct)") == \
+        "ICICI Prudential Direct"
+    assert intel_live.sanitize_query("   A   B   ") == "A B"
+    assert intel_live.sanitize_query("...") == ""
+    assert intel_live.sanitize_query("") == ""
+
+
+def test_fund_query_uses_amc_and_category_not_scheme_name():
+    plan = intel_live.build_live_plan(
+        fund_names=[
+            "HDFC Mid-Cap Opportunities Fund - Direct - Growth",
+            "GOLD GOLDFEED FUND - Direct - Growth",
+            "PARAM MOMENTUM FUND - Direct - Growth",
+        ],
+        now=NOW)
+    named = {q.query: q for q in plan.queries}
+    assert named["HDFC mid cap fund"].kind == "fund"
+    assert named["HDFC mid cap fund"].identifier == \
+        "HDFC Mid-Cap Opportunities Fund - Direct - Growth"
+    assert named["HDFC mid cap fund"].identifier_key == "fund_name"
+    assert named["gold fund"].identifier == "GOLD GOLDFEED FUND - Direct - Growth"
+    # no category keyword -> sanitized short scheme name, exact identifier kept
+    assert named["PARAM MOMENTUM"].kind == "fund"
+    assert named["PARAM MOMENTUM"].identifier == "PARAM MOMENTUM FUND - Direct - Growth"
+
+
+def test_simplify_query_falls_back_to_higher_recall_forms():
+    assert intel_live.simplify_query("GOLDBEES") == "gold price India"
+    assert intel_live.simplify_query("Sovereign Gold Bond") == "gold price India"
+    assert intel_live.simplify_query("gold price INR forecast") == "gold price India"
+    assert intel_live.simplify_query("Nifty 50 valuation PE ratio") == "Nifty 50 valuation"
+    assert intel_live.simplify_query("HDFC") == "HDFC"  # already minimal
+    assert intel_live.simplify_query("!!!") == ""
+
+
+def test_run_live_research_falls_back_when_query_zero_records(monkeypatch, tmp_path, caplog):
+    """A 0-record query is retried with a simplified form; the miss is logged."""
+    import logging
+
+    def _http_get(url, **kwargs):
+        query = (kwargs.get("params") or {}).get("q", "")
+        return _ok_response(query)  # echo the query so the parse seam can branch
+
+    monkeypatch.setattr(httpio, "_http_get", _http_get)
+
+    def _fake_parse(text):
+        if text == "gold price India":
+            return _entries_feed([
+                _feed_entry("Gold prices climb to a record in India",
+                            published_parsed=(2026, 9, 8, 11, 0, 0, 0, 0, 0))])
+        return _entries_feed([])
+
+    with caplog.at_level(logging.INFO, logger="lib.intelligence.live.pipeline"):
+        result = intel_live.run_live_research(
+            gold_symbols=["GOLDBEES"], facts=_Facts(), now=NOW,
+            news_cache=Cache(tmp_path / "news"),
+            gateway_cache=Cache(tmp_path / "gw"),
+            parse=_fake_parse)
+    assert result.status == intel_live.STATUS_OK
+    fallback = [r for r in result.cohort.records
+                if (r.payload or {}).get("query") == "gold price India"]
+    assert fallback, "the simplified fallback query must join the cohort"
+    assert any("0 records" in (r.getMessage() or "") for r in caplog.records)
+    assert "gold price India" in caplog.text
+
+
 # ---------------- gnews normalization + cache ----------------
 def test_fetch_gnews_normalizes_feed_records(monkeypatch, tmp_path):
     entry = _feed_entry("ETERNAL beats Q2 estimates - MoneyControl")
@@ -208,6 +324,36 @@ def test_fetch_gnews_second_call_is_cache_hit(monkeypatch, tmp_path):
     assert len(calls) == 1
     assert second.cache_hit is True
     assert second.records[0].id == first.records[0].id
+
+
+def test_respects_hourly_rate_limit(monkeypatch, tmp_path):
+    entry = _feed_entry("ETERNAL beats Q2 estimates")
+    calls = []
+
+    def _http_get(url, **kwargs):
+        calls.append(url)
+        return _ok_response()
+
+    monkeypatch.setattr(httpio, "_http_get", _http_get)
+    monkeypatch.setattr("lib.intelligence.live.news.feedparser.parse",
+                        lambda text: _entries_feed([entry]))
+    cache = Cache(tmp_path)
+    intel_live.fetch_gnews("ETERNAL", "holding", now=NOW, cache=cache)
+    assert len(calls) == 1
+
+    inside = intel_live.fetch_gnews(
+        "ETERNAL", "holding",
+        now=NOW + datetime.timedelta(minutes=45), cache=cache)
+    assert len(calls) == 1  # < 1 hour old -> served from cache, no network call
+    assert inside.cache_hit is True
+    assert inside.reason == "Cache fresh (45 min old) - skipping network call"
+
+    outside = intel_live.fetch_gnews(
+        "ETERNAL", "holding",
+        now=NOW + datetime.timedelta(minutes=61), cache=cache)
+    assert len(calls) == 2  # past the hourly window -> live refresh permitted
+    assert outside.cache_hit is False
+    assert outside.records[0].retrieved_at == NOW + datetime.timedelta(minutes=61)
 
 
 # ---------------- identifier labeling ----------------
@@ -290,7 +436,8 @@ def test_duplicate_stories_deduped_by_content_id(tmp_path):
     cache.save(live_news.news_cache_key("Nifty 50", "macro"),
                {"metadata": {}, "records": [r2.as_dict()]}, provider="gnews", retrieved_at=NOW)
     plan = intel_live.build_live_plan(stock_symbols=["ETERNAL"], now=NOW)
-    cohort = intel_live.assemble_cohort(plan=plan, now=NOW, cache=cache)
+    cohort = intel_live.assemble_cohort(plan=plan, now=NOW, cache=cache,
+                                        gateway_cache_dir=tmp_path / "gw")
     assert cohort.record_count == 1
     assert cohort.records[0].payload["symbol"] == "ETERNAL"  # holdings-first wins
 
@@ -300,12 +447,14 @@ def test_cache_roundtrip_and_corruption_skipped(tmp_path):
     rec = _news_record("ETERNAL", "holding", "ETERNAL steady", symbol="ETERNAL")
     _seed(cache, rec)
     plan = intel_live.build_live_plan(stock_symbols=["ETERNAL"], now=NOW)
-    cohort = intel_live.assemble_cohort(plan=plan, now=NOW, cache=cache)
+    cohort = intel_live.assemble_cohort(plan=plan, now=NOW, cache=cache,
+                                        gateway_cache_dir=tmp_path / "gw")
     assert cohort.record_count == 1
     assert cohort.records[0].id == rec.id
     cache._path(intel_live.news_cache_key("ETERNAL", "holding")).write_text(
         "{definitely not json", encoding="utf-8")
-    corrupt = intel_live.assemble_cohort(plan=plan, now=NOW, cache=cache)
+    corrupt = intel_live.assemble_cohort(plan=plan, now=NOW, cache=cache,
+                                         gateway_cache_dir=tmp_path / "gw")
     assert corrupt.record_count == 0  # corrupt bucket skipped, never fabricated
     rows = intel_live.live_status(cache=cache, now=NOW)
     assert any(r["status"] == "corrupt" for r in rows)

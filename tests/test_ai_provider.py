@@ -61,7 +61,7 @@ SAMPLE = {
 }
 
 
-def _ev(eid, source_type=SourceType.NEWS, entity="TEST", payload=None):
+def _ev(eid, source_type=SourceType.NEWS, entity="TEST", payload=None, now=None):
     return make_evidence(
         eid=eid,
         source="test-source",
@@ -69,7 +69,7 @@ def _ev(eid, source_type=SourceType.NEWS, entity="TEST", payload=None):
         source_type=source_type,
         entity=entity,
         title=f"headline {eid}",
-        now=NOW,
+        now=now if now is not None else NOW,
         payload=payload or {},
     )
 
@@ -188,9 +188,41 @@ def test_load_ai_config_defaults_no_key():
     cfg = ai.load_ai_config({})
     assert cfg.configured is False
     assert cfg.provider == "groq"
-    assert cfg.model == "openai/gpt-oss-120b"
+    assert cfg.model == "mixtral-8x7b-32768"
     assert cfg.base_url == "https://api.groq.com/openai/v1"
     assert cfg.api_key == ""
+    assert cfg.structured_output is True
+
+
+def test_default_model_config_is_valid_and_degrades_to_json_object(monkeypatch):
+    """The default model id is a live Groq model and "Run AI research" works."""
+    assert ai.DEFAULT_MODEL == "mixtral-8x7b-32768"
+    cfg = ai.AIConfig(api_key="k", provider="groq", model=ai.DEFAULT_MODEL)
+    assert cfg.provider == "groq"
+    assert cfg.model == ai.DEFAULT_MODEL
+    assert cfg.structured_output is True
+    # Groq supports json_schema only on gpt-oss/qwen3.8-27b; the default model
+    # must hit the single 400-degrade and succeed via json_object.
+    calls = []
+    seq = [
+        FakeResponse({"error": {"message": "response format json_schema "
+                                          "unsupported"}}, status_code=400),
+        FakeResponse(_chat_payload("ok")),
+    ]
+
+    def fake_post(*a, **k):
+        assert k["json"]["model"] == ai.DEFAULT_MODEL
+        calls.append(k["json"]["response_format"]["type"])
+        return seq.pop(0)
+
+    monkeypatch.setattr(aiclient.requests, "post", fake_post)
+    cli = aiclient.OpenAICompatClient(cfg)
+    response = cli.complete(ai.AIRequest(
+        messages=({"role": "user", "content": "x"},), json_schema=ai.OUTPUT_SCHEMA))
+    assert calls == ["json_schema", "json_object"]
+    assert response.meta["format"] == "json_object"
+    assert response.provider == "groq"
+    assert response.model == "fake-model"
 
 
 def test_load_ai_config_overrides_env():
@@ -226,7 +258,35 @@ def test_load_ai_config_ignores_garbage_values():
     assert cfg.timeout_seconds == 30.0
     assert cfg.max_tokens == 1200
     assert cfg.temperature == 0.0
-    assert cfg.max_evidence_catalog == 12
+    assert cfg.max_evidence_catalog == 20
+
+
+def test_load_ai_config_reads_streamlit_secrets(monkeypatch):
+    """st.secrets['ai'] wins over the environment inside a Streamlit run."""
+    import streamlit as st
+
+    monkeypatch.setattr(st.runtime, "exists", lambda: True)
+    monkeypatch.setattr(
+        st, "secrets",
+        {"ai": {"AI_API_KEY": "  s3cret-from-toml  ", "AI_MODEL": "stealth-model"}})
+    cfg = ai.load_ai_config({})
+    assert cfg.api_key == "s3cret-from-toml"
+    assert cfg.configured is True
+    assert cfg.model == "stealth-model"
+
+
+def test_load_ai_config_ignores_secrets_outside_runtime(monkeypatch):
+    """Outside a Streamlit runtime the secrets file must never be consulted."""
+    import streamlit as st
+
+    monkeypatch.setattr(st.runtime, "exists", lambda: False)
+    monkeypatch.setattr(
+        st, "secrets",
+        {"ai": {"AI_API_KEY": "ignored-secret"}})
+    cfg = ai.load_ai_config({"AI_PROVIDER": "openai_compat"})
+    assert cfg.configured is False
+    assert cfg.api_key == ""
+    assert cfg.provider == "openai_compat"
 
 
 def test_ai_config_status_never_exposes_key():
@@ -274,6 +334,75 @@ def test_build_context_never_dumps_raw_payload():
     assert blob not in ctx["user"]
     for item in ctx["catalog"]:
         assert len(item["snippet"]) <= 300
+
+
+def test_build_context_ranks_mapped_then_quality_then_recency():
+    """Catalog order reflects (a) mapped-first, (b) quality desc, (c) recency."""
+    old = datetime(2026, 9, 1, 8, 0, tzinfo=timezone.utc)
+    new = datetime(2026, 9, 7, 8, 0, tzinfo=timezone.utc)
+
+    def dev(eid, mapped, score, ts, category="news"):
+        return ExternalDevelopment(
+            evidence=_ev(eid, now=ts),
+            quality=EvidenceQuality(
+                evidence_id=eid, score=score, source_class="C", fresh=True,
+                relevance="mapped" if mapped else "unmapped", basis="test"),
+            category=category, headline=f"headline {eid}",
+            mapped=mapped, matched=("TEST",) if mapped else ())
+
+    # Deliberately scrambled: a newer-but-unmapped quality-0.99 record must
+    # fall behind mapped records even at lower quality, and a tie on quality
+    # must resolve by recency.
+    brief = _brief(external=(
+        dev("mapped-old", True, 0.90, old),
+        dev("mapped-new", True, 0.90, new),
+        dev("news-high", False, 0.99, new, category="news"),
+    ), evidence_count=3, mapped_count=2)
+    ctx = ai.build_context(brief=brief, max_evidence=20)
+    ids = [item["id"] for item in ctx["catalog"]]
+    assert ids == ["mapped-new", "mapped-old", "news-high"]
+
+
+def test_build_context_caps_catalog_and_allowlist_when_100_plus():
+    """With 100+ developments only the top-20 are sent; the allow-list stays
+    bounded to the catalog plus conclusion-cited ids, and the prompt notes the
+    truncation — the token budget can never blow up like the 46k-token error."""
+    devs = []
+    for i in range(120):
+        eid = f"ev:synth:{i:04d}"
+        mapped = i % 3 == 0
+        ts = datetime(2026, 9, min(1 + i % 7, 8), (i * 7) % 24,
+                      tzinfo=timezone.utc)
+        devs.append(ExternalDevelopment(
+            evidence=_ev(eid, now=ts),
+            quality=EvidenceQuality(
+                evidence_id=eid, score=round(0.5 + (i % 20) / 20.0, 3),
+                source_class="C", fresh=i < 60,
+                relevance="mapped" if mapped else "unmapped", basis="test"),
+            category="nav" if i % 2 else "news", headline=f"synth {i}",
+            mapped=mapped, matched=("TEST",) if mapped else ()))
+    brief = _brief(
+        external=tuple(devs), evidence_count=120, mapped_count=sum(
+            d.mapped for d in devs))
+    ctx = ai.build_context(brief=brief, max_evidence=20)
+
+    assert ctx["truncated"] is True
+    assert ctx["total_available"] == 120
+    assert len(ctx["catalog"]) == 20
+    # Every catalogued record is a mapped one (mapped-first ranking).
+    assert all(item["mapped"] for item in ctx["catalog"])
+    assert "top-20 most relevant developments out of 120 total records" \
+        in ctx["system"]
+    assert "top 20 of 120" in ctx["user"]
+    assert "lower-ranked records" in ctx["user"]
+
+    # Allow-list == catalog ids ∪ conclusion-cited ids; no full 120-id dump.
+    catalog_ids = {item["id"] for item in ctx["catalog"]}
+    conclusion_ids = {eid for c in brief.conclusions for eid in c.evidence_ids}
+    assert ctx["allowed_evidence_ids"] == (catalog_ids | conclusion_ids)
+    assert len(ctx["allowed_evidence_ids"]) <= 21
+    # Sanity token bound (chars/4): far below the 46k-token failure threshold.
+    assert len(ctx["user"]) < 40_000
 
 
 def test_build_messages_shape():
@@ -327,11 +456,53 @@ def test_parse_assessment_valid_and_confidence_clamped():
     assert ai.parse_assessment(json.dumps(under)).confidence == 0.0
 
 
-def test_parse_assessment_missing_overall_is_malformed():
+def test_parse_assessment_missing_overall_recovers():
+    """Missing overall_assessment degrades gracefully, never 'Malformed'."""
     bad = dict(SAMPLE)
     bad.pop("overall_assessment")
-    with pytest.raises(ai.AIOutputError):
-        ai.parse_assessment(json.dumps(bad))
+    assessment = ai.parse_assessment(json.dumps(bad))
+    assert assessment.overall_assessment.strip()
+    assert any("overall_assessment" in d for d in assessment.downgrades)
+
+
+def test_parse_assessment_overall_as_object_recovers():
+    """gpt-oss drift: a summary object with a text key is unpacked."""
+    bad = json.loads(json.dumps(SAMPLE))
+    bad["overall_assessment"] = {"summary": "Equity was the dominant driver."}
+    assessment = ai.parse_assessment(json.dumps(bad))
+    assert assessment.overall_assessment == "Equity was the dominant driver."
+    assert any("overall_assessment" in d for d in assessment.downgrades)
+    assert any("'summary'" in d for d in assessment.downgrades)
+
+
+def test_parse_assessment_overall_as_list_and_boolean_recovers():
+    bad = json.loads(json.dumps(SAMPLE))
+    bad["overall_assessment"] = ["first sentence", "second sentence"]
+    assessment = ai.parse_assessment(json.dumps(bad))
+    assert assessment.overall_assessment == "first sentence second sentence"
+    assert any("joined" in d for d in assessment.downgrades)
+
+    bad2 = json.loads(json.dumps(SAMPLE))
+    bad2["overall_assessment"] = True
+    assessment2 = ai.parse_assessment(json.dumps(bad2))
+    assert assessment2.overall_assessment == "Yes"
+    assert any("boolean" in d for d in assessment2.downgrades)
+
+
+def test_parse_assessment_uncertainty_nonstring_recovers():
+    bad = json.loads(json.dumps(SAMPLE))
+    bad["uncertainty"] = {"level": "low"}
+    assessment = ai.parse_assessment(json.dumps(bad))
+    assert assessment.uncertainty.strip()
+    assert any("uncertainty" in d for d in assessment.downgrades)
+
+
+def test_parse_assessment_scalar_values_are_bounded():
+    bad = json.loads(json.dumps(SAMPLE))
+    bad["overall_assessment"] = "x" * 5000
+    assessment = ai.parse_assessment(json.dumps(bad))
+    assert len(assessment.overall_assessment) <= ai.parse.MAX_SCALAR_TEXT + 1
+    assert any("truncated" in d.lower() for d in assessment.downgrades)
 
 
 def test_parse_assessment_nonfinite_confidence_is_malformed():
@@ -491,6 +662,28 @@ def test_client_registry_and_unknown_provider():
         ai.unregister_ai_provider("mem")
 
 
+def test_ollama_local_is_keyless_and_registered():
+    cfg = ai.AIConfig(api_key="", provider=ai.OLLAMA_LOCAL_PROVIDER,
+                      base_url=ai.OLLAMA_BASE_URL, model=ai.OLLAMA_MODEL,
+                      timeout_seconds=ai.OLLAMA_TIMEOUT_SECONDS)
+    assert ai.provider_is_configured(cfg) is True
+    assert ai.ai_config_status(cfg)["configured"] is True
+    assert cfg.timeout_seconds == 120.0
+    cli = ai.build_client(cfg)
+    assert cli.provider == ai.OLLAMA_LOCAL_PROVIDER
+
+
+def test_ollama_local_client_allows_empty_key(monkeypatch):
+    monkeypatch.setattr(aiclient.requests, "post",
+                        lambda url, **kwargs: FakeResponse(_chat_payload("{}")))
+    cfg = ai.AIConfig(api_key="", provider=ai.OLLAMA_LOCAL_PROVIDER,
+                      base_url=ai.OLLAMA_BASE_URL, model=ai.OLLAMA_MODEL,
+                      timeout_seconds=ai.OLLAMA_TIMEOUT_SECONDS)
+    cli = aiclient.OpenAICompatClient(cfg)
+    resp = cli.complete(ai.AIRequest(messages=({"role": "user", "content": "x"},)))
+    assert resp.provider == ai.OLLAMA_LOCAL_PROVIDER
+
+
 # -------------------------------------------------------------- grounding ---
 
 def test_known_evidence_ids_from_brief():
@@ -633,6 +826,82 @@ def test_run_provider_error_scrubs_key():
     assert API_KEY not in (out.reason or "")
 
 
+class _LocalFakeClient:
+    provider = ai.OLLAMA_LOCAL_PROVIDER
+    model = "llama3.1:8b"
+
+    def __init__(self, response_text=None, error=None):
+        self.response_text = response_text
+        self.error = error
+
+    def complete(self, request, api_key=""):
+        if self.error is not None:
+            raise self.error
+        return ai.AIResponse(
+            text=self.response_text, provider=self.provider, model=self.model,
+            created_at=None, latency_ms=5.0, meta={"format": "json_schema"})
+
+
+def test_ai_research_cascades_to_ollama_on_groq_timeout(monkeypatch):
+    from lib.intelligence.ai import pipeline as ai_pipe
+
+    built = []
+
+    def _build(cfg):
+        built.append(cfg.provider)
+        if cfg.provider == "groq":
+            return _LocalFakeClient(
+                error=ai.AIProviderTimeout("groq timed out after 30s"))
+        if cfg.provider == ai.OLLAMA_LOCAL_PROVIDER:
+            return _LocalFakeClient(response_text=json.dumps(SAMPLE))
+        raise AssertionError(f"unexpected provider {cfg.provider}")
+
+    monkeypatch.setattr(ai_pipe, "build_client", _build)
+    out = ai_pipe.run_ai_research(
+        brief=_brief(),
+        config=ai.AIConfig(api_key=API_KEY, provider="groq",
+                           model="openai/gpt-oss-120b"),
+        client=None, facts=_facts(), now=NOW)
+    assert out.status == "ok"
+    assert built == ["groq", ai.OLLAMA_LOCAL_PROVIDER]  # Groq -> Ollama cascade
+    assert out.assessment.provider == ai.OLLAMA_LOCAL_PROVIDER
+    assert out.fallback_used is False  # the fallback itself succeeded
+
+
+def test_ai_research_cascade_fails_when_ollama_unavailable(monkeypatch):
+    from lib.intelligence.ai import pipeline as ai_pipe
+
+    def _build(cfg):
+        if cfg.provider == "groq":
+            return _LocalFakeClient(
+                error=ai.AIProviderTimeout("groq timed out after 30s"))
+        return _LocalFakeClient(
+            error=ai.AIProviderUnavailable("ollama refused connection"))
+
+    monkeypatch.setattr(ai_pipe, "build_client", _build)
+    out = ai_pipe.run_ai_research(
+        brief=_brief(), config=ai.AIConfig(api_key=API_KEY, provider="groq"),
+        client=None, facts=_facts(), now=NOW)
+    assert out.status == "failed"  # Groq -> Ollama -> AI unavailable
+    assert out.fallback_used is True
+    assert "timed out" in (out.reason or "")
+
+
+def test_ai_research_ollama_primary_is_keyless(monkeypatch):
+    from lib.intelligence.ai import pipeline as ai_pipe
+
+    monkeypatch.setattr(
+        ai_pipe, "build_client",
+        lambda cfg: _LocalFakeClient(response_text=json.dumps(SAMPLE)))
+    cfg = ai.AIConfig(api_key="", provider=ai.OLLAMA_LOCAL_PROVIDER,
+                      base_url=ai.OLLAMA_BASE_URL, model=ai.OLLAMA_MODEL,
+                      timeout_seconds=ai.OLLAMA_TIMEOUT_SECONDS)
+    out = ai_pipe.run_ai_research(brief=_brief(), config=cfg,
+                                  client=None, facts=_facts(), now=NOW)
+    assert out.status == "ok"
+    assert out.provider == ai.OLLAMA_LOCAL_PROVIDER
+
+
 def test_run_malformed_response_classified():
     client = FakeClient(response_text="certainly not JSON")
     out = ai.run_ai_research(
@@ -641,6 +910,47 @@ def test_run_malformed_response_classified():
     assert out.status == "malformed"
     assert out.fallback_used is True
     assert out.assessment is None
+
+
+def test_run_malformed_overall_recovers_to_ok():
+    """The reported defect: overall_assessment arrives as an object. The
+    pipeline must NOT return 'Malformed response' — it recovers text and marks
+    the coercion in the downgrades the UI surfaces."""
+    text = json.loads(json.dumps(SAMPLE))
+    text["overall_assessment"] = {"summary": "Recovered summary from object form."}
+    client = FakeClient(response_text=json.dumps(text))
+    out = ai.run_ai_research(
+        brief=_brief(), config=ai.AIConfig(api_key=API_KEY),
+        client=client, facts=_facts())
+    assert out.status == "ok"
+    assert out.fallback_used is False
+    assert out.assessment.overall_assessment == "Recovered summary from object form."
+    assert any("overall_assessment" in d for d in out.assessment.downgrades)
+    assert out.assessment.synthesis is not None
+
+
+def test_run_logs_raw_response_redacted(caplog):
+    """Diagnostic DEBUG logging captures the raw answer before validation and
+    never leaks the API key into the logs (not shown in the UI)."""
+    import logging
+
+    text = json.loads(json.dumps(SAMPLE))
+    text["overall_assessment"] = {"summary": f"summary echoing {API_KEY}"}
+    client = FakeClient(response_text=json.dumps(text))
+    with caplog.at_level(logging.DEBUG,
+                        logger="lib.intelligence.ai.pipeline"):
+        out = ai.run_ai_research(
+            brief=_brief(), config=ai.AIConfig(api_key=API_KEY),
+            client=client, facts=_facts())
+    assert out.status == "ok"
+    pipeline_records = [
+        r for r in caplog.records
+        if r.name == "lib.intelligence.ai.pipeline"
+    ]
+    raw = [r for r in pipeline_records if "raw response" in r.getMessage()]
+    assert raw, "pipeline must log the raw response excerpt at DEBUG"
+    assert API_KEY not in caplog.text
+    assert "Bearer" not in caplog.text
 
 
 def test_run_unknown_evidence_downgraded_in_outcome():

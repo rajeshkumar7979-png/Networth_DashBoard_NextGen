@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import math
 
+from lib.intelligence.ai.config import DEFAULT_MAX_EVIDENCE_CATALOG
 from lib.intelligence.ai.schema import OUTPUT_NAME
 from lib.intelligence.research import classify_external
 
@@ -38,7 +39,13 @@ _SYSTEM_ROLE = (
     "list. End-of-answer uncertainty and limitations are mandatory. You never "
     "give buy/sell/hold/trade, execution, or personalized tax/investment "
     "instructions; output is decision-support only. Respond with a single JSON "
-    "object matching the schema named " + OUTPUT_NAME + "."
+    "object matching the schema named " + OUTPUT_NAME + " with EXACTLY these "
+    "fields: overall_assessment — ONE plain string (1-3 sentences, never a "
+    "nested object); confidence — a number between 0 and 1; uncertainty — ONE "
+    "plain string; invalidation_conditions and limitations — arrays of plain "
+    "strings; key_findings, risks, opportunities and research_needs — arrays "
+    "of objects with text (string), evidence_ids (array of strings) and kind "
+    "('fact' or 'interpretation')."
 )
 
 # Static per-answer constraints appended inside the user prompt (present in
@@ -130,18 +137,65 @@ def _catalog_block(catalog) -> str:
     return "\n".join(lines)
 
 
+def _recency_ts(dev) -> float:
+    """Newest-first recency key from the evidence's retrieved-at stamp."""
+    prov = getattr(getattr(dev, "evidence", None), "provenance", None)
+    ts = getattr(prov, "retrieved_at", None)
+    if ts is None:
+        return float("-inf")
+    try:
+        return ts.timestamp()
+    except (OverflowError, OSError, ValueError):
+        return float("-inf")
+
+
+def _rank_developments(brief) -> tuple:
+    """Rank external developments before the prompt is built:
+    (a) portfolio-mapped developments first,
+    (b) deterministic evidence-quality score descending,
+    (c) most-recently retrieved evidence first.
+    The ranked tuple is sliced to max_evidence so the prompt only ever carries
+    the top-N records — never the full cached universe (which can run to
+    thousands of records and overflow the model's token budget).
+    """
+    devs = list(getattr(brief, "external", ()) or ())
+
+    def key(d):
+        score = getattr(getattr(d, "quality", None), "score", None) or 0.0
+        return (0 if bool(getattr(d, "mapped", False)) else 1,
+                -float(score),
+                -_recency_ts(d))
+
+    return tuple(sorted(devs, key=key))
+
+
 def build_context(*, brief, question=None, max_evidence=None) -> dict:
     """Assemble the complete AI context pack into a plain dict.
 
+    The evidence catalog and citable-id allow-list are capped at max_evidence
+    (default DEFAULT_MAX_EVIDENCE_CATALOG) after a deterministic ranking —
+    portfolio-mapped first, quality descending, recency descending — so the
+    prompt never carries the full cached evidence universe.
+
     Returns keys: system, user, question, allowed_evidence_ids (frozenset),
     catalog (list of dicts with id/category/mapped/source/quality/headline/
-    snippet).
+    snippet), total_available, truncated.
     """
     question = (question or DEFAULT_QUESTION).strip() or DEFAULT_QUESTION
-    limit = max_evidence or 12
+    limit = max_evidence or DEFAULT_MAX_EVIDENCE_CATALOG
+
+    # Pre-filter: rank mapped-first, quality-desc, recency-desc, then cap at
+    # the catalog limit. With thousands of persisted records the prompt only
+    # ever carries the top-N; the allow-list is bounded to exactly those plus
+    # conclusion-cited ids (previously ALL external ids were listed, which blew
+    # past the model's token budget on a 46k-token "request too large" error).
+    all_devs = _rank_developments(brief)
+    total_available = len(all_devs)
+    selected = all_devs[:limit]
+    truncated = total_available > limit
 
     catalog = []
-    for dev in (brief.external or ())[:limit]:
+    for dev in selected:
         evidence = dev.evidence
         provenance = evidence.provenance
         snippet = _evidence_snippet(evidence)
@@ -156,7 +210,7 @@ def build_context(*, brief, question=None, max_evidence=None) -> dict:
         })
 
     allowed = set()
-    for dev in brief.external or ():
+    for dev in selected:
         allowed.add(dev.evidence.id)
     for c in brief.conclusions or ():
         allowed.update(c.evidence_ids)
@@ -169,6 +223,26 @@ def build_context(*, brief, question=None, max_evidence=None) -> dict:
     as_of_line = ""
     if brief.as_of is not None:
         as_of_line = brief.as_of.strftime("%d %b %Y %H:%M %Z")
+
+    if total_available:
+        scope = (f"You are analyzing the top-{len(selected)} most relevant "
+                 f"developments out of {total_available} total records")
+        if truncated:
+            scope += (f". {total_available - len(selected)} lower-ranked "
+                      "records were excluded; cite only the catalog above.")
+        else:
+            scope += "."
+        system = _SYSTEM_ROLE + "\n\n" + scope
+    else:
+        system = _SYSTEM_ROLE
+
+    if truncated:
+        _catalog_heading = (
+            f"External evidence catalog (only these records are citable"
+            f" — top {len(selected)} of {total_available}; "
+            "lower-ranked records truncated):")
+    else:
+        _catalog_heading = "External evidence catalog (only these records are citable):"
 
     user = "\n".join([
         "Portfolio research brief (deterministic, verified context only).",
@@ -189,7 +263,7 @@ def build_context(*, brief, question=None, max_evidence=None) -> dict:
         "Evidence gaps (explicit insufficiencies):",
         "\n".join(f"- {g}" for g in (brief.gaps or ())) or "(none)",
         "",
-        "External evidence catalog (only these records are citable):",
+        _catalog_heading,
         _catalog_block(catalog),
         "",
         "Allowed evidence ids (cite ONLY these):",
@@ -201,12 +275,14 @@ def build_context(*, brief, question=None, max_evidence=None) -> dict:
     ])
 
     return {
-        "system": _SYSTEM_ROLE,
+        "system": system,
         "user": user,
         "question": question,
         "allowed_evidence_ids": frozenset(allowed),
         "catalog": catalog,
         "allowed_ids_text": _USER_ALLOWED_HINT,
+        "total_available": total_available,
+        "truncated": truncated,
     }
 
 

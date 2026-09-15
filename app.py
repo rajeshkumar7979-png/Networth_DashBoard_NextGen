@@ -28,6 +28,10 @@ pg = st.navigation(
         "OPERATIONS": [
             st.Page("pages/8_Desk.py", title="Desk", url_path="desk"),
         ],
-    }
+    },
+    # The navigation widget itself is hidden: lib/ui/nav.py renders the brand
+    # rail (desktop st.sidebar + mobile bottom bar) with state-preserving
+    # st.page_link elements. url_paths above feed those page links.
+    position="hidden",
 )
 pg.run()

@@ -1,9 +1,16 @@
 # AI Research Provider v1 — structured-output parsing and strict local
 # validation. Works regardless of whether the provider used Structured Outputs
 # (json_schema), json_object mode, or plain text that happened to be JSON.
+#
+# Robustness rule: structural shape (arrays/objects/kinds) is validated
+# strictly — a genuinely broken answer stays malformed. The two scalar string
+# fields that providers most often drift on (overall_assessment, uncertainty)
+# are recovered best-effort with a labeled downgrade instead of failing the
+# whole answer, so an otherwise usable response still surfaces in the UI.
 from __future__ import annotations
 
 import json
+import logging
 import math
 from datetime import datetime
 from typing import Optional
@@ -15,6 +22,19 @@ from lib.intelligence.ai.schema import (
     MAX_FINDINGS_PER_SECTION,
     SECTIONS,
 )
+
+logger = logging.getLogger(__name__)
+
+# Bounded length for any recovered scalar string field (never an unbounded
+# echo of a runaway answer into the UI or the synthesis summary).
+MAX_SCALAR_TEXT = 1500
+
+_OVERALL_ASSESSMENT_FALLBACK = (
+    "No overall assessment was provided by the model. The deterministic "
+    "findings below carry the analysis."
+)
+
+_UNCERTAINTY_FALLBACK = "The model did not state an uncertainty level."
 
 
 def extract_json_object(text: str) -> dict:
@@ -80,6 +100,68 @@ def _as_str(value, field: str) -> str:
     if not isinstance(value, str):
         raise AIOutputError(f"Field '{field}' must be a string.")
     return value.strip()
+
+
+def _clip_scalar(text: str, field: str, downgrades: list) -> str:
+    if len(text) > MAX_SCALAR_TEXT:
+        downgrades.append(
+            f"Field '{field}' was truncated to {MAX_SCALAR_TEXT} characters.")
+        return text[:MAX_SCALAR_TEXT] + "…"
+    return text
+
+
+def _coerce_scalar_text(value, field: str, fallback: str, downgrades: list) -> str:
+    """Recover a plain string for a scalar field the model emitted wrongly.
+
+    Structured-output drift occasionally makes a provider return a JSON
+    object, list, boolean, or null where the schema demands a plain string
+    (that is the observed defect behind "overall_assessment must be a
+    string"). Instead of failing the whole answer we coerce the value to a
+    bounded plain string and record a downgrade, which the UI surfaces under
+    "Grounding / validation notes".
+    """
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            downgrades.append(
+                f"Field '{field}' was empty; used a fallback statement.")
+            return fallback
+        return _clip_scalar(text, field, downgrades)
+    if value is None:
+        downgrades.append(
+            f"Field '{field}' was missing; used a fallback statement.")
+        return fallback
+    logger.debug("Coercing AI scalar field '%s' from %s",
+                 field, type(value).__name__)
+    if isinstance(value, bool):
+        downgrades.append(f"Field '{field}' was boolean; coerced to text.")
+        return "Yes" if value else "No"
+    if isinstance(value, dict):
+        for key in ("text", "summary", "overall_assessment", "assessment",
+                    "statement", "content", "value"):
+            inner = value.get(key)
+            if isinstance(inner, str) and inner.strip():
+                downgrades.append(
+                    f"Field '{field}' was an object; used its '{key}' value.")
+                return _clip_scalar(inner.strip(), field, downgrades)
+        downgrades.append(
+            f"Field '{field}' was an object without a usable text key; "
+            "JSON-serialized (truncated).")
+        serialized = json.dumps(value, ensure_ascii=False, default=str)
+        return _clip_scalar(serialized, field, downgrades)
+    if isinstance(value, list):
+        parts = [p.strip() for p in value if isinstance(p, str) and p.strip()]
+        if parts:
+            downgrades.append(
+                f"Field '{field}' was a list; joined its string items.")
+            return _clip_scalar(" ".join(parts), field, downgrades)
+        downgrades.append(
+            f"Field '{field}' was a list of non-strings; used a fallback "
+            "statement.")
+        return fallback
+    downgrades.append(
+        f"Field '{field}' was {type(value).__name__}; coerced to text.")
+    return _clip_scalar(str(value), field, downgrades)
 
 
 def _as_str_list(value, field: str):
@@ -164,14 +246,15 @@ def parse_assessment(
     if not isinstance(data, dict):
         raise AIOutputError("Model response is not a JSON object.")
 
-    overall = _as_str(data.get("overall_assessment"), "overall_assessment")
-    if not overall:
-        raise AIOutputError("Field 'overall_assessment' is empty.")
-
-    confidence = _confidence(data.get("confidence"))
-    uncertainty = _as_str(data.get("uncertainty"), "uncertainty")
-
     downgrades = []
+    overall = _coerce_scalar_text(
+        data.get("overall_assessment"), "overall_assessment",
+        _OVERALL_ASSESSMENT_FALLBACK, downgrades)
+    confidence = _confidence(data.get("confidence"))
+    uncertainty = _coerce_scalar_text(
+        data.get("uncertainty"), "uncertainty",
+        _UNCERTAINTY_FALLBACK, downgrades)
+
     findings = _findings(data, downgrades)
 
     invalidation = _as_str_list(data.get("invalidation_conditions"),

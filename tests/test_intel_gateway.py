@@ -257,6 +257,51 @@ def test_fred_missing_key_unavailable_without_network(monkeypatch, cache_dir):
     assert calls == []
 
 
+def test_fred_api_key_reads_streamlit_secrets_first(monkeypatch):
+    """Inside a Streamlit runtime, st.secrets['fred']['FRED_API_KEY'] wins over
+    the environment — AGENTS.md §8 credentials come from secrets/env only."""
+    import streamlit as st
+
+    import lib.intelligence.sources.fred as fred
+
+    monkeypatch.setattr(st.runtime, "exists", lambda: True)
+    monkeypatch.setattr(
+        st, "secrets", {"fred": {"FRED_API_KEY": "  s3cret-from-toml  "}})
+    monkeypatch.setenv("FRED_API_KEY", "env-key")
+    assert fred._api_key() == "s3cret-from-toml"
+
+
+def test_fred_api_key_falls_back_to_env_outside_runtime(monkeypatch):
+    """Outside a Streamlit runtime the secrets file must never be consulted:
+    the env fallback (and only it) is used."""
+    import streamlit as st
+
+    import lib.intelligence.sources.fred as fred
+
+    monkeypatch.setattr(st.runtime, "exists", lambda: False)
+    monkeypatch.setattr(
+        st, "secrets", {"fred": {"FRED_API_KEY": "ignored-secret"}})
+    monkeypatch.setenv("FRED_API_KEY", "env-key")
+    assert fred._api_key() == "env-key"
+    monkeypatch.delenv("FRED_API_KEY", raising=False)
+    with pytest.raises(Exception) as exc:
+        fred._api_key()
+    assert "FRED_API_KEY is not set" in str(exc.value)
+
+
+def test_fred_never_short_circuits_missing_secret_inside_runtime(monkeypatch):
+    """Empty or missing st.secrets['fred'] value degrades to env (never raises
+    on secret access problems)."""
+    import streamlit as st
+
+    import lib.intelligence.sources.fred as fred
+
+    monkeypatch.setattr(st.runtime, "exists", lambda: True)
+    monkeypatch.setattr(st, "secrets", {"fred": {"FRED_API_KEY": "   "}})
+    monkeypatch.setenv("FRED_API_KEY", "env-key")
+    assert fred._api_key() == "env-key"
+
+
 def test_fred_fresh_cache_served_without_network(monkeypatch, fred_env, cache_dir):
     monkeypatch.setattr(httpio, "_http_get", fake_get(_fred_routes()))
     first = fetch_fred_series("DFF", cache=cache_dir)
@@ -312,6 +357,40 @@ def test_fred_latest_observation_tail(monkeypatch, fred_env, cache_dir):
     monkeypatch.setattr(httpio, "_http_get", fake_get(_fred_routes()))
     result = latest_fred_observation("DFF", cache=cache_dir)
     assert len(result.records) == 1 and result.records[0].payload["value"] == 4.79
+
+
+def test_fred_requests_newest_window_not_oldest(monkeypatch, fred_env):
+    """Regression: FRED applies `limit` to the sorted window, so an ascending
+    query with a limit returns the OLDEST N observations. We must request the
+    newest window (sort_order=desc) — before the fix the macro cascade served
+    1962 US 10Y / 1973 USD/INR values as if current."""
+    import lib.intelligence.sources.fred as fred
+
+    captured = {}
+
+    def _capture(url, params=None, headers=None, timeout=None):
+        captured.update(params or {})
+        return FakeResponse({"observations": []})
+
+    monkeypatch.setattr(httpio, "_http_get", _capture)
+    fred._observations("DFF", 120)
+    assert captured.get("sort_order") == "desc"
+    assert int(captured.get("limit")) == 120
+
+
+def test_fred_normalize_sorts_observations_ascending(fred_env):
+    """A newest-first provider window is normalized back to ascending so
+    latest_fred_observation's tail is genuinely the latest point."""
+    import lib.intelligence.sources.fred as fred
+
+    observations = [
+        {"date": "2026-09-08", "value": "4.79"},
+        {"date": "2026-09-05", "value": "4.83"},
+        {"date": "2026-09-04", "value": "."},
+    ]
+    records = fred._normalize("DFF", {}, observations, utc_now())
+    assert [r.payload["value"] for r in records] == [4.83, 4.79]
+    assert records[-1].payload["date"] == "2026-09-08"
 
 
 def test_record_from_dict_tolerant_of_weird_payload(fred_env):

@@ -6,12 +6,17 @@ from lib.ui import page_header_html, section_header_html, banner, footnote, nav_
 
 inject_css()
 
-st.markdown(nav_shell("decisions"), unsafe_allow_html=True)
+nav_shell("decisions")
 st.markdown(page_header_html(
     "Northline · Family desk",
     "Decision Desk",
     "Test a move before you make it — a deterministic sandbox for maturing money "
     "and allocation choices. Not investment advice.",
+    meta=[
+        "DECISION SANDBOX",
+        "DETERMINISTIC ONLY",
+        "NOT INVESTMENT ADVICE",
+    ],
 ), unsafe_allow_html=True)
 
 default_amount = float(st.session_state.get("matured_fd_amount", 0) or 0)
@@ -99,15 +104,19 @@ else:
 st.markdown(section_header_html("Current allocation & net worth", "03"),
             unsafe_allow_html=True)
 
-_def_eq = float(st.session_state.get("cc_equity_pct", 17.0) or 17.0)
-_def_liq = float(st.session_state.get("cc_liquid_pct", 18.0) or 18.0)
-_def_inr = float(st.session_state.get("cc_inr_fd_pct", 16.0) or 16.0)
-_def_fcnr = float(st.session_state.get("cc_fcnr_pct", 42.0) or 42.0)
-_def_gold = float(st.session_state.get("cc_gold_pct", 6.0) or 6.0)
-_def_nw = float(st.session_state.get("cc_net_worth", 25_200_000) or 25_200_000)
+# Read from Command Center when it has run; otherwise start from NEUTRAL zero
+# rather than fabricating a portfolio. These weights/net-worth are user inputs
+# (the sandbox's own assumptions), never figures the app computed without a run.
+_def_eq = float(st.session_state.get("cc_equity_pct", 0.0) or 0.0)
+_def_liq = float(st.session_state.get("cc_liquid_pct", 0.0) or 0.0)
+_def_inr = float(st.session_state.get("cc_inr_fd_pct", 0.0) or 0.0)
+_def_fcnr = float(st.session_state.get("cc_fcnr_pct", 0.0) or 0.0)
+_def_gold = float(st.session_state.get("cc_gold_pct", 0.0) or 0.0)
+_def_nw = float(st.session_state.get("cc_net_worth", 0.0) or 0.0)
 
-st.caption("Enter your current approximate weights (pre-filled from Command Center). "
-           "Gold is kept constant across scenarios.")
+st.caption("Enter your current approximate weights. They are pre-filled from the "
+           "Command Center only when it has already run (no fabricated portfolio here — "
+           "without a run start from zero). Gold is kept constant across scenarios.")
 
 c1, c2, c3, c4, c5 = st.columns(5)
 with c1:
@@ -121,7 +130,7 @@ with c4:
 with c5:
     curr_gold = st.number_input("Gold %", 0.0, 100.0, float(round(_def_gold, 1)), 0.5)
 
-total_nw = st.number_input("Current Net Worth (₹)", min_value=1.0,
+total_nw = st.number_input("Current Net Worth (₹)", min_value=0.0,
                            value=float(round(_def_nw, 0)), step=100000.0)
 
 mode = st.radio(

@@ -17,8 +17,10 @@ from lib.formatters import format_inr, format_inr_compact, safe_float
 from lib.ui import (
     caption as ui_caption,
     empty_state as ui_empty,
+    ladder_rows as ui_ladder,
     nav_shell as ui_nav,
     page_header_html as ui_page_header,
+    safe_page_link,
     section_header_html as ui_section,
     unavailable as ui_unavailable,
 )
@@ -29,12 +31,17 @@ IST = pytz.timezone("Asia/Kolkata")
 NOW_IST = datetime.now(IST)
 TODAY = pd.Timestamp(NOW_IST.date())
 
-st.markdown(ui_nav("outlook"), unsafe_allow_html=True)
+ui_nav("outlook")
 st.markdown(ui_page_header(
     "Northline · Family desk",
     "Outlook",
     "What happens next — the maturity calendar, a 12-month ladder and an illustrative "
     "5-year view you can poke at. No forecasts; only workbook dates and your assumptions.",
+    meta=[
+        f"AS OF {NOW_IST.strftime('%d %b %Y, %H:%M IST')}",
+        "WORKBOOK DATES ONLY",
+        "NO GUESSED FX",
+    ],
 ), unsafe_allow_html=True)
 
 _books = st.session_state.get("cc_books") or {}
@@ -135,25 +142,15 @@ else:
     _inr = _ladder[_ladder["Currency"].astype(str).str.strip().str.upper().fillna("INR") != "USD"]
     _usd = _ladder[_ladder["Currency"].astype(str).str.strip().str.upper() == "USD"]
 
-    inr_totals = {}
+    inr_rows = []
     for pm, grp in _inr.groupby("_ym"):
-        inr_totals[str(pm)] = float(pd.to_numeric(
-            grp["Current Value (INR)"], errors="coerce")
-            .fillna(pd.to_numeric(grp.get("Maturity Amount (Native)"), errors="coerce"))
-            .sum() or 0)
-    if inr_totals:
-        mx = max(inr_totals.values()) or 1
-        labels = sorted(inr_totals)
-        html = ""
-        for ym in labels:
-            val = inr_totals[ym]
-            width = max(1.0, val / mx * 100)
-            html += (
-                f'<div class="ladder-row"><div class="ladder-ym">{ym}</div>'
-                f'<div class="ladder-bar-wrap"><div class="ladder-bar" style="width:{width:.1f}%"></div></div>'
-                f'<div class="ladder-val">{format_inr_compact(val)}</div></div>'
-            )
-        st.markdown(html, unsafe_allow_html=True)
+        _native = grp.get("Maturity Amount (Native)")
+        _fallback = pd.to_numeric(_native, errors="coerce") if _native is not None else None
+        _vals = pd.to_numeric(grp["Current Value (INR)"], errors="coerce")
+        _total = (_vals.fillna(_fallback).sum() if _fallback is not None else _vals.sum())
+        inr_rows.append({"label": str(pm), "value": float(_total or 0)})
+    if inr_rows:
+        st.markdown(ui_ladder(inr_rows), unsafe_allow_html=True)
     else:
         st.markdown(ui_caption("No INR FDs mature across the next 12 months."))
 
@@ -213,7 +210,7 @@ st.markdown(ui_caption(
 # --------------------------------------------------
 st.markdown("---")
 st.markdown("**Money that frees up has a decision to make.**")
-st.markdown('<a class="t-drill" href="../decisions" style="font-size:0.95rem;">Open Decision Desk →</a>',
-            unsafe_allow_html=True)
+with st.container(key="nb_drill_links"):
+    safe_page_link("pages/2_Deep_Health.py", label="Open Decision Desk →")
 st.caption(f"Outlook as-of {NOW_IST:%d %b %Y, %H:%M IST} · weeks and months from the workbook's own "
            "maturity dates; nothing else is projected.")

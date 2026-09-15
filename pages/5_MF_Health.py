@@ -23,13 +23,18 @@ from lib.ui import (
 # ==================================================
 inject_css()
 
-st.markdown(nav_shell("funds"), unsafe_allow_html=True)
+nav_shell("funds")
 st.markdown(page_header_html(
     "Northline · Family desk",
     "Funds",
     "Quality, overlap, concentration — the mutual-fund book, portfolio-first. Every pillar "
     "traces to a disclosed or observed number; cost stays un-scored (no free expense-ratio "
     "source).",
+    meta=[
+        "PORTFOLIO-FIRST",
+        "DISCLOSED NUMBERS ONLY",
+        "COST UNSCORED",
+    ],
 ), unsafe_allow_html=True)
 
 mf_list = st.session_state.get("mf_holdings_for_health", [])

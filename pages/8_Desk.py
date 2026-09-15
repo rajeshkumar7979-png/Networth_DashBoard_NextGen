@@ -34,11 +34,16 @@ theme.inject_css()
 IST = pytz.timezone("Asia/Kolkata")
 NOW_IST = datetime.now(IST)
 
-st.markdown(ui_nav("desk"), unsafe_allow_html=True)
+ui_nav("desk")
 st.markdown(ui_page_header(
     "Northline · Family desk",
     "Desk",
     "Sources, exports, integrity — how to read this terminal and where every number came from.",
+    meta=[
+        f"AS OF {NOW_IST.strftime('%d %b %Y, %H:%M IST')}",
+        "CACHE-READ-ONLY",
+        "NO VALUATION HERE",
+    ],
 ), unsafe_allow_html=True)
 
 _books = st.session_state.get("cc_books") or {}
