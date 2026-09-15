@@ -188,7 +188,7 @@ def test_load_ai_config_defaults_no_key():
     cfg = ai.load_ai_config({})
     assert cfg.configured is False
     assert cfg.provider == "groq"
-    assert cfg.model == "mixtral-8x7b-32768"
+    assert cfg.model == "llama-3.3-70b-versatile"
     assert cfg.base_url == "https://api.groq.com/openai/v1"
     assert cfg.api_key == ""
     assert cfg.structured_output is True
@@ -196,13 +196,13 @@ def test_load_ai_config_defaults_no_key():
 
 def test_default_model_config_is_valid_and_degrades_to_json_object(monkeypatch):
     """The default model id is a live Groq model and "Run AI research" works."""
-    assert ai.DEFAULT_MODEL == "mixtral-8x7b-32768"
+    assert ai.DEFAULT_MODEL == "llama-3.3-70b-versatile"
     cfg = ai.AIConfig(api_key="k", provider="groq", model=ai.DEFAULT_MODEL)
     assert cfg.provider == "groq"
     assert cfg.model == ai.DEFAULT_MODEL
     assert cfg.structured_output is True
-    # Groq supports json_schema only on gpt-oss/qwen3.8-27b; the default model
-    # must hit the single 400-degrade and succeed via json_object.
+    # Groq supports json_schema (strict) only on gpt-oss/qwen3.8-27b; the default
+    # model must hit the single 400-degrade and succeed via json_object.
     calls = []
     seq = [
         FakeResponse({"error": {"message": "response format json_schema "
@@ -633,6 +633,37 @@ def test_openai_compat_double_400_raises(monkeypatch):
         cli.complete(ai.AIRequest(
             messages=({"role": "user", "content": "x"},), json_schema=ai.OUTPUT_SCHEMA))
     assert API_KEY not in str(exc.value)
+
+
+def test_openai_compat_404_discontinued_model_raises_clear_error(monkeypatch, caplog):
+    """A 404 'model discontinued' payload must raise the actionable AI_MODEL
+    error immediately (no json_schema -> json_object degrade retry is wasted),
+    log a warning pointing at .streamlit/secrets.toml, and never leak the key."""
+    calls = []
+
+    def fake_post(*a, **k):
+        calls.append(k["json"]["model"])
+        return FakeResponse(
+            {"error": {"message": "Model retired-model-123 discontinued"}},
+            status_code=404)
+
+    monkeypatch.setattr(aiclient.requests, "post", fake_post)
+    cli = aiclient.OpenAICompatClient(
+        ai.AIConfig(api_key=API_KEY, provider="groq", model="retired-model-123"))
+    with caplog.at_level("WARNING", logger="lib.intelligence.ai.client"):
+        with pytest.raises(ai.AIProviderError) as exc:
+            cli.complete(ai.AIRequest(
+                messages=({"role": "user", "content": "x"},),
+                json_schema=ai.OUTPUT_SCHEMA))
+    assert calls == ["retired-model-123"]  # failed fast, never degraded
+    text = str(exc.value)
+    assert "retired-model-123" in text
+    assert "no longer supported" in text
+    assert "update AI_MODEL" in text
+    assert "https://console.groq.com/docs/models" in text
+    assert API_KEY not in text
+    assert "update AI_MODEL in .streamlit/secrets.toml" in caplog.text
+    assert API_KEY not in caplog.text
 
 
 def test_openai_compat_missing_content_raises(monkeypatch):

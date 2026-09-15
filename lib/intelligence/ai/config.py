@@ -38,13 +38,15 @@ _AI_ENV_KEYS = (
 )
 
 # Default provider: Groq — genuine free/developer tier (no credit card) and a
-# stable OpenAI-compatible chat/completions API. Default model is Groq's
-# mixtral-8x7b-32768 (32768-token context; llama-3.1-70b-versatile was
-# discontinued by Groq). Note: Groq's `json_schema` Structured Outputs are
-# supported only on a few models (gpt-oss variants and qwen3.8-27b); mixtral
-# rejects json_schema with a 400, so the client's existing single 400-degrade
-# retry runs it in `json_object` mode instead (the prompts already spell out the
-# JSON shape, so the tolerant parser still recovers the fields).
+# stable OpenAI-compatible chat/completions API. Default model is Groq's current
+# stable workhorse llama-3.3-70b-versatile (131k context, 32k max output; the
+# previous default mixtral-8x7b-32768 and llama-3.1-70b-versatile have been
+# discontinued by Groq). Note: Groq's `json_schema` Structured Outputs (strict
+# mode) are supported only on a few models (openai/gpt-oss-20b, gpt-oss-120b,
+# qwen3.8-27b); llama-3.3-70b-versatile accepts JSON Object mode but not
+# json_schema, so the client's existing single 400-degrade retry runs it in
+# `json_object` mode instead (the prompts already spell out the JSON shape, so
+# the tolerant parser still recovers the fields).
 # openai/gpt-oss-120b remains selectable via AI_MODEL when true json_schema is
 # wanted (its scalar fields can drift and return objects — parse.py recovers
 # those). The AI layer is provider-neutral: these values are only defaults and
@@ -52,7 +54,7 @@ _AI_ENV_KEYS = (
 # OpenRouter, Together, LM Studio, vLLM, ...).
 DEFAULT_PROVIDER = "groq"
 DEFAULT_BASE_URL = "https://api.groq.com/openai/v1"
-DEFAULT_MODEL = "mixtral-8x7b-32768"
+DEFAULT_MODEL = "llama-3.3-70b-versatile"
 DEFAULT_TIMEOUT_SECONDS = 30.0
 DEFAULT_MAX_TOKENS = 1200
 DEFAULT_TEMPERATURE = 0.0

@@ -7,6 +7,7 @@
 # only inside `complete()` — never during import or page load.
 from __future__ import annotations
 
+import logging
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -19,6 +20,27 @@ from lib.intelligence.ai.schema import OUTPUT_SCHEMA, OUTPUT_NAME
 
 # Requests-style timeout tuple: (connect, read).
 CONNECT_TIMEOUT_SECONDS = 5.0
+
+_LOG = logging.getLogger(__name__)
+
+# Phrase markers (case-insensitive) that identify a discontinued/retired model
+# id rejection so we can give the user an actionable AI_MODEL error instead of
+# wasting a json_schema -> json_object degrade retry on a dead model.
+_DISCONTINUED_MODEL_MARKERS = (
+    "model discontinued",
+    "model not found",
+    "model is no longer supported",
+    "model does not exist",
+)
+
+# Whole-word markers that also identify a discontinued/retired model, needed
+# when the provider embeds the model id between the words — e.g. Groq's
+# "Model retired-model-123 discontinued": the id 'retired-model-123' sits
+# between "model" and "discontinued", so no contiguous phrase marker matches.
+_DISCONTINUED_MODEL_TOKENS = frozenset((
+    "discontinued",
+    "retired",
+))
 
 
 class AIProviderTimeout(Exception):
@@ -112,6 +134,21 @@ def _safe_error_message(response, secret: Optional[str]) -> str:
     return redact(message, secret)
 
 
+def _is_discontinued_model_error(message: str) -> bool:
+    """True when the provider rejected the request because the model id is no
+    longer served (discontinued/retired), regardless of the HTTP status code."""
+    lowered = str(message or "").lower()
+    if any(marker in lowered for marker in _DISCONTINUED_MODEL_MARKERS):
+        return True
+    # Fall back to word-boundary tokens for id-embedded phrasings like
+    # "Model retired-model-123 discontinued": neither contiguous marker matches
+    # because the model id sits between the words. Treat every non-alphanumeric
+    # run as a word separator and look for the standalone token.
+    tokens = set("".join(ch if ch.isalnum() else " "
+                         for ch in lowered).split())
+    return bool(set(_DISCONTINUED_MODEL_TOKENS) & tokens)
+
+
 class OpenAICompatClient:
     """Reference OpenAI-compatible /chat/completions client.
 
@@ -179,11 +216,24 @@ class OpenAICompatClient:
             latency_ms = (time.perf_counter() - start) * 1000.0
             if response.status_code == 200:
                 return self._parse_response(response, mode, latency_ms, key)
+            message = _safe_error_message(response, key)
+            if _is_discontinued_model_error(message):
+                # Model retired/renamed: a json_schema -> json_object degrade
+                # retry cannot help, so fail fast with an actionable message.
+                _LOG.warning(
+                    "AI model '%s' is no longer supported by provider '%s' — "
+                    "update AI_MODEL in .streamlit/secrets.toml "
+                    "(see https://console.groq.com/docs/models).",
+                    self._config.model, self._config.provider)
+                raise AIProviderError(
+                    f"AI model {self._config.model} is no longer supported. "
+                    "Please update AI_MODEL in your secrets file. "
+                    "See https://console.groq.com/docs/models for current "
+                    "models.")
             if attempt + 1 < len(modes) and response.status_code == 400:
                 # json_schema unsupported on this model -> degrade to json_object.
                 continue
-            raise AIProviderError(
-                _safe_error_message(response, key))
+            raise AIProviderError(message)
 
         raise AIProviderError(
             f"AI provider rejected the request ({self._config.provider}).")
