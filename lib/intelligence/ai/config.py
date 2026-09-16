@@ -198,6 +198,41 @@ def redact(text: str, secret: Optional[str]) -> str:
     return re.sub(r"(Bearer\s+)[A-Za-z0-9._~\-]+", r"\1***", str(text))
 
 
+def resolve_ai_model(model_or_none: Optional[str], available: list[str]) -> tuple[list, str]:
+    """Return ``(warnings, chosen)`` for a model vs a live/known model catalog.
+
+    Deterministic, network-free fallback seam: when ``model_or_none`` is
+    configured but absent from ``available`` (e.g. the provider discontinued
+    it, or discovery returned a catalog the pin is not in), the call resolves
+    to the first available model id and returns an explanatory warning line.
+    When ``model_or_none`` is empty/None, the catalog head is chosen without
+    a warning. ``available`` must already be keyless/redact-scrubbed by the
+    caller (discovery seam); this function never touches the key.
+
+    Never fabricates: an empty ``available`` yields ``("", original or "")``
+    with a warning, so the caller can degrade to "model unavailable" instead
+    of inventing an id.
+    """
+    warnings: list[bool] = []
+    original = (model_or_none or "").strip()
+    if not available:
+        warnings.append(
+            "no discovered model catalog is available; "
+            "cannot verify the configured AI model"
+        )
+        return warnings, original
+    if not original:
+        return warnings, available[0]
+    if original in available:
+        return warnings, original
+    warnings.append(
+        f"configured AI model {original!r} is not in the available catalog "
+        f"({len(available)} models); falling back to first available "
+        f"{available[0]!r}"
+    )
+    return warnings, available[0]
+
+
 def ai_config_status(config: Optional[AIConfig] = None) -> dict:
     """Read-only provider metadata for the UI. Never includes the key."""
     cfg = config if config is not None else load_ai_config()
