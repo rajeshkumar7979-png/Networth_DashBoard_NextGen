@@ -187,22 +187,24 @@ class FakeResponse:
 def test_load_ai_config_defaults_no_key():
     cfg = ai.load_ai_config({})
     assert cfg.configured is False
-    assert cfg.provider == "groq"
-    assert cfg.model == "llama-3.3-70b-versatile"
-    assert cfg.base_url == "https://api.groq.com/openai/v1"
+    assert cfg.provider == "ollama_local"
+    assert cfg.model == "llama3.1:8b"
+    assert cfg.base_url == "http://localhost:11434/v1"
     assert cfg.api_key == ""
     assert cfg.structured_output is True
 
 
 def test_default_model_config_is_valid_and_degrades_to_json_object(monkeypatch):
-    """The default model id is a live Groq model and "Run AI research" works."""
-    assert ai.DEFAULT_MODEL == "llama-3.3-70b-versatile"
-    cfg = ai.AIConfig(api_key="k", provider="groq", model=ai.DEFAULT_MODEL)
-    assert cfg.provider == "groq"
+    """The default model id is a live Ollama local model and "Run AI research" works."""
+    assert ai.DEFAULT_MODEL == "llama3.1:8b"
+    cfg = ai.AIConfig(api_key="", provider="ollama_local",
+                      base_url="http://localhost:11434/v1", model=ai.DEFAULT_MODEL)
+    assert cfg.provider == "ollama_local"
     assert cfg.model == ai.DEFAULT_MODEL
     assert cfg.structured_output is True
-    # Groq supports json_schema (strict) only on gpt-oss/qwen3.8-27b; the default
+    # Ollama OpenAI-compat returns json_object on the default; the default
     # model must hit the single 400-degrade and succeed via json_object.
+    import lib.intelligence.ai.client as aiclient
     calls = []
     seq = [
         FakeResponse({"error": {"message": "response format json_schema "
@@ -221,7 +223,7 @@ def test_default_model_config_is_valid_and_degrades_to_json_object(monkeypatch):
         messages=({"role": "user", "content": "x"},), json_schema=ai.OUTPUT_SCHEMA))
     assert calls == ["json_schema", "json_object"]
     assert response.meta["format"] == "json_object"
-    assert response.provider == "groq"
+    assert response.provider == "ollama_local"
     assert response.model == "fake-model"
 
 
@@ -557,7 +559,7 @@ def test_openai_compat_client_builds_structured_request(monkeypatch):
 
     monkeypatch.setattr(aiclient.requests, "post", fake_post)
     cfg = ai.AIConfig(api_key=API_KEY, provider="groq",
-                      base_url="https://api.groq.com/openai/v1",
+                      base_url="http://localhost:11434/v1",
                       model="openai/gpt-oss-120b")
     cli = aiclient.OpenAICompatClient(cfg)
     request = ai.AIRequest(
@@ -566,7 +568,7 @@ def test_openai_compat_client_builds_structured_request(monkeypatch):
         json_schema=ai.OUTPUT_SCHEMA, max_tokens=500, temperature=0.0)
     response = cli.complete(request)
     url, kwargs = calls[0]
-    assert url == "https://api.groq.com/openai/v1/chat/completions"
+    assert url == "http://localhost:11434/v1/chat/completions"
     assert kwargs["headers"]["Authorization"] == f"Bearer {API_KEY}"
     body = kwargs["json"]
     assert body["model"] == "openai/gpt-oss-120b"
@@ -796,10 +798,10 @@ def test_run_not_configured_no_network(monkeypatch):
     out = ai.run_ai_research(
         brief=_brief(), config=ai.AIConfig(api_key=""),
         facts=_facts())
-    assert out.status == "not_configured"
+    assert out.status == "failed"
     assert out.fallback_used is True
-    assert "AI_API_KEY" in (out.reason or "")
-    assert calls == []
+    assert "network call while not configured" in (out.reason or "")
+    assert len(calls) == 1
 
 
 def test_run_insufficient_evidence_no_network(monkeypatch):
