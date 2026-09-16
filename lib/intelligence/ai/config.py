@@ -52,9 +52,9 @@ _AI_ENV_KEYS = (
 # those). The AI layer is provider-neutral: these values are only defaults and
 # can be overridden for any OpenAI-compatible endpoint (OpenAI, Groq,
 # OpenRouter, Together, LM Studio, vLLM, ...).
-DEFAULT_PROVIDER = "groq"
-DEFAULT_BASE_URL = "https://api.groq.com/openai/v1"
-DEFAULT_MODEL = "llama-3.3-70b-versatile"
+DEFAULT_PROVIDER = "ollama_local"
+DEFAULT_BASE_URL = "http://localhost:11434/v1"
+DEFAULT_MODEL = "llama3.1:8b"
 DEFAULT_TIMEOUT_SECONDS = 30.0
 DEFAULT_MAX_TOKENS = 1200
 DEFAULT_TEMPERATURE = 0.0
