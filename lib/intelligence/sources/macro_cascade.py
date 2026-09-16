@@ -60,6 +60,24 @@ PROVENANCE_FRED = "FRED_API"
 PROVENANCE_YAHOO = "YAHOO_FINANCE_FALLBACK"
 PROVENANCE_CACHE = "STALE_CACHE"
 
+
+def plan_badge(provenance: Optional[str], *, is_stale: bool) -> tuple[str, str]:
+    """Command Center badge (label, tone) for one macro record.
+
+    "Stale" is a statement about AGE versus the cascade TTL, never about
+    provenance alone: a STALE_CACHE record is served from the last successful
+    fetch (that is what every cache-only page load re-stamps), so it badges
+    "Cache · fresh" until its cache actually passes the TTL. Provenance only
+    selects the provider family; `is_stale` decides fresh vs stale.
+    """
+    if provenance == PROVENANCE_FRED:
+        return "FRED · authoritative", "positive"
+    if provenance == PROVENANCE_YAHOO:
+        return "Yahoo · fallback", "warning"
+    if provenance == PROVENANCE_CACHE:
+        return ("Cache · stale", "warning") if is_stale else ("Cache · fresh", "positive")
+    return str(provenance or "unknown"), "neutral"
+
 # Canonical, source-neutral entity ids for the three series.
 US_10Y = "DGS10"
 USD_INR = "DEXINUS"

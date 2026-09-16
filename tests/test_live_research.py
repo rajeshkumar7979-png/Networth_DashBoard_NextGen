@@ -155,7 +155,10 @@ def test_build_live_plan_derives_queries_from_holdings():
     assert named["ETERNAL"].identifier_key == "symbol"
     assert named["Sovereign Gold Bond"].kind == "gold"
     assert named["Sovereign Gold Bond"].identifier == ""
-    assert "GOLDBEES" in named and named["GOLDBEES"].identifier == "GOLDBEES"
+    gold_etf = named["Gold ETF India NAV"]
+    assert gold_etf.kind == "gold" and gold_etf.identifier == "GOLDBEES"
+    assert "GOLDBEES" not in named  # gold ETFs use the category query, not ticker
+    assert named["Gold ETF India NAV"].identifier_key == "symbol"
     assert "SGBSEP31II-GB" not in named  # SGB tickers stay on generic gold queries
     assert named["PARAM MOMENTUM"].kind == "fund"
     assert named["PARAM MOMENTUM"].identifier == "PARAM MOMENTUM FUND - Direct - Growth"
@@ -252,6 +255,80 @@ def test_simplify_query_falls_back_to_higher_recall_forms():
     assert intel_live.simplify_query("Nifty 50 valuation PE ratio") == "Nifty 50 valuation"
     assert intel_live.simplify_query("HDFC") == "HDFC"  # already minimal
     assert intel_live.simplify_query("!!!") == ""
+
+
+# ---------------- gold ETF category query + zero-record recovery ladder ---
+def test_gold_etf_uses_category_query_not_bare_ticker():
+    plan = intel_live.build_live_plan(
+        gold_symbols=[("GOLDBEES", 73320.32), ("GOLDMONET", 512.5),
+                      "SGBSEP31II-GB"],
+        asset_class_weights={"gold": 10.0}, now=NOW)
+    named = {q.query: q for q in plan.queries}
+    gold_etf = named["Gold ETF India NAV"]
+    assert gold_etf.kind == "gold" and gold_etf.category == "holding"
+    assert gold_etf.identifier == "GOLDBEES"  # exact first ETF kept for mapping
+    assert gold_etf.identifier_key == "symbol"
+    # weighted pairs must never leak amounts into a query (regression: the
+    # gold branch previously stringified the tuple -> "GOLDBEES 73320 32")
+    assert "GOLDBEES" not in named and ("GOLDMONET" not in named)
+    assert not any("73320" in q.query for q in plan.queries)
+    assert named["Sovereign Gold Bond"].kind == "gold"  # SGB route unchanged
+    assert named["Sovereign Gold Bond"].identifier == ""
+
+
+def test_zero_record_retries_ladder():
+    # numbers stripped first, then the gold/silver price headline
+    assert intel_live.zero_record_retries(
+        "GOLDBEES 73320 32", kind="gold") == ("GOLDBEES", "gold price India")
+    # gold-ETF category query degrades straight to the price headline
+    assert intel_live.zero_record_retries(
+        "Gold ETF India NAV", kind="gold") == ("gold price India",)
+    # multi-word, no explicit kind -> strip numbers then first three words
+    assert intel_live.zero_record_retries(
+        "Nifty 50 valuation PE ratio") == ("Nifty valuation PE ratio",
+                                           "Nifty 50 valuation")
+    assert intel_live.zero_record_retries("HDFC") == ()
+    assert intel_live.zero_record_retries("!!!") == ()
+
+
+def test_run_live_research_fallback_strips_numbers(monkeypatch, tmp_path, caplog):
+    """A 0-record query with an embedded amount is retried bare, then the
+    gold price headline; every candidate is logged and the winner joins the
+    cohort."""
+    import logging
+
+    def _http_get(url, **kwargs):
+        query = (kwargs.get("params") or {}).get("q", "")
+        return _ok_response(query)
+
+    monkeypatch.setattr(httpio, "_http_get", _http_get)
+
+    def _fake_parse(text):
+        if text == "gold price India":
+            return _entries_feed([
+                _feed_entry("Gold ETFs see record inflows in India",
+                            published_parsed=(2026, 9, 8, 10, 0, 0, 0, 0, 0))])
+        return _entries_feed([])  # primary and "GOLDBEES" return zero records
+
+    plan = intel_live.ResearchPlan(
+        queries=(
+            intel_live.NewsQuery(query="GOLDBEES 73320 32", category="holding",
+                                 kind="gold", identifier="GOLDBEES",
+                                 identifier_key="symbol"),
+        ),
+        generated_at=NOW)
+    with caplog.at_level(logging.INFO, logger="lib.intelligence.live.pipeline"):
+        result = intel_live.run_live_research(
+            plan=plan, facts=_Facts(), now=NOW,
+            news_cache=Cache(tmp_path / "news"),
+            gateway_cache=Cache(tmp_path / "gw"),
+            parse=_fake_parse)
+    assert result.status == intel_live.STATUS_OK
+    assert len(result.cohort.records) == 1
+    assert (result.cohort.records[0].payload or {}).get("query") == "gold price India"
+    assert "GOLDBEES 73320 32" in caplog.text  # the original miss is logged
+    assert "GOLDBEES" in caplog.text            # the number-stripped retry is logged
+    assert "gold price India" in caplog.text    # the winning retry is logged
 
 
 def test_run_live_research_falls_back_when_query_zero_records(monkeypatch, tmp_path, caplog):

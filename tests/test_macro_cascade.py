@@ -24,6 +24,7 @@ from lib.intelligence.sources.macro_cascade import (
     USD_INR,
     get_macro_fx_snapshot,
     load_macro_snapshot,
+    plan_badge,
 )
 from lib.intelligence.sources.record import (
     SourceRecord,
@@ -364,3 +365,42 @@ def test_aware_now_is_normalized_before_cache_freshness(tmp_path):
     assert result.status == "ok"
     assert result.is_stale is False
     assert all(r.payload["provenance"] == PROVENANCE_CACHE for r in result.records)
+
+
+def test_plan_badge_staleness_is_age_not_provenance():
+    """The Command Center badges STALE_CACHE records by AGE vs the 12h TTL, not
+    by provenance: a cache-only page load always re-stamps STALE_CACHE, so a
+    recent cache must badge "fresh", never "stale"."""
+    assert plan_badge(PROVENANCE_CACHE, is_stale=False) == ("Cache · fresh", "positive")
+    assert plan_badge(PROVENANCE_CACHE, is_stale=True) == ("Cache · stale", "warning")
+    assert plan_badge(PROVENANCE_FRED, is_stale=False) == ("FRED · authoritative", "positive")
+    assert plan_badge(PROVENANCE_FRED, is_stale=True) == ("FRED · authoritative", "positive")
+    assert plan_badge(PROVENANCE_YAHOO, is_stale=False) == ("Yahoo · fallback", "warning")
+    assert plan_badge(PROVENANCE_YAHOO, is_stale=True) == ("Yahoo · fallback", "warning")
+    assert plan_badge(None, is_stale=False) == ("unknown", "neutral")
+
+
+def test_load_macro_snapshot_recent_cache_badges_fresh(tmp_path):
+    """The exact reported scenario: a cache written 1 minute before NOW (well
+    under the 12-hour TTL) reads back is_stale=False and must badge
+    "Cache · fresh" — never the misleading "Cache · stale"."""
+    cache = Cache(base_dir=tmp_path)
+    recent = NOW - timedelta(minutes=1)  # 08:13 -> 08:14 IST analogue
+    for series_id, value in (("DGS10", 4.05), ("DEXINUS", 85.1),
+                             (INDIA_FRED_SERIES, 6.9)):
+        record = _fred_record(series_id, value, now=recent)
+        cache.save(
+            f"fred:{series_id}",
+            {"metadata": {}, "records": [record.as_dict()]},
+            provider="fred", retrieved_at=recent,
+        )
+
+    result = load_macro_snapshot(now=NOW, cache=cache)
+    assert result.status == "ok"
+    assert result.is_stale is False
+    assert result.metadata["plans"] == {
+        US_10Y: PROVENANCE_CACHE, USD_INR: PROVENANCE_CACHE, INDIA_10Y: PROVENANCE_CACHE}
+    for record in result.records:
+        assert record.payload["provenance"] == PROVENANCE_CACHE
+        assert plan_badge(record.payload["provenance"],
+                          is_stale=result.is_stale) == ("Cache · fresh", "positive")

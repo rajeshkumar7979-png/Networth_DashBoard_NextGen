@@ -4,7 +4,7 @@ import numpy as np
 import yfinance as yf
 import requests
 import feedparser
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import pytz
 import plotly.express as px
 import plotly.graph_objects as go
@@ -1922,11 +1922,6 @@ else:
 # carry spread is a calculated fact over those observed records.
 # ==================================================
 _macro_disp = _macro_snap if "_macro_snap" in dir() else None
-_PROV_UI = {
-    "FRED_API":           ("FRED · authoritative", "positive"),
-    "YAHOO_FINANCE_FALLBACK": ("Yahoo · fallback", "warning"),
-    "STALE_CACHE":        ("Cache · stale", "warning"),
-}
 with st.expander("Macro Indicators · USD/INR, India 10Y & US 10Y"):
     if _macro_disp is None:
         st.markdown(ui_unavailable(
@@ -1942,18 +1937,29 @@ with st.expander("Macro Indicators · USD/INR, India 10Y & US 10Y"):
         _macro_ts = max((r.retrieved_at for r in _macro_disp.records
                          if r.retrieved_at is not None), default=None)
         if _macro_disp.is_stale:
-            _macro_note = ("**Last updated:** stale — press 'Refresh research "
-                           "evidence' to update")
+            _macro_note = ("**Last updated:** stale (older than the 12-hour "
+                           "cache window) — press 'Refresh research evidence' "
+                           "to update")
         elif _macro_ts is not None:
-            _macro_note = (f"**Last updated:** {_macro_ts:%d %b %Y %H:%M} UTC "
-                           "· cached read, refreshed only via the explicit button")
+            _macro_ts_ist = _macro_ts.replace(tzinfo=timezone.utc).astimezone(IST)
+            _age_s = int((now_ist - _macro_ts_ist).total_seconds())
+            if _age_s < 60:
+                _age_txt = " · just now"
+            elif _age_s < 3600:
+                _age_txt = f" · {max(_age_s // 60, 1)} min ago"
+            else:
+                _age_txt = (f" · {_age_s // 3600} h {(_age_s % 3600) // 60} min ago")
+            _macro_note = (f"**Last updated:** {_macro_ts_ist:%d %b %Y %H:%M} IST"
+                           f" ({_macro_ts:%H:%M} UTC){_age_txt}"
+                           " · cached read, refreshed only via the explicit button")
         else:
             _macro_note = "Cached read, refreshed only via the explicit button."
         st.caption(_macro_note)
         for _rec in _macro_disp.records:
             _p = _rec.payload or {}
             _prov = str(_p.get("provenance") or "unknown")
-            _badge, _tone = _PROV_UI.get(_prov, (_prov, "neutral"))
+            _badge, _tone = intel_macro.plan_badge(
+                _prov, is_stale=_macro_disp.is_stale)
             _raw = _p.get("value")
             _val_s = (f"{float(_raw):,.4f}".rstrip("0").rstrip(".")
                       if isinstance(_raw, (int, float)) else str(_raw or "–"))

@@ -91,16 +91,21 @@ buckets = [
 ]
 nonempty = [b for b in buckets if not b[1].empty]
 if nonempty:
+    _isd_currency = _fd["Currency"].astype(str).str.strip().str.upper().fillna("INR")
     cards = []
     for label, df in buckets:
         if df.empty:
             continue
-        tot_inr = float(pd.to_numeric(df["Current Value (INR)"], errors="coerce").sum() or 0)
-        cards.append({
-            "label": label,
-            "value": format_inr_compact(tot_inr) if tot_inr else "—",
-            "sub": f"{len(df)} FD{'s' if len(df) > 1 else ''}",
-        })
+        _inr_rows = df[_isd_currency.reindex(df.index) != "USD"]
+        _usd_rows = df[_isd_currency.reindex(df.index) == "USD"]
+        _cards = []
+        if not _inr_rows.empty:
+            tot_inr = float(pd.to_numeric(_inr_rows["Current Value (INR)"], errors="coerce").sum() or 0)
+            _cards.append((format_inr_compact(tot_inr) if tot_inr else "—", f"{len(_inr_rows)} FD{'s' if len(_inr_rows) > 1 else ''}"))
+        if not _usd_rows.empty:
+            _cards.append((f"{len(_usd_rows)} USD FD{'s' if len(_usd_rows) > 1 else ''}", "FCNR·USD"))
+        for _val, _sub in _cards:
+            cards.append({"label": label, "value": _val, "sub": _sub})
     _bucket_grid = "".join(
         f'<div class="t-kpi"><div class="t-kpi-label">{_c["label"]}</div>'
         f'<div class="t-kpi-value">{_c["value"]}</div>'

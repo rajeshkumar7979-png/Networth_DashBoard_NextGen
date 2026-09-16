@@ -5,8 +5,10 @@
 #   * one query per held stock symbol, ranked by portfolio weight (bounded)
 #   * one query per held MF fund, ranked by portfolio weight (bounded; short-name
 #     query + full-name identifier)
-#   * gold: a sovereign-gold query only when an SGB is actually held, a per-ETF
-#     symbol query for each non-SGB gold holding, and one INR gold-price query
+#   * gold: a sovereign-gold query only when an SGB is actually held, a single
+#     gold-ETF category query ("Gold ETF India NAV") for all non-SGB gold
+#     holdings (bare tickers like "GOLDBEES" are not recalled by Google News),
+#     and one INR gold-price query
 #   * asset-class contextual queries, emitted only when the exposure exists:
 #       FCNR (USD) book        -> "USD INR forecast RBI policy"
 #       gold held              -> "gold price INR forecast"
@@ -38,6 +40,11 @@ MAX_PORTFOLIO_QUERIES = 6
 
 FRED_USD_INR_TARGET = "DEXINUS"
 _SGB_PREFIX = "SGB"
+# Gold-ETF category query. Bare ETF tickers ("GOLDBEES", "GOLDMONET") are not
+# recalled by Google News; this category phrase finds the 8-record class of
+# results the other holdings get. Zero-record hits degrade to the "gold price
+# India" headline via simplify_query()/zero_record_retries().
+GOLD_ETF_QUERY = "Gold ETF India NAV"
 
 # Query hygiene: Google News RSS phrase-matches the raw query; underscores,
 # plus signs and punctuation tokenize poorly and suppress recall (observed:
@@ -242,6 +249,49 @@ def simplify_query(query: str, kind: str = "") -> str:
     return base
 
 
+_QUERY_DIGITS = re.compile(r"[0-9]+")
+
+
+def strip_numbers(text) -> str:
+    """Remove digit runs (prices, amounts, weights) from a sanitized query.
+
+    "GOLDBEES 73320 32" -> "GOLDBEES". Used by the zero-record recovery ladder
+    when a number leaked into the query text. Pure and deterministic.
+    """
+    value = sanitize_query(text)
+    if not value:
+        return ""
+    return _QUERY_SPACES.sub(" ", _QUERY_DIGITS.sub(" ", value)).strip()
+
+
+def zero_record_retries(query: str, kind: str = "") -> tuple[str, ...]:
+    """Ordered, deduped zero-record retry queries — never includes the original.
+
+    Recovery ladder (each step applies only when it differs from the original
+    query and from earlier steps, case-insensitively):
+      1. numbers stripped  ("GOLDBEES 73320 32" -> "GOLDBEES")
+      2. simplified form   (gold/silver -> "<metal> price India"; >3 words ->
+                            the first three words)
+      3. gold/silver-kind  -> explicit "<metal> price India" secondary fallback
+    Deterministic and pure.
+    """
+    candidates: list[str] = []
+    seen = {sanitize_query(query).lower()}
+
+    def add_candidate(text) -> None:
+        text = (text or "").strip()
+        if not text or text.lower() in seen:
+            return
+        seen.add(text.lower())
+        candidates.append(text)
+
+    add_candidate(strip_numbers(query))
+    add_candidate(simplify_query(query, kind=kind))
+    if str(kind).lower() in ("gold", "silver"):
+        add_candidate(f"{str(kind).lower()} price India")
+    return tuple(candidates)
+
+
 def build_live_plan(*, stock_symbols=(), fund_names=(), gold_symbols=(),
                     has_usd_book: bool = False, equity_pct=None,
                     asset_class_weights=None, now=None) -> ResearchPlan:
@@ -299,19 +349,18 @@ def build_live_plan(*, stock_symbols=(), fund_names=(), gold_symbols=(),
             candidate(weight, short, "holding", "fund",
                       identifier=full, identifier_key="fund_name")
 
-    gold_symbols = [str(s).strip() for s in (gold_symbols or ()) if str(s).strip()]
+    gold_symbols = [name.strip() for name, _ in rank_by_weight(gold_symbols or ())]
     if gold_symbols:
         sgb = [s for s in gold_symbols if s.upper().startswith(_SGB_PREFIX)]
         etfs = [s for s in gold_symbols if not s.upper().startswith(_SGB_PREFIX)]
         if sgb:
             candidate(gold_weight, sanitize_query("Sovereign Gold Bond"),
                       "holding", "gold")
-        for symbol in etfs:
-            query = sanitize_query(symbol)
-            if not query:
-                continue
-            candidate(gold_weight, query, "holding", "gold",
-                      identifier=symbol, identifier_key="symbol")
+        if etfs:
+            # One shared category query for every non-SGB gold holding; the
+            # exact first ETF symbol stays available for exact-match mapping.
+            candidate(gold_weight, GOLD_ETF_QUERY, "holding", "gold",
+                      identifier=etfs[0], identifier_key="symbol")
         candidate(gold_weight, ASSET_CLASS_QUERIES["gold"], "macro", "asset_class")
 
     if has_usd_book:

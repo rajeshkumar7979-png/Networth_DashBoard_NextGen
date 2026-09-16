@@ -24,7 +24,12 @@ from lib.intelligence.sources.record import SourceResult, unavailable_result, ut
 
 from .cohort import LiveCohort, assemble_cohort
 from .news import LIVE_CACHE_DIR, NEWS_PROVIDER, fetch_gnews, scrub_error, to_naive_utc
-from .planner import NewsQuery, ResearchPlan, build_live_plan, simplify_query
+from .planner import (
+    NewsQuery,
+    ResearchPlan,
+    build_live_plan,
+    zero_record_retries,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -120,10 +125,12 @@ def run_live_research(*, stock_symbols=(), fund_names=(), gold_symbols=(),
             continue
         if result.records:
             continue
-        # Zero records: retry once with a simplified, higher-recall query and
-        # log the miss for debugging. The fallback bucket joins the cohort.
-        simplified = simplify_query(query.query, kind=query.kind)
-        if not simplified or simplified.lower() == query.query.lower():
+        # Zero records: walk the recovery ladder (number-stripped base, then
+        # simplified/price-headline forms) and join each fallback bucket into
+        # the cohort. Misses are logged at INFO for debugging and never become
+        # failures.
+        retries = zero_record_retries(query.query, kind=query.kind)
+        if not retries:
             logger.info(
                 "gnews query returned 0 records (query=%r category=%r kind=%r) "
                 "- no simpler form available", query.query, query.category,
@@ -131,22 +138,28 @@ def run_live_research(*, stock_symbols=(), fund_names=(), gold_symbols=(),
             continue
         logger.info(
             "gnews query returned 0 records (query=%r category=%r kind=%r) - "
-            "retrying simplified: %r", query.query, query.category, query.kind,
-            simplified)
-        fb = fetch_news(simplified, query.category, identifiers, is_fallback=True)
-        results.append(fb)
-        if fb.status == "ok":
-            if not fb.records:
-                logger.info(
-                    "gnews simplified query also returned 0 records "
-                    "(query=%r)", simplified)
+            "retrying %d candidate(s): %s", query.query, query.category,
+            query.kind, len(retries), [r for r in retries])
+        for retry_text in retries:
+            fb = fetch_news(retry_text, query.category, identifiers,
+                            is_fallback=True)
+            results.append(fb)
+            if fb.status != "ok":
+                logger.info("gnews retry failed (query=%r status=%s)",
+                            retry_text, fb.status)
+                continue
             effective_queries.append(NewsQuery(
-                query=simplified,
+                query=retry_text,
                 category=query.category,
                 kind=query.kind,
                 identifier=query.identifier,
                 identifier_key=query.identifier_key,
             ))
+            if not fb.records:
+                logger.info("gnews retry also returned 0 records (query=%r)",
+                            retry_text)
+            else:
+                break
 
     for series in plan.fred_targets:
         try:

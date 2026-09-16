@@ -21,6 +21,7 @@ from lib.intelligence.live.news import (
 )
 from lib.intelligence.live.planner import (
     ASSET_CLASS_QUERIES,
+    GOLD_ETF_QUERY,
     MAX_FUND_QUERIES,
     MAX_PORTFOLIO_QUERIES,
     MAX_STOCK_QUERIES,
@@ -31,6 +32,8 @@ from lib.intelligence.live.planner import (
     rank_by_weight,
     sanitize_query,
     simplify_query,
+    strip_numbers,
+    zero_record_retries,
 )
 from lib.intelligence.live.cohort import (
     GATEWAY_PROVIDERS,
@@ -54,6 +57,7 @@ __all__ = [
     "ASSET_CLASS_QUERIES",
     "FRED_USD_INR_TARGET",
     "GATEWAY_PROVIDERS",
+    "GOLD_ETF_QUERY",
     "LIVE_CACHE_DIR",
     "LiveCohort",
     "LiveResult",
@@ -82,6 +86,8 @@ __all__ = [
     "sanitize_query",
     "scrub_error",
     "simplify_query",
+    "strip_numbers",
     "to_naive_utc",
     "usd_book_present",
+    "zero_record_retries",
 ]
