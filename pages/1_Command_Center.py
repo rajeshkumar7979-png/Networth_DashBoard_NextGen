@@ -2058,6 +2058,32 @@ if _research_brief is not None:
                     "`AI_PROVIDER`, `AI_MODEL`, `AI_BASE_URL`, `AI_TIMEOUT_SECONDS`) to "
                     "enable it. Until then the deterministic Research Brief is the only "
                     "synthesis — unchanged.")
+            _is_ollama = _ai_cfg["provider"] == intel_ai.OLLAMA_LOCAL_PROVIDER
+            _ollama_health = st.session_state.get("cc_ai_ollama_health")
+            if _is_ollama:
+                if st.button("Check Ollama connection", key="cc_ai_ollama_check",
+                             disabled=not _ai_cfg["configured"]):
+                    with st.spinner("Checking Ollama connection…"):
+                        _ollama_health = intel_ai.check_ollama_health()
+                        st.session_state["cc_ai_ollama_health"] = _ollama_health
+                if _ollama_health is not None:
+                    if _ollama_health.get("ok"):
+                        st.success(
+                            f"Ollama is running — {_ollama_health['count']} model(s) "
+                            f"pulled ({_ollama_health.get('latency_ms', 0):.0f} ms): "
+                            f"{', '.join(_ollama_health.get('models') or ()) or 'none'}")
+                    else:
+                        st.error(intel_ai.OLLAMA_NOT_RUNNING_HINT)
+                        if intel_ai.ollama_command_available():
+                            if st.button("Start Ollama Service", key="cc_ai_ollama_start"):
+                                _started, _start_msg = intel_ai.start_ollama_service()
+                                if _started:
+                                    st.info(_start_msg)
+                                else:
+                                    st.error(_start_msg)
+                        else:
+                            st.caption("The `ollama` executable was not found on PATH — "
+                                       "install it from https://ollama.com first.")
             _ai_fp = (
                 tuple(sorted(_research_brief.totals.items())),
                 _research_brief.evidence_count,
@@ -2071,15 +2097,34 @@ if _research_brief is not None:
             if st.button("Run AI research (explicit call to the configured provider)",
                          key="cc_ai_run",
                          disabled=not _ai_cfg["configured"]):
-                with st.spinner("Running AI research…"):
-                    st.session_state["cc_ai_outcome"] = intel_ai.run_ai_research(
-                        brief=_research_brief,
-                        facts=_intel_facts.all_facts()
-                            if _intel_facts is not None else (),
-                        evidence=tuple(_intel_evidence.items)
-                            if _intel_evidence is not None else (),
-                        now=now_ist)
-                    st.session_state["cc_ai_outcome_for"] = _ai_fp
+                _gate_ok = True
+                if _is_ollama:
+                    with st.spinner("Checking Ollama connection…"):
+                        st.session_state["cc_ai_ollama_health"] = intel_ai.check_ollama_health()
+                    _gate_ok = bool(st.session_state["cc_ai_ollama_health"].get("ok"))
+                if _gate_ok:
+                    with st.spinner(intel_ai.OLLAMA_FIRST_RUN_SPINNER):
+                        st.session_state["cc_ai_outcome"] = intel_ai.run_ai_research(
+                            brief=_research_brief,
+                            facts=_intel_facts.all_facts()
+                                if _intel_facts is not None else (),
+                            evidence=tuple(_intel_evidence.items)
+                                if _intel_evidence is not None else (),
+                            now=now_ist)
+                        st.session_state["cc_ai_outcome_for"] = _ai_fp
+                else:
+                    st.session_state.pop("cc_ai_outcome", None)
+                    st.error(intel_ai.OLLAMA_NOT_RUNNING_HINT)
+                    if intel_ai.ollama_command_available():
+                        if st.button("Start Ollama Service", key="cc_ai_ollama_start_from_run"):
+                            _started, _start_msg = intel_ai.start_ollama_service()
+                            if _started:
+                                st.info(_start_msg)
+                            else:
+                                st.error(_start_msg)
+                    else:
+                        st.caption("The `ollama` executable was not found on PATH — "
+                                   "install it from https://ollama.com first.")
             _ai_outcome = st.session_state.get("cc_ai_outcome")
             if _ai_outcome is None:
                 st.caption("Not run yet — press the button to invoke the AI provider "
@@ -2130,6 +2175,14 @@ if _research_brief is not None:
                     "the model.")
             else:
                 st.warning(f"{_ai_outcome.status_label}: {_ai_outcome.reason}")
+                if _is_ollama:
+                    _ai_hint = intel_ai.ollama_failure_hint(_ai_outcome.reason)
+                    if _ai_hint:
+                        st.caption(_ai_hint)
+                    if _ai_outcome.status == intel_ai.STATUS_FAILED and \
+                            not intel_ai.ollama_command_available():
+                        st.caption("The `ollama` executable was not found on PATH — "
+                                   "install it from https://ollama.com first.")
                 st.caption("Falling back to the deterministic Research Brief "
                            "synthesis — unchanged.")
         except Exception as _ai_err:

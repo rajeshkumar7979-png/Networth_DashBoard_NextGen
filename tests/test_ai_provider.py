@@ -191,6 +191,7 @@ def test_load_ai_config_defaults_no_key():
     assert cfg.model == "llama3.1:8b"
     assert cfg.base_url == "http://localhost:11434/v1"
     assert cfg.api_key == ""
+    assert cfg.timeout_seconds == 180.0
     assert cfg.structured_output is True
 
 
@@ -257,7 +258,7 @@ def test_load_ai_config_ignores_garbage_values():
         "AI_TEMPERATURE": "??",
         "AI_MAX_EVIDENCE_CATALOG": "many",
     })
-    assert cfg.timeout_seconds == 30.0
+    assert cfg.timeout_seconds == 180.0
     assert cfg.max_tokens == 1200
     assert cfg.temperature == 0.0
     assert cfg.max_evidence_catalog == 20
@@ -701,7 +702,7 @@ def test_ollama_local_is_keyless_and_registered():
                       timeout_seconds=ai.OLLAMA_TIMEOUT_SECONDS)
     assert ai.provider_is_configured(cfg) is True
     assert ai.ai_config_status(cfg)["configured"] is True
-    assert cfg.timeout_seconds == 120.0
+    assert cfg.timeout_seconds == 180.0
     cli = ai.build_client(cfg)
     assert cli.provider == ai.OLLAMA_LOCAL_PROVIDER
 

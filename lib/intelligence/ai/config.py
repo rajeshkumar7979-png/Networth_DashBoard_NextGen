@@ -55,7 +55,10 @@ _AI_ENV_KEYS = (
 DEFAULT_PROVIDER = "ollama_local"
 DEFAULT_BASE_URL = "http://localhost:11434/v1"
 DEFAULT_MODEL = "llama3.1:8b"
-DEFAULT_TIMEOUT_SECONDS = 30.0
+# Local inference (Ollama) is slow on first run (model load/download): the
+# timeout defaults to 180 s (3 minutes), not 30 s, so a cold local model has
+# time to answer before the request is abandoned.
+DEFAULT_TIMEOUT_SECONDS = 180.0
 DEFAULT_MAX_TOKENS = 1200
 DEFAULT_TEMPERATURE = 0.0
 DEFAULT_STRUCTURED_OUTPUT = True
@@ -65,7 +68,7 @@ DEFAULT_MAX_EVIDENCE_CATALOG = 20
 OLLAMA_LOCAL_PROVIDER = "ollama_local"
 OLLAMA_BASE_URL = "http://localhost:11434/v1"
 OLLAMA_MODEL = "llama3.1:8b"
-OLLAMA_TIMEOUT_SECONDS = 120.0
+OLLAMA_TIMEOUT_SECONDS = 180.0
 
 # Providers that require no API key (local inference servers).
 _KEYLESS_PROVIDERS = frozenset({OLLAMA_LOCAL_PROVIDER})
