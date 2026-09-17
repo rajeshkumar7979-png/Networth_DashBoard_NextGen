@@ -51,12 +51,51 @@ _assets = st.session_state.get("cc_assets") or {}
 _rates = st.session_state.get("cc_rates") or {}
 _snapshot = st.session_state.get("cc_intel_snapshot") or {}
 
+# -------------------------------------------------
+# RUN CONTROLS & EXPORTS — single shared touch-point band.
+# The Excel uploader, the force-recalculate trigger, the snapshot/auto-refresh
+# toggles dry-write session keys for the Command Center to read on its next pass
+# (cc_uploaded_file / cc_log_snapshot / cc_auto_refresh). Nothing here calls the
+# network; the Command Center remains the only page that fetches live evidence.
+# -------------------------------------------------
+_controls_exp = st.expander("Run controls & exports", expanded=False)
+with _controls_exp:
+    st.markdown("### Controls")
+    st.file_uploader(
+        "Upload new Excel",
+        type=["xlsx", "xls"],
+        key="cc_uploaded_file",
+        help="Pick the family workbook (.xlsx/.xls). It dry-writes the session key that the Command Center reads on its next run — nothing is fetched until you run there.",
+    )
+    if st.button("Force Recalculate", use_container_width=True, type="primary"):
+        st.cache_data.clear()
+        st.rerun()
+    st.toggle(
+        "Log today's snapshot to history", value=bool(st.session_state.get("cc_log_snapshot", True)), key="cc_log_snapshot"
+    )
+    st.toggle(
+        "Auto refresh every 5 minutes", value=bool(st.session_state.get("cc_auto_refresh", True)), key="cc_auto_refresh"
+    )
+    st.markdown("---")
+    st.markdown("### History")
+    if st.button("Reset history file", use_container_width=True):
+        st.session_state["cc_reset_history"] = True
+    st.markdown("---")
+    st.markdown("### Restore / merge history CSV")
+    st.file_uploader(
+        "Restore history CSV",
+        type=["csv"],
+        key="cc_hist_upload",
+        help="Merge an existing history file into the history log. The Command Center applies this on its next run.",
+    )
+    st.caption("Run controls & exports save to the session only. Nothing is recalculated until the Command Center runs.")
+
 _ready = bool(_books) or bool(_assets)
 if not _ready:
     st.markdown(ui_empty(
         "Nothing to show until the Command Center runs.",
         "Desk is a read-only view over the session data the Command Center builds.",
-        "Open Command Center once, then return here.",
+        "Upload a workbook above, open Command Center once, then return here.",
     ), unsafe_allow_html=True)
     st.stop()
 

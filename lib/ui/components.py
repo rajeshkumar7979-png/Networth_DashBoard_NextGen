@@ -173,7 +173,7 @@ def stacked_bar(parts, total=None, height=16):
             continue
         pct = v / denominator * 100.0
         segs.append(
-            f'<div class="t-bar-seg" style="width:{pct:.2f}%;background:{p.get("color", "#3b82f6")}" '
+            f'<div class="t-bar-seg" style="width:{pct:.2f}%;background:{p.get("color", "#c5cedb")}" '
             f'title="{_esc(p.get("label", ""))}: {v:,.0f}"></div>'
         )
     bar = f'<div class="t-bar-track" style="height:{int(height)}px">{"".join(segs)}</div>'
@@ -184,7 +184,7 @@ def stacked_bar(parts, total=None, height=16):
         pct = v / denominator * 100.0
         legend.append(
             f'<li><span class="nm">'
-            f'<span style="color:{p.get("color", "#3b82f6")}">●</span> '
+            f'<span style="color:{p.get("color", "#c5cedb")}">●</span> '
             f'{_esc(p.get("label", ""))}</span>'
             f'<span class="amt">{pct:.1f}% · {v:,.0f}</span></li>'
         )
@@ -396,3 +396,88 @@ def _fmt_compact(value):
         return format_inr_compact(float(value))
     except (TypeError, ValueError):
         return "" if value in (None, "") else str(value)
+
+
+# ---------------------------------------------------------------------------
+# Northline briefing extras — health ring, five-sleeve strip, stance pill
+# ---------------------------------------------------------------------------
+def score_ring(score, label="HEALTH", sub="", size=136, stroke=9):
+    """Radial health ring with the numeric score in the centre (Newsreader).
+    score: number 0..100. The ring stroke colour is chosen by score band:
+    ok (>=75) / warn (55-74) / urgent (<55)."""
+    try:
+        s = max(0.0, min(100.0, float(score)))
+    except (TypeError, ValueError):
+        s = 0.0
+    band = "t-ring-ok" if s >= 75 else ("t-ring-warn" if s >= 55 else "t-ring-urgent")
+    radius = (size - stroke * 2) / 2.0
+    circ = round(2 * 3.141592653589793 * radius, 3)
+    filled = round(circ * s / 100.0, 3)
+    sub_html = f'<div class="t-ring-sub">{_esc(sub)}</div>' if sub else ""
+    return (
+        f'<div class="t-ring-wrap {band}" style="width:{size}px;height:{size}px">'
+        f'<svg class="t-ring" width="{size}" height="{size}" viewBox="0 0 {size} {size}" '
+        f'role="img" aria-label="{_esc(label)} score {s:.0f}">'
+        f'<circle class="t-ring-track" cx="{size/2}" cy="{size/2}" r="{radius}"></circle>'
+        f'<circle class="t-ring-progress" cx="{size/2}" cy="{size/2}" r="{radius}" '
+        f'stroke-dasharray="{filled} {circ - filled}"></circle></svg>'
+        f'<div class="t-ring-center"><div class="t-ring-score">{s:.0f}</div>'
+        f'<div class="t-ring-label">{_esc(label)}</div>{sub_html}</div></div>'
+    )
+
+
+def weight_strip(parts, total=None):
+    """Five-sleeve allocation strip for the Northline briefing.
+    parts: list of dict(label, value, color). Renders one segmented bar plus a
+    five-column legend. Percentages derive from the given values; absent
+    sleeves simply do not render. Colours default to SLEEVE_COLORS-by-label."""
+    from lib.theme import SLEEVE_COLORS
+    labelled = {k.lower(): v for k, v in SLEEVE_COLORS.items()}
+    norm = []
+    for p in parts:
+        try:
+            v = max(0.0, float(p.get("value") or 0.0))
+        except (TypeError, ValueError):
+            continue
+        label = str(p.get("label") or "")
+        color = p.get("color") or labelled.get(label.lower(), "#c5cedb")
+        norm.append((label, v, color))
+    denominator = float(total) if total is not None else sum(v for _, v, _ in norm)
+    if denominator <= 0:
+        return '<div class="t-empty">No allocation to display.</div>'
+    segs = []
+    legend = []
+    for label, v, color in norm:
+        if v <= 0:
+            continue
+        pct = v / denominator * 100.0
+        segs.append(
+            f'<div class="t-strip-seg" style="flex:0 0 {pct:.2f}%;background:{color}" '
+            f'title="{_esc(label)}: {v:,.0f}"></div>'
+        )
+        legend.append(
+            f'<div class="t-sleeve">'
+            f'<span class="t-sleeve-dot" style="background:{color}"></span>'
+            f'<span class="t-sleeve-name">{_esc(label)}</span>'
+            f'<span class="t-sleeve-pct">{pct:.1f}%</span>'
+            f'<span class="t-sleeve-val">{_fmt_compact(v)}</span></div>'
+        )
+    bar = f'<div class="t-strip-bar">{"".join(segs)}</div>'
+    legend_html = f'<div class="t-strip-legend">{"".join(legend)}</div>' if legend else ""
+    return f'<div class="t-strip">{bar}{legend_html}</div>'
+
+
+def stance_pill(text, tone=""):
+    """A single serene stance sentence as a wide pill. tone: ok | warn | crit."""
+    cls = f" t-stance-{tone}" if tone else ""
+    return f'<div class="t-stance{cls}">{text}</div>'
+
+
+def dots(done, total, tone="neutral"):
+    """Small step dots for a bounded progress context (e.g. 3 of 6 stages)."""
+    t = int(total or 0)
+    d = max(0, min(t, int(done or 0)))
+    dots_html = "".join(
+        f'<span class="t-dot{" t-dot-on" if i < d else ""}"></span>' for i in range(t)
+    )
+    return f'<span class="t-dots">{dots_html}</span>'

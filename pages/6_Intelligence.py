@@ -258,9 +258,52 @@ if _dev_rows:
             "ok" if _live_result.status == "ok" else "cache"), unsafe_allow_html=True)
 else:
     st.markdown(ui_caption(
-        "No cached developments yet. Open Command Center and press "
-        "'Refresh research evidence' to fetch — that is the only moment a network call happens."),
-        unsafe_allow_html=True)
+        "No cached cohort yet. Press 'Refresh research evidence' below — that is the "
+        "only moment a network call happens. Nothing else on this page ever hits the "
+        "network, re-computes valuation or runs AI."), unsafe_allow_html=True)
+    with st.expander("Fetch live research evidence (explicit press only)"):
+        st.markdown(ui_caption(
+            "No network call happens when this page loads. The single moment a network "
+            "call happens is pressing this button."), unsafe_allow_html=True)
+        _btn_done = st.button(
+            "Refresh research evidence", type="primary", use_container_width=True,
+            help="Explicit user action: the only moment this app ever calls the network.")
+        if _btn_done:
+            _sym_stocks = _books.get("stocks") or () if "cc_books" in dir() else ()
+            _sym_funds = _books.get("mf") or () if "cc_books" in dir() else ()
+            _sym_gold = _books.get("gold") or () if "cc_books" in dir() else ()
+            try:
+                with st.spinner("Fetching live research evidence…"):
+                    _new_live = intel_live.run_live_research(
+                        stock_symbols=_sym_stocks, fund_names=_sym_funds,
+                        gold_symbols=_sym_gold, now=NOW_IST)
+                st.session_state["cc_live_result"] = _new_live
+                st.session_state["cc_live_cohort"] = _new_live.cohort
+                st.rerun()
+            except Exception as _renew_exc:
+                st.warning(f"Refresh unavailable: {_renew_exc}")
+    with st.expander("Macro posture (cached gateway facts, network-free)"):
+        _macro_gw = _rates.get("usd_inr") or _rates.get("gold_10g_inr")
+        if _macro_gw is not None:
+            _sub = (f"USD/INR {_rates['usd_inr']:.2f}" if _rates.get("usd_inr")
+                    else f"Gold ₹{_rates['gold_10g_inr']:,.0f}/10g")
+            st.markdown(ui_pill("cached macro evidence", "ok"), unsafe_allow_html=True)
+            st.caption(f"Cached reference rate this run — {_sub}. Read from disk, never fetched here.")
+        else:
+            st.markdown(ui_pill("no cached macro evidence", "cache"), unsafe_allow_html=True)
+            st.caption("Run Command Center once to populate the cached macro posture.")
+    with st.expander("AI opt-in interpretation"):
+        st.markdown(ui_caption(
+            "AI here is strictly opt-in and never runs on page load. If enabled, "
+            "interpretation happens only on explicit AI actions in the Command Center."),
+            unsafe_allow_html=True)
+        _ai_opt_in = st.checkbox(
+            "Opt in to AI interpretation", value=False,
+            help="Network-free toggle: enabling it never fetches anything and never calls an AI provider here.",
+            key="cc_ai_opt_in_intel")
+        if _ai_opt_in:
+            st.caption("Opt-in recorded. AI interpretation still runs only via the Command Center's "
+                       "explicit AI action — never on this page load.")
 
 
 # ==================================================
