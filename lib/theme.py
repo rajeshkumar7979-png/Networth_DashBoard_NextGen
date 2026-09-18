@@ -46,12 +46,12 @@ DESIGN_SYSTEM_CSS = r"""
 
 /* ============ design tokens ============ */
 :root {
-  --c-bg: #08090c; --c-bg-card: #101218; --c-bg-surface: #101218;
+  --c-bg: #08090c; --c-bg-card: #12141c; --c-bg-surface: #12141c;
   --c-bg-deep: #0c0d12; --c-bg-raised: #161922;
-  --c-border: #222632; --c-border-hover: #2e3444; --c-border-subtle: #191c24;
+  --c-border: #2a2f3c; --c-border-hover: #2e3444; --c-border-subtle: #191c24;
   --c-border-strong: #2e3444;
-  --c-text: #eceef2; --c-text-body: #e4e7ec; --c-text-secondary: #d4d8e0;
-  --c-text-muted: #8b93a4; --c-text-dim: #7a8193; --c-text-faint: #5c6578;
+  --c-text: #eceef2; --c-text-body: #e4e7ec; --c-text-secondary: #dce0e8;
+  --c-text-muted: #9aa3b5; --c-text-dim: #7a8193; --c-text-faint: #5c6578;
   --c-text-ghost: #565d6d; --c-text-buried: #4a5160;
   --c-accent: #c5cedb; --c-accent-fg: #0b0c10;
   --c-up: #3cba8c; --c-up-soft: #6fd0ad; --c-down: #e15d5d; --c-down-soft: #ee7f7f;
@@ -62,7 +62,7 @@ DESIGN_SYSTEM_CSS = r"""
   --f-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --rail-w: 220px; --bar-h: 60px;
   --r-sm: 8px; --r-md: 12px; --r-lg: 14px; --r-pill: 999px;
-  --sp-xs: 4px; --sp-sm: 8px; --sp-md: 14px; --sp-lg: 22px;
+  --sp-xs: 4px; --sp-sm: 8px; --sp-md: 18px; --sp-lg: 28px;
 }
 
 /* ============ base ============ */
