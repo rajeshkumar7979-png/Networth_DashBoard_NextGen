@@ -1,4 +1,4 @@
-﻿import streamlit as st
+import streamlit as st
 import pandas as pd
 import yfinance as yf
 import requests
@@ -1569,153 +1569,157 @@ except Exception:
 pulse_rows = build_market_pulse_rows()
 
 # ==================================================
-# WHAT DESERVES ATTENTION â€” run flags + evidence-backed risks / research needs
-# Every item carries why-it-matters + invalidation; thin evidence surfaces as
-# info-level, never as fabricated. Decision-support only â€” not advice/orders.
-# ==================================================
-st.markdown(ui_section("What deserves attention"), unsafe_allow_html=True)
-_attention_items = []
-for _fl_level, _fl_title, _fl_body in flags[:6]:
-    _attention_items.append({"level": _fl_level, "title": _fl_title, "body": _fl_body})
-if _research_brief is not None:
-    for _r in _research_brief.risks[:3]:
-        _attention_items.append({
-            "level": "critical" if _r.strength == "strong" else "warning",
-            "title": _r.title,
-            "body": _r.statement + " Â· " + _r.invalidation,
-        })
-    for _n in _research_brief.research_needs[:2]:
-        _attention_items.append({
-            "level": "info",
-            "title": "Decide: " + _n.title,
-            "body": _n.statement,
-        })
-_seen_titles = set()
-_dedup_attention = []
-for _a in _attention_items:
-    _key = _a["title"].strip().lower()
-    if _key in _seen_titles:
-        continue
-    _seen_titles.add(_key)
-    _dedup_attention.append(_a)
-_flag_sev = {"critical": 0, "warning": 1, "info": 2}
-_dedup_attention.sort(key=lambda x: _flag_sev.get(x["level"], 3))
-if _dedup_attention:
-    st.markdown(ui_attn(_dedup_attention[:6]), unsafe_allow_html=True)
-    st.caption("Run flags first, then evidence-backed risks and decision-support research needs.")
-else:
-    st.markdown(ui_empty("Nothing flagged right now.",
-                         "No warning, risk or decision-support item this run."),
-                unsafe_allow_html=True)
-
-# ==================================================
-# WHAT CHANGED THIS RUN â€” compact
-# Valuation attribution only; the workbook has no cash-flow ledger, so the
-# invested diff between runs is never called a deposit/withdrawal/SIP.
-# ==================================================
-st.markdown(ui_section("What changed this run"), unsafe_allow_html=True)
-if _research_brief is not None and _research_brief.changes:
-    _chg_cards = [
-        {
-            "label": c.label,
-            "value": f"{c.amount:,.0f}" if c.amount is not None else "\u2014",
-            "sub": c.kind.replace("_", " ") + (" \u00b7 " + c.note if c.note else ""),
-            "tone": "up" if (c.amount is not None and c.amount >= 0)
-                    else ("down" if (c.amount is not None and c.amount < 0) else ""),
-        }
-        for c in _research_brief.changes[:6]
-    ]
-    st.markdown(ui_kpi_cards(_chg_cards, cols=3), unsafe_allow_html=True)
-elif cc_drivers is not None and cc_drivers["drivers"]:
-    _chg_cards = []
-    for _k, _v in cc_drivers["drivers"].items():
-        _chg_cards.append({
-            "label": cc_drivers["driver_labels"].get(_k, _k),
-            "value": f"{_v:,.0f}",
-            "sub": "valuation attribution",
-            "tone": "up" if _v >= 0 else "down",
-        })
-    st.markdown(ui_kpi_cards(_chg_cards[:6], cols=3), unsafe_allow_html=True)
-else:
-    st.markdown(ui_empty("Change breakdown unavailable",
-                         "The register or research layer did not build this run."),
-                unsafe_allow_html=True)
-
-if _dt is not None:
-    _delta_cap = (f"Snapshot delta Â· \u0394 Current Value {_dt['delta_current']:,.0f} vs prior snapshot "
-                  f"Â· market / valuation change {_dt['market_valuation_change']:,.0f} "
-                  f"Â· Invested-Basis Change {_dt['invested_basis_change']:,.0f}. "
-                  + NOT_A_CASHFLOW_LABEL)
-elif _delta is not None and not _delta.get("available"):
-    _delta_cap = (f"{_delta['reason']} (|\u0394| \u2248 \u20B9{_delta['unattributed_abs']:,.0f}). "
-                  + NOT_A_CASHFLOW_LABEL)
-else:
-    _delta_cap = ("Add a second snapshot (a later run) to see the \u0394 Current Value vs "
-                  "prior snapshot. " + NOT_A_CASHFLOW_LABEL)
-st.markdown(ui_caption(_delta_cap), unsafe_allow_html=True)
-
-# ==================================================
-# MARKET PULSE â€” 8 compact tiles
-# ==================================================
-st.markdown(ui_section("Market pulse"), unsafe_allow_html=True)
-pulse_cards = []
-for row in pulse_rows:
-    if row["Value"] is None:
-        val = "\u2014"
-        chg = None
-        sub = "no quote this run"
+with st.expander("What deserves attention", expanded=False):
+    # WHAT DESERVES ATTENTION â€” run flags + evidence-backed risks / research needs
+    # Every item carries why-it-matters + invalidation; thin evidence surfaces as
+    # info-level, never as fabricated. Decision-support only â€” not advice/orders.
+    # ==================================================
+    st.markdown(ui_section("What deserves attention"), unsafe_allow_html=True)
+    _attention_items = []
+    for _fl_level, _fl_title, _fl_body in flags[:6]:
+        _attention_items.append({"level": _fl_level, "title": _fl_title, "body": _fl_body})
+    if _research_brief is not None:
+        for _r in _research_brief.risks[:3]:
+            _attention_items.append({
+                "level": "critical" if _r.strength == "strong" else "warning",
+                "title": _r.title,
+                "body": _r.statement + " Â· " + _r.invalidation,
+            })
+        for _n in _research_brief.research_needs[:2]:
+            _attention_items.append({
+                "level": "info",
+                "title": "Decide: " + _n.title,
+                "body": _n.statement,
+            })
+    _seen_titles = set()
+    _dedup_attention = []
+    for _a in _attention_items:
+        _key = _a["title"].strip().lower()
+        if _key in _seen_titles:
+            continue
+        _seen_titles.add(_key)
+        _dedup_attention.append(_a)
+    _flag_sev = {"critical": 0, "warning": 1, "info": 2}
+    _dedup_attention.sort(key=lambda x: _flag_sev.get(x["level"], 3))
+    if _dedup_attention:
+        st.markdown(ui_attn(_dedup_attention[:2]), unsafe_allow_html=True)
+        st.caption("Run flags first, then evidence-backed risks and decision-support research needs.")
     else:
-        val = row["fmt"].format(row["Value"])
-        chg = row["Chg %"]
-        sub = None
-        if chg is not None:
-            sub = f"{'â–²' if chg >= 0 else 'â–¼'} {chg:+.2f}%"
-    ath = row.get("ATH %")
-    if ath is not None:
-        sub = f"{sub + ' Â· ' if sub else ''}{ath:.1f}% from ATH"
-    pulse_cards.append({
-        "label": row["Market"],
-        "value": val,
-        "sub": sub or "",
-        "tone": "up" if (chg is not None and chg >= 0)
-                else ("down" if (chg is not None and chg < 0) else ""),
-    })
-st.markdown(ui_kpi_cards(pulse_cards, cols=4), unsafe_allow_html=True)
-st.markdown(ui_caption("Free delayed sources Â· Gold â‚¹/10g & Silver â‚¹/kg (INR) Â· day change "
-                       "vs prior close Â· ATH from Yahoo daily history"), unsafe_allow_html=True)
-
-# ==================================================
-# NEWS â€” portfolio context (â‰¤6 rows + sentiment chips)
-# ==================================================
-st.markdown(ui_section("News Â· portfolio context"), unsafe_allow_html=True)
-if news_items:
-    _news_cards = []
-    for _n in news_items[:6]:
-        _news_cards.append(ui_research_row(
-            title=str(_n.get("title") or ""),
-            meta=str(_n.get("published") or "")[:16],
-            body=str(_n.get("query") or ""),
-            tag="NEWS",
-            href=str(_n.get("link") or ""),
-        ))
-    st.markdown(ui_research_grid(_news_cards), unsafe_allow_html=True)
-    if groups:
-        _news_chips = "".join(ui_badge(
-            ("NEGATIVE" if g["sentiment"] == "red"
-             else ("POSITIVE" if g["sentiment"] == "green" else "NEUTRAL"))
-            + " Â· " + g["asset"],
-            "negative" if g["sentiment"] == "red"
-            else ("positive" if g["sentiment"] == "green" else "neutral"))
-            for g in groups)
-        st.markdown(f'<div class="t-caption">News by asset: {_news_chips}</div>',
+        st.markdown(ui_empty("Nothing flagged right now.",
+                             "No warning, risk or decision-support item this run."),
                     unsafe_allow_html=True)
-    safe_page_link("pages/4_News.py", label="Open Pulse feed â†’")
-else:
-    st.markdown(ui_empty("No news this run",
-                         "Google News returned nothing for the portfolio names."),
-                unsafe_allow_html=True)
 
-# ==================================================
+    # ==================================================
+with st.expander("What changed this run", expanded=False):
+    # WHAT CHANGED THIS RUN â€” compact
+    # Valuation attribution only; the workbook has no cash-flow ledger, so the
+    # invested diff between runs is never called a deposit/withdrawal/SIP.
+    # ==================================================
+    st.markdown(ui_section("What changed this run"), unsafe_allow_html=True)
+    if _research_brief is not None and _research_brief.changes:
+        _chg_cards = [
+            {
+                "label": c.label,
+                "value": f"{c.amount:,.0f}" if c.amount is not None else "\u2014",
+                "sub": c.kind.replace("_", " ") + (" \u00b7 " + c.note if c.note else ""),
+                "tone": "up" if (c.amount is not None and c.amount >= 0)
+                        else ("down" if (c.amount is not None and c.amount < 0) else ""),
+            }
+            for c in _research_brief.changes[:6]
+        ]
+        st.markdown(ui_kpi_cards(_chg_cards, cols=3), unsafe_allow_html=True)
+    elif cc_drivers is not None and cc_drivers["drivers"]:
+        _chg_cards = []
+        for _k, _v in cc_drivers["drivers"].items():
+            _chg_cards.append({
+                "label": cc_drivers["driver_labels"].get(_k, _k),
+                "value": f"{_v:,.0f}",
+                "sub": "valuation attribution",
+                "tone": "up" if _v >= 0 else "down",
+            })
+        st.markdown(ui_kpi_cards(_chg_cards[:6], cols=3), unsafe_allow_html=True)
+    else:
+        st.markdown(ui_empty("Change breakdown unavailable",
+                             "The register or research layer did not build this run."),
+                    unsafe_allow_html=True)
+
+    if _dt is not None:
+        _delta_cap = (f"Snapshot delta Â· \u0394 Current Value {_dt['delta_current']:,.0f} vs prior snapshot "
+                      f"Â· market / valuation change {_dt['market_valuation_change']:,.0f} "
+                      f"Â· Invested-Basis Change {_dt['invested_basis_change']:,.0f}. "
+                      + NOT_A_CASHFLOW_LABEL)
+    elif _delta is not None and not _delta.get("available"):
+        _delta_cap = (f"{_delta['reason']} (|\u0394| \u2248 \u20B9{_delta['unattributed_abs']:,.0f}). "
+                      + NOT_A_CASHFLOW_LABEL)
+    else:
+        _delta_cap = ("Add a second snapshot (a later run) to see the \u0394 Current Value vs "
+                      "prior snapshot. " + NOT_A_CASHFLOW_LABEL)
+    st.markdown(ui_caption(_delta_cap), unsafe_allow_html=True)
+
+    # ==================================================
+with st.expander("Market pulse", expanded=False):
+    # MARKET PULSE â€” 8 compact tiles
+    # ==================================================
+    st.markdown(ui_section("Market pulse"), unsafe_allow_html=True)
+    pulse_cards = []
+    for row in pulse_rows:
+        if row["Value"] is None:
+            val = "\u2014"
+            chg = None
+            sub = "no quote this run"
+        else:
+            val = row["fmt"].format(row["Value"])
+            chg = row["Chg %"]
+            sub = None
+            if chg is not None:
+                sub = f"{'â–²' if chg >= 0 else 'â–¼'} {chg:+.2f}%"
+        ath = row.get("ATH %")
+        if ath is not None:
+            sub = f"{sub + ' Â· ' if sub else ''}{ath:.1f}% from ATH"
+        pulse_cards.append({
+            "label": row["Market"],
+            "value": val,
+            "sub": sub or "",
+            "tone": "up" if (chg is not None and chg >= 0)
+                    else ("down" if (chg is not None and chg < 0) else ""),
+        })
+    st.markdown(ui_kpi_cards(pulse_cards, cols=4), unsafe_allow_html=True)
+    st.markdown(ui_caption("Free delayed sources Â· Gold â‚¹/10g & Silver â‚¹/kg (INR) Â· day change "
+                           "vs prior close Â· ATH from Yahoo daily history"), unsafe_allow_html=True)
+
+    # ==================================================
+with st.expander("News", expanded=False):
+    # NEWS â€” portfolio context (â‰¤6 rows + sentiment chips)
+    # ==================================================
+    st.markdown(ui_section("News Â· portfolio context"), unsafe_allow_html=True)
+    if news_items:
+        _news_cards = []
+        for _n in news_items[:6]:
+            _news_cards.append(ui_research_row(
+                title=str(_n.get("title") or ""),
+                meta=str(_n.get("published") or "")[:16],
+                body=str(_n.get("query") or ""),
+                tag="NEWS",
+                href=str(_n.get("link") or ""),
+            ))
+        st.markdown(ui_research_grid(_news_cards), unsafe_allow_html=True)
+        if groups:
+            _news_chips = "".join(ui_badge(
+                ("NEGATIVE" if g["sentiment"] == "red"
+                 else ("POSITIVE" if g["sentiment"] == "green" else "NEUTRAL"))
+                + " Â· " + g["asset"],
+                "negative" if g["sentiment"] == "red"
+                else ("positive" if g["sentiment"] == "green" else "neutral"))
+                for g in groups)
+            st.markdown(f'<div class="t-caption">News by asset: {_news_chips}</div>',
+                        unsafe_allow_html=True)
+        safe_page_link("pages/4_News.py", label="Open Pulse feed â†’")
+    else:
+        st.markdown(ui_empty("No news this run",
+                             "Google News returned nothing for the portfolio names."),
+                    unsafe_allow_html=True)
+
+    # ==================================================
 # DRILL HOOKS â€” same-session page links (never raw anchors)
 # ==================================================
 st.markdown("---")
