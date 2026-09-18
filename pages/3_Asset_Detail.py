@@ -31,9 +31,8 @@ inject_css()
 nav_shell("holdings")
 st.markdown(page_header_html(
     "Northline · Family desk",
-    "Holdings",
-    "Every line, one book — the four sleeves the Command Center routes from the workbook, "
-    "with a dossier for any single instrument.",
+    "Every line, one book",
+    "The four sleeves the Command Center routes from the workbook, with a dossier for any single instrument.",
 ), unsafe_allow_html=True)
 
 BOOK_KIND = {"MF": "mf", "Stocks": "stocks", "Gold": "gold", "FD": "fd"}

@@ -22,16 +22,22 @@ def _esc(value):
     return _html.escape(str(value), quote=False)
 
 
+def _esc_attr(value):
+    if value is None:
+        return ""
+    return _html.escape(str(value), quote=True)
+
+
 # ---------------------------------------------------------------------------
 # Typography / page shell
 # ---------------------------------------------------------------------------
 def page_header_html(kicker, title, sub="", meta=()):
-    parts = ["<div>"]
+    parts = ['<div class="t-pagehead">']
     if kicker:
         parts.append(f'<div class="t-kicker">{_esc(kicker)}</div>')
-    parts.append(f'<div class="t-title">{_esc(title)}</div>')
+    parts.append(f'<h1 class="t-title">{_esc(title)}</h1>')
     if sub:
-        parts.append(f'<div class="t-sub">{_esc(sub)}</div>')
+        parts.append(f'<p class="t-sub">{_esc(sub)}</p>')
     if meta:
         pills = "".join(f'<span class="t-meta-pill">{_esc(m)}</span>' for m in meta if m)
         if pills:
@@ -49,10 +55,10 @@ def section_header_html(label, meta="", index=None, desc=""):
         index, meta = str(meta).strip(), ""
     idx_html = f'<span class="t-section-index">{_esc(index)}</span>' if index else ""
     meta_html = f'<span class="t-section-meta">{_esc(meta)}</span>' if meta else ""
-    head = (f'<div class="t-section-title">{idx_html}'
+    head = (f'<div class="t-section"><div class="t-section-title">{idx_html}'
             f'<span class="t-section-lbl">{_esc(label)}</span>{meta_html}</div>')
     desc_html = f'<div class="t-section-desc">{_esc(desc)}</div>' if desc else ""
-    return head + desc_html
+    return head + desc_html + "</div>"
 
 
 def caption(text, tone=""):
@@ -70,6 +76,19 @@ def footnote(text):
 def status_pill(text, state="neutral"):
     """state: ok | cache | off | info | neutral"""
     return f'<span class="t-pill t-pill-{state}"><span class="t-dot"></span>{_esc(text)}</span>'
+
+
+def status_dots(items):
+    """items: list of dict(label, on). Word + 6px dot; never colour alone."""
+    bits = []
+    for it in items:
+        on = bool(it.get("on"))
+        cls = "t-sdot-on" if on else "t-sdot-off"
+        bits.append(
+            f'<span class="t-sdot {cls}"><span class="t-sdot-mark"></span>'
+            f'{_esc(it.get("label", ""))}</span>'
+        )
+    return f'<div class="t-sdot-row">{"".join(bits)}</div>'
 
 
 def pill(text, tone="neutral"):
@@ -174,7 +193,7 @@ def stacked_bar(parts, total=None, height=16):
         pct = v / denominator * 100.0
         segs.append(
             f'<div class="t-bar-seg" style="width:{pct:.2f}%;background:{p.get("color", "#c5cedb")}" '
-            f'title="{_esc(p.get("label", ""))}: {v:,.0f}"></div>'
+            f'title="{_esc_attr(p.get("label", ""))}: {v:,.0f}"></div>'
         )
     bar = f'<div class="t-bar-track" style="height:{int(height)}px">{"".join(segs)}</div>'
     legend = []
@@ -201,14 +220,17 @@ def attention_tiles(tiles):
     for t in tiles:
         level = t.get("level", "info")
         if level == "critical":
-            tag_cls, border = "t-tag-urgent", "#7f1d1d"
+            tag_cls, lvl_cls = "t-tag-urgent", "t-attn-urgent"
+            default_tag = "URGENT"
         elif level == "warning":
-            tag_cls, border = "t-tag-review", "#78350f"
+            tag_cls, lvl_cls = "t-tag-review", "t-attn-warn"
+            default_tag = "REVIEW"
         else:
-            tag_cls, border = "t-tag-upcoming", "#1e3a5f"
-        tag = t.get("tag") or {"critical": "URGENT", "warning": "REVIEW", "info": "WATCH"}[level]
+            tag_cls, lvl_cls = "t-tag-upcoming", "t-attn-info"
+            default_tag = "NOTE"
+        tag = t.get("tag") or default_tag
         items.append(
-            f'<div class="t-attn-tile" style="border-color:{border}">'
+            f'<div class="t-attn-tile {lvl_cls}">'
             f'<span class="t-attn-tag {tag_cls}">{_esc(tag)}</span>'
             f'<p class="t-attn-title">{_esc(t.get("title", ""))}</p>'
             f'<p class="t-attn-body">{_esc(t.get("body", ""))}</p></div>'
@@ -218,7 +240,7 @@ def attention_tiles(tiles):
 
 def watchlist(items):
     """Restrained hierarchical attention list. level: critical | warning | info.
-    Each row carries a small tag (HIGH PRIORITY / WATCH / INFORMATION), a title
+    Each row carries a small tag (HIGH PRIORITY / WATCH / NOTE), a title
     and a 'why it matters' body — evidence first, not alarm styling."""
     label = {"critical": "HIGH PRIORITY", "warning": "WATCH", "info": "INFORMATION"}
     cls = {"critical": "urgent", "warning": "warn", "info": "info"}
@@ -276,13 +298,88 @@ def hero_metrics(primary, supporting=(), foot=""):
     return f'<div class="t-hero">{"".join(main)}{side_html}</div>'
 
 
+def briefing_hero(kicker, value, meta_bits, stance, ring_html, strip_html):
+    """Northline combined briefing card: family net worth + ring + five-sleeve strip.
+    meta_bits: list of dict(text, tone=None) rendered as 'Invested · P&L · %'."""
+    metas = []
+    for i, bit in enumerate(meta_bits or ()):
+        if i:
+            metas.append('<span class="t-brief-sep">·</span>')
+        tone = (bit or {}).get("tone") or ""
+        cls = f" t-signed-{tone}" if tone in ("up", "down") else ""
+        metas.append(f'<span class="t-brief-bit{cls}">{_esc((bit or {}).get("text", ""))}</span>')
+    stance_html = (
+        f'<div class="t-stance-mini">{_esc(stance)}</div>' if stance else ""
+    )
+    return (
+        '<div class="t-brief">'
+        '<div class="t-brief-top">'
+        '<div class="t-brief-main">'
+        f'<div class="t-brief-kicker">{_esc(kicker)}</div>'
+        f'<div class="t-brief-value">{_esc(value)}</div>'
+        f'<div class="t-brief-meta">{"".join(metas)}</div>'
+        f'{stance_html}'
+        '</div>'
+        f'<div class="t-brief-ring">{ring_html}</div>'
+        '</div>'
+        f'<div class="t-brief-strip">{strip_html}</div>'
+        '</div>'
+    )
+
+
+def news_strip(items):
+    """Editorial pulse list. items: dict(title, meta, href, sentiment)."""
+    rows = []
+    for it in items or ():
+        sent = str(it.get("sentiment") or "neutral")
+        if sent in ("green", "positive", "up"):
+            dot = "up"
+        elif sent in ("red", "negative", "down"):
+            dot = "down"
+        else:
+            dot = "neutral"
+        href = str(it.get("href") or it.get("link") or "").strip()
+        title = _esc(it.get("title") or "")
+        meta = _esc(it.get("meta") or "")
+        inner = (
+            f'<span class="t-news-dot t-news-dot-{dot}"></span>'
+            f'<span class="t-news-copy"><span class="t-news-title">{title}</span>'
+            f'<span class="t-news-meta">{meta}</span></span>'
+        )
+        if href:
+            row = (f'<li class="t-news-row"><a href="{_esc_attr(href)}" '
+                   f'target="_blank" rel="noopener noreferrer">{inner}</a></li>')
+        else:
+            row = f'<li class="t-news-row"><div class="t-news-plain">{inner}</div></li>'
+        rows.append(row)
+    if not rows:
+        return '<div class="t-empty">No headlines this run.</div>'
+    return f'<ul class="t-news-strip">{"".join(rows)}</ul>'
+
+
+def due_list(rows):
+    """Cash-coming-due rows. rows: dict(name, meta, amount)."""
+    if not rows:
+        return '<div class="t-empty">No deposits mature in the next 90 days.</div>'
+    items = []
+    for r in rows:
+        items.append(
+            '<li class="t-due-row">'
+            f'<span class="t-due-name">{_esc(r.get("name", ""))}</span>'
+            f'<span class="t-due-meta">{_esc(r.get("meta", ""))}</span>'
+            f'<span class="t-due-amt">{_esc(r.get("amount", ""))}</span>'
+            '</li>'
+        )
+    return f'<ul class="t-due-list">{"".join(items)}</ul>'
+
+
 # ---------------------------------------------------------------------------
 # Research rows — compact headline cards with evidence meta
 # ---------------------------------------------------------------------------
 def research_row(title, meta="", body="", tag="", href="", tone="", badge=""):
     safe_title = _esc(title)
     if href:
-        safe_title = f'<a href="{href}" target="_blank" rel="noopener">{safe_title}</a>'
+        safe_title = f'<a href="{_esc_attr(href)}" target="_blank" rel="noopener">{safe_title}</a>'
     top = ""
     if tag or meta or badge:
         top = ('<div class="t-research-top">'
@@ -401,7 +498,7 @@ def _fmt_compact(value):
 # ---------------------------------------------------------------------------
 # Northline briefing extras — health ring, five-sleeve strip, stance pill
 # ---------------------------------------------------------------------------
-def score_ring(score, label="HEALTH", sub="", size=136, stroke=9):
+def score_ring(score, label="HEALTH", sub="", size=96, stroke=7):
     """Radial health ring with the numeric score in the centre (Newsreader).
     score: number 0..100. The ring stroke colour is chosen by score band:
     ok (>=75) / warn (55-74) / urgent (<55)."""
@@ -410,17 +507,18 @@ def score_ring(score, label="HEALTH", sub="", size=136, stroke=9):
     except (TypeError, ValueError):
         s = 0.0
     band = "t-ring-ok" if s >= 75 else ("t-ring-warn" if s >= 55 else "t-ring-urgent")
-    radius = (size - stroke * 2) / 2.0
+    radius = (size - stroke) / 2.0
     circ = round(2 * 3.141592653589793 * radius, 3)
     filled = round(circ * s / 100.0, 3)
     sub_html = f'<div class="t-ring-sub">{_esc(sub)}</div>' if sub else ""
     return (
         f'<div class="t-ring-wrap {band}" style="width:{size}px;height:{size}px">'
         f'<svg class="t-ring" width="{size}" height="{size}" viewBox="0 0 {size} {size}" '
-        f'role="img" aria-label="{_esc(label)} score {s:.0f}">'
-        f'<circle class="t-ring-track" cx="{size/2}" cy="{size/2}" r="{radius}"></circle>'
+        f'role="img" aria-label="{_esc_attr(label)} score {s:.0f}">'
+        f'<circle class="t-ring-track" cx="{size/2}" cy="{size/2}" r="{radius}" '
+        f'stroke-width="{stroke}"></circle>'
         f'<circle class="t-ring-progress" cx="{size/2}" cy="{size/2}" r="{radius}" '
-        f'stroke-dasharray="{filled} {circ - filled}"></circle></svg>'
+        f'stroke-width="{stroke}" stroke-dasharray="{filled} {circ - filled}"></circle></svg>'
         f'<div class="t-ring-center"><div class="t-ring-score">{s:.0f}</div>'
         f'<div class="t-ring-label">{_esc(label)}</div>{sub_html}</div></div>'
     )
@@ -453,14 +551,13 @@ def weight_strip(parts, total=None):
         pct = v / denominator * 100.0
         segs.append(
             f'<div class="t-strip-seg" style="flex:0 0 {pct:.2f}%;background:{color}" '
-            f'title="{_esc(label)}: {v:,.0f}"></div>'
+            f'title="{_esc_attr(label)}: {v:,.0f}"></div>'
         )
         legend.append(
             f'<div class="t-sleeve">'
-            f'<span class="t-sleeve-dot" style="background:{color}"></span>'
-            f'<span class="t-sleeve-name">{_esc(label)}</span>'
-            f'<span class="t-sleeve-pct">{pct:.1f}%</span>'
-            f'<span class="t-sleeve-val">{_fmt_compact(v)}</span></div>'
+            f'<div class="t-sleeve-name"><span class="t-sleeve-dot" style="background:{color}"></span>{_esc(label)}</div>'
+            f'<div class="t-sleeve-pct">{pct:.1f}%</div>'
+            f'<div class="t-sleeve-val">{_fmt_compact(v)}</div></div>'
         )
     bar = f'<div class="t-strip-bar">{"".join(segs)}</div>'
     legend_html = f'<div class="t-strip-legend">{"".join(legend)}</div>' if legend else ""

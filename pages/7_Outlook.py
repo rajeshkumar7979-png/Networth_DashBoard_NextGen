@@ -34,9 +34,9 @@ TODAY = pd.Timestamp(NOW_IST.date())
 ui_nav("outlook")
 st.markdown(ui_page_header(
     "Northline · Family desk",
-    "Outlook",
-    "What happens next — the maturity calendar, a 12-month ladder and an illustrative "
-    "5-year view you can poke at. No forecasts; only workbook dates and your assumptions.",
+    "What happens next",
+    "Cash that is maturing, a five-year illustration of today’s mix versus a 40% equity book, "
+    "and a quiet place to test a move. Not investment advice.",
     meta=[
         f"AS OF {NOW_IST.strftime('%d %b %Y, %H:%M IST')}",
         "WORKBOOK DATES ONLY",

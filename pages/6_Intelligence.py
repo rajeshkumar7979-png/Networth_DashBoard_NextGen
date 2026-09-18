@@ -13,6 +13,7 @@
 import streamlit as st
 from datetime import datetime
 import pytz
+import pandas as pd
 
 from lib import theme
 from lib.formatters import format_inr_compact
@@ -43,8 +44,7 @@ ui_nav("intelligence")
 st.markdown(ui_page_header(
     "Northline · Family desk",
     "Intelligence",
-    "What matters now — the fixed, evidence-backed signals your portfolio throws, "
-    "read in one sitting. Everything here is read-only synthesis of the Command Center's run.",
+    "What the evidence says — fixed, evidence-backed signals from this run. Read-only. Nothing here is an order.",
     meta=[
         f"AS OF {NOW_IST.strftime('%d %b %Y, %H:%M IST')}",
         "READ-ONLY SYNTHESIS",
@@ -134,8 +134,16 @@ if _posture:
 st.markdown(ui_section("What matters now", "facts first, never advice"), unsafe_allow_html=True)
 
 _risk_rows = []
+_sig_noninfo = []
+if _briefing is not None:
+    _sig_noninfo = [s for s in getattr(_briefing, "signals", ()) or ()
+                    if getattr(s, "level", "info") != "info"]
+_sig_titles = {str(getattr(s, "label", "")).strip().lower() for s in _sig_noninfo}
+
 if _research is not None:
     for _c in _research.risks:
+        if str(_c.title or "").strip().lower() in _sig_titles:
+            continue
         _badge = ui_badge(f"STRENGTH {_c.strength.upper()}", "warning")
         _risk_rows.append(ui_research_row(
             title=_c.title,
@@ -148,13 +156,7 @@ if _research is not None:
         _gaps = [g for g in _research.gaps if g]
         if _gaps:
             st.caption("Insufficient evidence (never invented): " + " · ".join(_gaps[:6]))
-if _risk_rows:
-    st.markdown(ui_research_grid(_risk_rows), unsafe_allow_html=True)
 
-_sig_noninfo = []
-if _briefing is not None:
-    _sig_noninfo = [s for s in getattr(_briefing, "signals", ()) or ()
-                    if getattr(s, "level", "info") != "info"]
 if _briefing is not None and _sig_noninfo:
     _watch = []
     for _s in _sig_noninfo:
@@ -166,6 +168,10 @@ if _briefing is not None and _sig_noninfo:
             "what": f"Invalidated by: {_s.invalidation or 'evidence refresh'}",
         })
     st.markdown(ui_watch(_watch), unsafe_allow_html=True)
+
+if _risk_rows:
+    with st.expander(f"Further research risks ({len(_risk_rows)})", expanded=not _sig_noninfo):
+        st.markdown(ui_research_grid(_risk_rows), unsafe_allow_html=True)
 
 _questions = []
 if _research is not None:

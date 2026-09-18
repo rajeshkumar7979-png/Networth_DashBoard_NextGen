@@ -37,8 +37,8 @@ NOW_IST = datetime.now(IST)
 ui_nav("desk")
 st.markdown(ui_page_header(
     "Northline · Family desk",
-    "Desk",
-    "Sources, exports, integrity — how to read this terminal and where every number came from.",
+    "Sources, exports, how to read this",
+    "Tape status, downloads, reconciliation, and the method behind every number. Nothing here re-values the book.",
     meta=[
         f"AS OF {NOW_IST.strftime('%d %b %Y, %H:%M IST')}",
         "CACHE-READ-ONLY",
@@ -87,6 +87,16 @@ with _controls_exp:
         type=["csv"],
         key="cc_hist_upload",
         help="Merge an existing history file into the history log. The Command Center applies this on its next run.",
+    )
+    st.markdown("---")
+    st.markdown("### Books")
+    st.number_input(
+        "Liabilities (session-only, ₹)",
+        min_value=0.0,
+        value=float(st.session_state.get("cc_liabilities", 0.0) or 0.0),
+        step=100000.0,
+        key="cc_liabilities",
+        help="No liabilities sheet exists in the workbook. This is a session-only estimate used by Command as Net Worth = Total Assets − Liabilities.",
     )
     st.caption("Run controls & exports save to the session only. Nothing is recalculated until the Command Center runs.")
 

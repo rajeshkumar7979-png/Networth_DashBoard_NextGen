@@ -53,9 +53,9 @@ from streamlit.errors import StreamlitPageNotFoundError
 
 # (slug, rail label, mobile/top label, glyph). Order is the rail order.
 _PRIMARY_ITEMS = [
-    ("command", "Command", "Home", "\u25cf"),
-    ("outlook", "Outlook", "Plan", "\u25f7"),
-    ("holdings", "Holdings", "Hold", "\u25a3"),
+    ("command", "Command", "Command", "\u25cf"),
+    ("outlook", "Outlook", "Outlook", "\u25f7"),
+    ("holdings", "Holdings", "Holdings", "\u25a3"),
     ("funds", "Funds", "Funds", "\u25d0"),
     ("desk", "Desk", "Desk", "\u2699"),
 ]
@@ -138,14 +138,14 @@ def nav_shell(current="command"):
         with _top_left:
             st.markdown(
                 '<div class="nb-topbar">'
-                '<span class="nb-top-name">NORTHLINE</span>'
-                '<span class="nb-top-sub">Family desk</span>'
+                '<span class="nb-top-kicker">Northline</span>'
+                '<span class="nb-top-name">Family desk</span>'
                 "</div>",
                 unsafe_allow_html=True,
             )
         with _top_right:
             with st.container(key="nb_pulse_link"):
-                safe_page_link(PAGE_FILES["pulse"], label="\u2261  Pulse",
+                safe_page_link(PAGE_FILES["pulse"], label="Pulse",
                                help="Open Pulse")
 
     # Mobile bottom bar — exactly five items, pinned by the container key.
@@ -163,8 +163,8 @@ def nav_shell(current="command"):
     # Desktop rail — st.sidebar styled by theme.py as the brand rail.
     with st.sidebar:
         st.markdown(
-            '<div class="nb-brand"><div class="nb-brand-name">NORTHLINE</div>'
-            '<div class="nb-brand-sub">Family desk</div></div>',
+            '<div class="nb-brand"><div class="nb-brand-kicker">Northline</div>'
+            '<div class="nb-brand-name">Family desk</div></div>',
             unsafe_allow_html=True,
         )
         st.markdown(_group_label("BOOKS"), unsafe_allow_html=True)
