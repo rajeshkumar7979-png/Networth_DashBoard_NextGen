@@ -46,6 +46,27 @@ def _num(value):
         return None
 
 
+def _fmt_inr(value):
+    n = _num(value)
+    return format_inr(n) if n is not None else "—"
+
+
+def _fmt_pct(value):
+    n = _num(value)
+    return f"{n:.2f}%" if n is not None else "—"
+
+
+def _money_view(frame):
+    """Pre-format rupees as Indian-grouped text. Streamlit NumberColumn ₹%d
+    cannot Indian-group, which produced ₹2767314 on the FD sleeve."""
+    out = frame.copy()
+    out["Booked"] = out["Current Value"].map(_fmt_inr)
+    out["Invested ₹"] = out["Invested"].map(_fmt_inr)
+    out["P&L ₹"] = out["P&L"].map(_fmt_inr)
+    out["Return"] = out["Return %"].map(_fmt_pct)
+    return out
+
+
 def _raw_records_for(books, kind, key):
     """Original book row(s) behind a canonical key — only shown, never derived."""
     book = (books or {}).get(BOOK_KIND.get(kind))
@@ -116,21 +137,27 @@ with tabs[0]:
         st.markdown(caption("Class labels follow the Command Center routing rules "
                             "(gold is routed out of stocks/MF; FCNR ≠ INR FD); no-data classes "
                             "don't appear because they have no workbook source."), unsafe_allow_html=True)
+    _ov = _show[["Name", "Member", "Kind", "Class", "Current Value", "Invested", "P&L", "Return %"]].sort_values(
+        "Current Value", ascending=False)
+    _ov_view = _money_view(_ov)
     st.dataframe(
-        _show[["Name", "Member", "Kind", "Class", "Current Value", "Invested", "P&L", "Return %"]]
-        .sort_values("Current Value", ascending=False),
+        _ov_view[["Name", "Member", "Kind", "Class", "Booked", "Invested ₹", "P&L ₹", "Return"]],
         hide_index=True, use_container_width=True,
         column_config={
             "Name": st.column_config.TextColumn("Instrument", width="medium"),
-            "Member": st.column_config.TextColumn("Member", width="small"),
+            "Member": st.column_config.TextColumn("Member", width="medium"),
             "Kind": st.column_config.TextColumn("Sleeve", width="small"),
             "Class": st.column_config.TextColumn("Class", width="small"),
-            "Current Value": st.column_config.NumberColumn("Current (INR)", format="₹%d"),
-            "Invested": st.column_config.NumberColumn("Invested (INR)", format="₹%d"),
-            "P&L": st.column_config.NumberColumn("P&L", format="₹%d"),
-            "Return %": st.column_config.NumberColumn("Return %", format="%.2f%%"),
+            "Booked": st.column_config.TextColumn("Booked (INR)", width="small"),
+            "Invested ₹": st.column_config.TextColumn("Invested (INR)", width="small"),
+            "P&L ₹": st.column_config.TextColumn("P&L", width="small"),
+            "Return": st.column_config.TextColumn("Return %", width="small"),
         },
     )
+    st.markdown(caption(
+        "Return % = (current − invested) / invested from the single purchase record. "
+        "Not annualized, not XIRR. FD ROI % p.a. in the dossier is the contractual rate."),
+        unsafe_allow_html=True)
 
 _map = {"Mutual funds": "MF", "Stocks": "Stocks", "Gold": "Gold", "FDs": "FD"}
 
@@ -141,9 +168,6 @@ def _render_sleeve(kind):
         st.markdown(caption("Nothing in this sleeve for the selected member(s)."),
                     unsafe_allow_html=True)
         return
-    cols = ["Name", "Member", "Current Value", "Invested", "P&L", "Return %"]
-    if kind == "FD":
-        cols = ["Name", "Member", "Maturity", "Current Value", "Invested", "P&L", "Return %"]
     df = sub.copy()
     if kind == "FD":
         def _fmt_mat(v):
@@ -155,17 +179,56 @@ def _render_sleeve(kind):
             ts = pd.to_datetime(s, errors="coerce")
             return ts.strftime("%d %b %Y") if pd.notna(ts) else s
         df["Maturity"] = df["Maturity"].map(_fmt_mat) if "Maturity" in df.columns else "—"
-    st.dataframe(df[cols].sort_values("Current Value", ascending=False),
-                 hide_index=True, use_container_width=True,
-                 column_config={
-                     "Name": st.column_config.TextColumn("Instrument", width="medium"),
-                     "Member": st.column_config.TextColumn("Member", width="small"),
-                     "Maturity": st.column_config.TextColumn("Maturity", width="small"),
-                     "Current Value": st.column_config.NumberColumn("Current (INR)", format="₹%d"),
-                     "Invested": st.column_config.NumberColumn("Invested (INR)", format="₹%d"),
-                     "P&L": st.column_config.NumberColumn("P&L", format="₹%d"),
-                     "Return %": st.column_config.NumberColumn("Return %", format="%.2f%%"),
-                 })
+        products, accounts = [], []
+        for _, r in df.iterrows():
+            recs = _raw_records_for(books, "FD", str(r["Key"]))
+            rec = recs[0] if recs else {}
+            product = str(rec.get("Product") or r.get("Class") or "FD")
+            if product.upper() == "FCNR":
+                product = "FCNR (USD)"
+            products.append(product)
+            accounts.append(str(rec.get("Account Number") or ""))
+        df["Product"] = products
+        df["Account"] = accounts
+        view = _money_view(df).sort_values("Current Value", ascending=False)
+        st.dataframe(
+            view[["Product", "Account", "Member", "Maturity",
+                  "Booked", "Invested ₹", "P&L ₹", "Return"]],
+            hide_index=True, use_container_width=True,
+            column_config={
+                "Product": st.column_config.TextColumn("Product", width="small"),
+                "Account": st.column_config.TextColumn("Account", width="small"),
+                "Member": st.column_config.TextColumn("Member", width="medium"),
+                "Maturity": st.column_config.TextColumn("Maturity", width="small"),
+                "Booked": st.column_config.TextColumn("Booked (INR)", width="small"),
+                "Invested ₹": st.column_config.TextColumn("Invested (INR)", width="small"),
+                "P&L ₹": st.column_config.TextColumn("P&L", width="small"),
+                "Return": st.column_config.TextColumn("Return %", width="small"),
+            },
+        )
+        st.markdown(caption(
+            "Booked = Current Value (INR). Return % is (booked − invested) / invested "
+            "from the single purchase record — not annualized, not XIRR. "
+            "ROI % p.a. in the dossier is the contractual rate."),
+            unsafe_allow_html=True)
+        return
+    view = _money_view(df).sort_values("Current Value", ascending=False)
+    st.dataframe(
+        view[["Name", "Member", "Booked", "Invested ₹", "P&L ₹", "Return"]],
+        hide_index=True, use_container_width=True,
+        column_config={
+            "Name": st.column_config.TextColumn("Instrument", width="medium"),
+            "Member": st.column_config.TextColumn("Member", width="medium"),
+            "Booked": st.column_config.TextColumn("Booked (INR)", width="small"),
+            "Invested ₹": st.column_config.TextColumn("Invested (INR)", width="small"),
+            "P&L ₹": st.column_config.TextColumn("P&L", width="small"),
+            "Return": st.column_config.TextColumn("Return %", width="small"),
+        },
+    )
+    st.markdown(caption(
+        "Return % = (current − invested) / invested from the single purchase record. "
+        "Not annualized, not XIRR."),
+        unsafe_allow_html=True)
 
 
 for _tab_name, _tab in zip(("Mutual funds", "Stocks", "Gold", "FDs"), tabs[1:]):
@@ -244,6 +307,42 @@ for _idx, (__, row) in enumerate(_positions.iterrows()):
 
     # Identity — from the book rows the Command Center published
     recs = _raw_records_for(books, str(row["Kind"]), str(row["Key"]))
+    rec = recs[0] if recs else {}
+    if str(row["Kind"]) == "FD" and str(rec.get("Currency") or "").strip().upper() == "USD":
+        _int = _num(rec.get("Interest Return (INR)"))
+        _fx = _num(rec.get("FX Gain/Loss (INR)"))
+        _native = _num(rec.get("Principal (Native)"))
+        _prin_inr = _num(rec.get("Principal (INR, at deposit FX)"))
+        _rates = st.session_state.get("cc_rates") or {}
+        _today_fx = _num(_rates.get("usd_inr"))
+        _dep_fx = (_prin_inr / _native) if (_prin_inr is not None and _native) else None
+        _fx_sub = "n/a"
+        if _dep_fx is not None and _today_fx is not None:
+            _fx_sub = f"deposit {_dep_fx:.2f} → today {_today_fx:.2f}"
+        elif _today_fx is not None:
+            _fx_sub = f"today {_today_fx:.2f}"
+        st.markdown(section_header_html("FCNR return · two parts", "USD book marked to INR"),
+                    unsafe_allow_html=True)
+        st.markdown(kpi_cards([
+            {"label": "Interest at today's FX",
+             "value": format_inr(_int) if _int is not None else "n/a",
+             "sub": "Accrued USD × this run's USD/INR",
+             "tone": tone_for(_int) if _int is not None else "neutral"},
+            {"label": "FX on principal",
+             "value": format_inr(_fx) if _fx is not None else "n/a",
+             "sub": "Principal × (today − deposit-date FX)",
+             "tone": tone_for(_fx) if _fx is not None else "neutral"},
+            {"label": "Native principal",
+             "value": format_identity_value("Principal (native)", _native, currency="USD")
+                      if _native is not None else "n/a",
+             "sub": _fx_sub},
+        ]), unsafe_allow_html=True)
+        st.markdown(caption(
+            "FCNR is a USD deposit book. Native principal and maturity proceeds stay in USD. "
+            "INR is this run's mark. Interest + FX on principal = FCNR P&L within ₹1. "
+            "Figures are the Command Center book columns, not a second valuation."),
+            unsafe_allow_html=True)
+
     identity = []
     if recs:
         rec = recs[0]
@@ -286,6 +385,11 @@ for _idx, (__, row) in enumerate(_positions.iterrows()):
 
     st.markdown(section_header_html("Not recorded for this position", "no-data"),
                 unsafe_allow_html=True)
+    st.markdown(empty_state(
+        "NRI / tax treatment is not modelled",
+        "No tax ledger, FEMA classification, or treaty treatment exists in the workbook. "
+        "This is not tax advice. Missing stays missing — never filled with zero.",
+    ), unsafe_allow_html=True)
     st.markdown(
         "<div class='t-card'><ul class='t-list'>"
         "<li>XIRR / return history — transaction dates beyond the purchase record are not stored</li>"

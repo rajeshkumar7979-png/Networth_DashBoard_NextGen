@@ -15,9 +15,10 @@ import pandas as pd
 import pytz
 
 from lib import theme
-from lib.formatters import format_inr_compact, format_inr_indian
+from lib.formatters import format_inr_compact, format_inr_indian, format_inr
 from lib.intelligence.sources import gateway_status
 from lib.intelligence import live as intel_live
+from lib.drivers import NOT_A_CASHFLOW_LABEL
 from lib.register import aggregate_by_class, build_asset_register, family_level_sum
 from lib.ui import (
     caption as ui_caption,
@@ -155,10 +156,30 @@ st.markdown(
     unsafe_allow_html=True)
 if _rates:
     _rd = []
+    _fx_src = _rates.get("usd_inr_source") or "Frankfurter"
+    _fx_pub = _rates.get("usd_inr_published")
     if _rates.get("usd_inr") is not None:
-        _rd.append(f"USD/INR {_rates['usd_inr']:.2f}")
+        _fx_bit = f"USD/INR {_rates['usd_inr']:.2f} · {_fx_src}"
+        if _fx_pub:
+            _fx_bit += f" published {_fx_pub}"
+        _rd.append(_fx_bit)
     if _rates.get("gold_10g_inr") is not None:
-        _rd.append(f"Gold ₹/10g {_rates['gold_10g_inr']:,.0f}")
+        _g_src = _rates.get("gold_source") or "goldprice.dev"
+        _rd.append(f"Gold ₹/10g {format_inr_indian(_rates['gold_10g_inr'])} · {_g_src}")
+    _amfi = _rates.get("amfi_source")
+    if _amfi:
+        _amfi_bit = str(_amfi)
+        if _rates.get("amfi_cache_date"):
+            _amfi_bit += f" {_rates['amfi_cache_date']}"
+        if _rates.get("amfi_schemes"):
+            _amfi_bit += f" · {_rates['amfi_schemes']} schemes"
+        _rd.append(_amfi_bit)
+    _eq = _rates.get("equities_source")
+    if _eq:
+        _rd.append(str(_eq))
+    _retrieved = _rates.get("retrieved_at")
+    if _retrieved:
+        _rd.append(f"retrieved {_retrieved}")
     if _rd:
         st.markdown(f'<div class="t-caption">Reference rates this run: {" · ".join(_rd)}.</div>',
                     unsafe_allow_html=True)
@@ -189,18 +210,34 @@ try:
             "If this ever shows ✗ FAIL, stop and inspect: a register key collision or a books/"
             "assets mismatch means the standalone pages are reading a different picture."),
             unsafe_allow_html=True)
+    _recon_sess = st.session_state.get("cc_recon_tests") or []
+    if _recon_sess:
+        with st.expander(f"Recon grid · {len(_recon_sess)} tests (class, book, count, currency, key)"):
+            _rg = []
+            for _t in _recon_sess:
+                _rg.append({
+                    "Result": "PASS" if _t.get("ok") else "FAIL",
+                    "Test": _t.get("name") or "",
+                    "Detail": _t.get("detail") or "",
+                })
+            st.dataframe(pd.DataFrame(_rg), hide_index=True, use_container_width=True)
     if _classes is not None and not _classes.empty:
         with st.expander("Class totals (register view)"):
+            _cls = _classes.copy()
+            if "Current Value" in _cls.columns:
+                _cls["Current Value"] = _cls["Current Value"].map(
+                    lambda v: format_inr(v) if pd.notna(v) else "—")
+            if "Invested" in _cls.columns:
+                _cls["Invested"] = _cls["Invested"].map(
+                    lambda v: format_inr(v) if pd.notna(v) else "—")
             st.dataframe(
-                _classes,
+                _cls,
                 hide_index=True,
                 use_container_width=True,
                 column_config={
                     "Asset Class": st.column_config.TextColumn("Asset class"),
-                    "Current Value": st.column_config.NumberColumn(
-                        "Current (INR)", format="₹%.0f"),
-                    "Invested": st.column_config.NumberColumn(
-                        "Invested (INR)", format="₹%.0f"),
+                    "Current Value": st.column_config.TextColumn("Current (INR)"),
+                    "Invested": st.column_config.TextColumn("Invested (INR)"),
                     "Data Backed": st.column_config.CheckboxColumn("Data backed"),
                 },
             )
@@ -282,6 +319,56 @@ if os.path.exists(history_path):
         st.download_button("Download history CSV",
                            data=_hist.to_csv(index=False).encode("utf-8"),
                            file_name="networth_history.csv", mime="text/csv")
+
+
+# --------------------------------------------------
+# 04b — P&L ATTRIBUTION vs INVESTED-BASIS CHANGE
+# --------------------------------------------------
+st.markdown(ui_section("P&L attribution vs Invested-Basis Change", "two different numbers"),
+            unsafe_allow_html=True)
+_research = st.session_state.get("cc_research_brief")
+_pnl_cs, _ibc_cs = [], []
+if _research is not None and getattr(_research, "changes", None):
+    _pnl_cs = [c for c in _research.changes
+               if getattr(c, "kind", "") != "invested_basis_change"]
+    _ibc_cs = [c for c in _research.changes
+               if getattr(c, "kind", "") == "invested_basis_change"]
+if _pnl_cs:
+    st.markdown(ui_caption(
+        "This run's P&L attribution — valuation drivers (market / NAV / gold / "
+        "FCNR interest / FCNR FX / INR FD interest). Not cash moved."
+    ), unsafe_allow_html=True)
+    _chg_cards = []
+    for c in _pnl_cs[:6]:
+        _chg_cards.append(
+            f'<div class="t-kpi"><div class="t-kpi-label">{c.label}</div>'
+            f'<div class="t-kpi-value">{format_inr_compact(c.amount) if c.amount is not None else "—"}</div>'
+            f'<div class="t-kpi-sub">valuation attribution</div></div>'
+        )
+    st.markdown(f'<div class="t-kpi-grid">{"".join(_chg_cards)}</div>', unsafe_allow_html=True)
+if _ibc_cs:
+    st.markdown(ui_caption(
+        "Invested-Basis Change vs prior snapshot — " + NOT_A_CASHFLOW_LABEL
+    ), unsafe_allow_html=True)
+    _ibc_cards = []
+    for c in _ibc_cs[:4]:
+        _ibc_cards.append(
+            f'<div class="t-kpi"><div class="t-kpi-label">{c.label}</div>'
+            f'<div class="t-kpi-value">{format_inr_compact(c.amount) if c.amount is not None else "—"}</div>'
+            f'<div class="t-kpi-sub">{NOT_A_CASHFLOW_LABEL}</div></div>'
+        )
+    st.markdown(f'<div class="t-kpi-grid">{"".join(_ibc_cards)}</div>', unsafe_allow_html=True)
+if not _pnl_cs and not _ibc_cs:
+    st.markdown(ui_caption(
+        "Open Command Center to publish this run's P&L attribution and Invested-Basis Change. "
+        + NOT_A_CASHFLOW_LABEL),
+        unsafe_allow_html=True)
+
+st.markdown(ui_empty(
+    "NRI / tax treatment is not modelled",
+    "Desk does not compute FEMA classification, treaty relief, or a tax ledger. "
+    "This is not tax advice. Missing stays missing — never filled with zero.",
+), unsafe_allow_html=True)
 
 
 # --------------------------------------------------

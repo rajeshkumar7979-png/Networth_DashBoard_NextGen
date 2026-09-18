@@ -347,12 +347,28 @@ def trailing_return(hist_df, years):
     return None if past_nav <= 0 else ((latest_nav / past_nav) ** (1 / years) - 1) * 100
 
 @st.cache_data(ttl=300)
-def get_usd_inr():
+def get_usd_inr_quote():
+    """Frankfurter latest USD/INR plus the source's published date.
+
+    Valuation still consumes only the float (see get_usd_inr). The date is
+    provenance for the rates strip — never fed into FCNR math.
+    """
     try:
         r = requests.get("https://api.frankfurter.app/latest?from=USD&to=INR", timeout=8)
-        return float(r.json()["rates"]["INR"])
+        payload = r.json()
+        return {
+            "value": float(payload["rates"]["INR"]),
+            "published": payload.get("date"),
+            "source": "Frankfurter",
+        }
     except Exception:
-        return None  # FIXED: no more silent 95.5 fallback — see integrity check below
+        return None
+
+
+@st.cache_data(ttl=300)
+def get_usd_inr():
+    q = get_usd_inr_quote()
+    return None if not q else q["value"]
 
 # NEW — Phase 2 (FCNR audit): historical FX rate as of a specific deposit
 # date, so a USD FD's INR cost basis reflects the rate on the day it was
@@ -998,6 +1014,48 @@ if register is not None:
             f"{format_inr(_drv_sum)} vs {format_inr(total_pnl)} (bound \u20B9{_bound:.1f})",
         ))
 
+# PHASE B — count / currency / register-key recon (display over existing books).
+_n_mf = int(len(mf_valid)) if mf_valid is not None else 0
+_n_stocks = int(len(stocks_valid)) if stocks_valid is not None else 0
+_n_gold = int(len(gold_valid)) if gold_valid is not None else 0
+_n_fd = int(len(fd_valid)) if fd_valid is not None else 0
+_n_books = _n_mf + _n_stocks + _n_gold + _n_fd
+if register is not None:
+    _n_reg = int(len(register))
+    recon_tests.append((
+        "Register row count = four-book row count",
+        _n_reg == _n_books,
+        f"{_n_reg} register rows vs {_n_books} book rows",
+    ))
+    recon_tests.append((
+        "Register keys unique",
+        bool(register["Key"].is_unique) if "Key" in register.columns else False,
+        f"{int(register['Key'].nunique()) if 'Key' in register.columns else 0} unique / {_n_reg} rows",
+    ))
+    _reg_src = register.groupby("Source").size().to_dict() if "Source" in register.columns else {}
+    for _src, _n_page in (("MF", _n_mf), ("Stocks", _n_stocks), ("Gold", _n_gold), ("FD", _n_fd)):
+        _n_r = int(_reg_src.get(_src, 0))
+        recon_tests.append((
+            f"Register {_src} count = {_src} book count",
+            _n_r == _n_page,
+            f"{_n_r} vs {_n_page}",
+        ))
+if not fd_valid.empty and "Currency" in fd_valid.columns:
+    _cur_u = fd_valid["Currency"].astype(str).str.strip().str.upper()
+    _n_usd = int((_cur_u == "USD").sum())
+    _n_non_usd = int((_cur_u != "USD").sum())
+    _n_fcnr_prod = int((fd_valid["Product"] == "FCNR").sum()) if "Product" in fd_valid.columns else _n_usd
+    recon_tests.append((
+        "FCNR product count = USD deposit count",
+        _n_fcnr_prod == _n_usd,
+        f"{_n_fcnr_prod} FCNR vs {_n_usd} USD",
+    ))
+    recon_tests.append((
+        "INR FD count = non-USD deposit count",
+        _n_non_usd == (_n_fd - _n_usd),
+        f"{_n_non_usd} non-USD / {_n_fd} deposits",
+    ))
+
 # -------------------------------------------------
 # RED FLAGS
 # -------------------------------------------------
@@ -1318,6 +1376,28 @@ if _n_crit:
     )
 st.markdown(f'<p class="t-brief-copy">{_html.escape(" ".join(_brief_parts))}</p>',
             unsafe_allow_html=True)
+
+# FCNR two-return strip on the briefing (native USD book marked to INR).
+if total_fcnr:
+    st.markdown(ui_section("FCNR return · two parts", "USD book marked to INR"),
+                unsafe_allow_html=True)
+    st.markdown(ui_kpi_cards([
+        {"label": "Interest at today's FX",
+         "value": format_inr_compact(total_fcnr_interest),
+         "sub": "Accrued USD × this run's USD/INR",
+         "tone": "up" if (total_fcnr_interest or 0) >= 0 else "down"},
+        {"label": "FX on principal",
+         "value": format_inr_compact(total_fx_gain),
+         "sub": "Principal × (today − deposit-date FX)",
+         "tone": "up" if (total_fx_gain or 0) >= 0 else "down"},
+    ], cols=2), unsafe_allow_html=True)
+    st.markdown(ui_caption(
+        "FCNR is a USD deposit book. Native principal and maturity proceeds stay in USD — "
+        "never converted at a guessed settlement rate. The INR figures are this run's "
+        f"reference mark at USD/INR {('%.2f' % usd_inr) if usd_inr else 'n/a'}. "
+        "Interest + FX on principal = FCNR P&L "
+        "within ₹1 (lib/valuation)."
+    ), unsafe_allow_html=True)
 
 # Visible briefing attention (string pinned by smoke tests). Two insight cards
 # on the first screen — real flags first, allocation notes fill any gap.
@@ -1690,29 +1770,36 @@ with st.expander("Books · recon & laboratory", expanded=False):
         _pulse_cap += f" · Silver ₹{_silver_txt} / kg"
     st.markdown(ui_caption(_pulse_cap), unsafe_allow_html=True)
 
-    st.markdown(ui_section("Pulse", "portfolio tape"), unsafe_allow_html=True)
-    if news_items:
+    st.markdown(ui_section("Pulse", "holdings + NRI / tax"), unsafe_allow_html=True)
+    _tape = [n for n in (news_items or [])
+             if n.get("category") in ("holding", "nri_tax")]
+    if _tape:
         _sent_by_title = {}
         if groups:
             for g in groups:
                 for it in g.get("items") or ():
                     _sent_by_title[str(it.get("title") or "").strip().lower()] = g.get("sentiment")
         _news_rows = []
-        for _n in news_items[:6]:
+        for _n in _tape[:6]:
             _title = str(_n.get("title") or "")
             _src = str(_n.get("source") or _n.get("query") or "Wire")
+            _cat = "NRI / tax" if _n.get("category") == "nri_tax" else "Holding"
             _age = str(_n.get("published") or "")[:16]
             _news_rows.append({
                 "title": _title,
-                "meta": " · ".join(p for p in (_src, _age) if p),
+                "meta": " · ".join(p for p in (_cat, _src, _age) if p),
                 "href": str(_n.get("link") or ""),
                 "sentiment": _sent_by_title.get(_title.strip().lower(), "neutral"),
             })
         st.markdown(ui_news(_news_rows), unsafe_allow_html=True)
+        st.markdown(ui_caption(
+            "Holdings + NRI/tax only. Market backdrop is on Pulse, collapsed — "
+            "it is not mapped to a book identifier."
+        ), unsafe_allow_html=True)
         safe_page_link("pages/4_News.py", label="Full tape →")
     else:
-        st.markdown(ui_empty("No news this run",
-                             "Google News returned nothing for the portfolio names."),
+        st.markdown(ui_empty("No holdings or NRI/tax headlines this run",
+                             "Market backdrop, if any, is not shown here — it is not mapped to your book."),
                     unsafe_allow_html=True)
 
     st.markdown(ui_section("FCNR return split"), unsafe_allow_html=True)
@@ -1737,19 +1824,33 @@ with st.expander("Books · recon & laboratory", expanded=False):
         )
 
     st.markdown(ui_section("What changed this run"), unsafe_allow_html=True)
+    _pnl_cs = []
+    _ibc_cs = []
     if _research_brief is not None and _research_brief.changes:
+        _pnl_cs = [c for c in _research_brief.changes
+                   if getattr(c, "kind", "") != "invested_basis_change"]
+        _ibc_cs = [c for c in _research_brief.changes
+                   if getattr(c, "kind", "") == "invested_basis_change"]
+    if _pnl_cs:
+        st.markdown(ui_caption(
+            "This run's P&L attribution — valuation drivers (market / NAV / gold / "
+            "FCNR interest / FCNR FX / INR FD interest). Not cash moved."
+        ), unsafe_allow_html=True)
         _chg_cards = [
             {
                 "label": c.label,
                 "value": format_inr_compact(c.amount) if c.amount is not None else "—",
-                "sub": c.kind.replace("_", " ") + (" · " + c.note if c.note else ""),
+                "sub": "valuation attribution",
                 "tone": "up" if (c.amount is not None and c.amount >= 0)
                         else ("down" if (c.amount is not None and c.amount < 0) else ""),
             }
-            for c in _research_brief.changes[:6]
+            for c in _pnl_cs[:6]
         ]
         st.markdown(ui_kpi_cards(_chg_cards, cols=3), unsafe_allow_html=True)
     elif cc_drivers is not None and cc_drivers["drivers"]:
+        st.markdown(ui_caption(
+            "This run's P&L attribution — valuation drivers. Not cash moved."
+        ), unsafe_allow_html=True)
         _chg_cards = []
         for _k, _v in cc_drivers["drivers"].items():
             _chg_cards.append({
@@ -1763,6 +1864,39 @@ with st.expander("Books · recon & laboratory", expanded=False):
         st.markdown(ui_empty("Change breakdown unavailable",
                              "The register or research layer did not build this run."),
                     unsafe_allow_html=True)
+
+    if _ibc_cs:
+        st.markdown(ui_caption(
+            "Invested-Basis Change vs prior snapshot — " + NOT_A_CASHFLOW_LABEL
+        ), unsafe_allow_html=True)
+        _ibc_cards = [
+            {
+                "label": c.label,
+                "value": format_inr_compact(c.amount) if c.amount is not None else "—",
+                "sub": NOT_A_CASHFLOW_LABEL,
+            }
+            for c in _ibc_cs[:4]
+        ]
+        st.markdown(ui_kpi_cards(_ibc_cards, cols=3), unsafe_allow_html=True)
+
+    if _delta_rows:
+        st.markdown(ui_caption(
+            "Per-class snapshot delta: Δ Current Value = Invested-Basis Change + "
+            "market/valuation change. " + NOT_A_CASHFLOW_LABEL
+        ), unsafe_allow_html=True)
+        _dshow = []
+        for _r in _delta_rows:
+            _dshow.append({
+                "Asset class": _r.get("Asset Class"),
+                "Δ Current": format_inr(_r.get("Δ Current Value"))
+                    if _r.get("Δ Current Value") is not None else "—",
+                "Invested-Basis Change": format_inr(
+                    _r.get("Invested-Basis Change (not cash flow)"))
+                    if _r.get("Invested-Basis Change (not cash flow)") is not None else "—",
+                "Market / valuation": format_inr(_r.get("Market/Valuation Change"))
+                    if _r.get("Market/Valuation Change") is not None else "—",
+            })
+        st.dataframe(pd.DataFrame(_dshow), hide_index=True, use_container_width=True)
 
     if _dt is not None:
         _delta_cap = (f"Snapshot delta · Δ Current Value {format_inr(_dt['delta_current'])} vs prior snapshot "
@@ -1861,6 +1995,9 @@ try:
         "gold_pct": float(gold_pct),
         "health_score": float(health_score),
     }
+    st.session_state["cc_recon_tests"] = [
+        {"name": n, "ok": bool(ok), "detail": str(d)} for n, ok, d in recon_tests
+    ]
     st.session_state["cc_live_cohort"] = (
         _live_cohort if "_live_cohort" in dir() and _live_cohort is not None else None
     )
@@ -1874,10 +2011,20 @@ try:
             if str(_p.get("Market")) == "GOLD ₹/10g" and _p.get("Value") is not None:
                 _gold10g = float(_p["Value"])
                 break
+    _fx_q = get_usd_inr_quote() if "get_usd_inr_quote" in dir() else None
     st.session_state["cc_rates"] = {
         "usd_inr": float(usd_inr) if usd_inr else None,
         "gold_10g_inr": _gold10g,
         "as_of": now_ist.isoformat(),
+        "retrieved_at": now_ist.strftime("%d %b %Y %H:%M IST"),
+        "usd_inr_source": (_fx_q or {}).get("source") or "Frankfurter",
+        "usd_inr_published": (_fx_q or {}).get("published"),
+        "amfi_source": ("AMFI live" if (len(amfi_navs) and not amfi_cache_date)
+                        else ("AMFI cache" if amfi_cache_date else "AMFI offline")),
+        "amfi_cache_date": str(amfi_cache_date) if amfi_cache_date else None,
+        "amfi_schemes": int(len(amfi_navs) or 0),
+        "gold_source": "goldprice.dev (Yahoo COMEX × USD/INR fallback)",
+        "equities_source": "Groww LTP + Yahoo close",
     }
 except Exception:
     pass

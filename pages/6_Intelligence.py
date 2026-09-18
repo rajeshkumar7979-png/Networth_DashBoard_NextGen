@@ -17,6 +17,7 @@ import pytz
 import pandas as pd
 
 from lib import theme
+from lib.drivers import NOT_A_CASHFLOW_LABEL
 from lib.formatters import format_inr_compact
 from lib.intelligence import exposure as intel_exposure
 from lib.intelligence import live as intel_live
@@ -114,16 +115,22 @@ if _cc_assets.get("total_assets"):
             "sub": "Net worth = total assets (no liabilities recorded)",
         })
 if _rates.get("usd_inr") is not None:
+    _fx_sub = _rates.get("usd_inr_source") or "this run's reference rate"
+    if _rates.get("usd_inr_published"):
+        _fx_sub += f" · published {_rates['usd_inr_published']}"
     _posture.append({
         "label": "USD/INR",
         "value": f"{_rates['usd_inr']:.2f}",
-        "sub": "this run's reference rate",
+        "sub": _fx_sub,
     })
 if _rates.get("gold_10g_inr") is not None:
+    _g_sub = _rates.get("gold_source") or "India spot"
+    if _rates.get("retrieved_at"):
+        _g_sub += f" · {_rates['retrieved_at']}"
     _posture.append({
         "label": "Gold ₹/10g",
         "value": f"{_rates['gold_10g_inr']:,.0f}",
-        "sub": "India spot",
+        "sub": _g_sub,
     })
 if _cohort is not None and _cohort.has_records:
     _posture.append({
@@ -217,34 +224,55 @@ if _questions:
 
 
 # ==================================================
-# C — WHAT CHANGED THIS RUN (P&L delta view)
+# C — WHAT CHANGED THIS RUN (P&L attribution vs Invested-Basis Change)
 # ==================================================
 if _research is not None and _research.changes:
     st.markdown(ui_section("What changed this run", "deterministic delta vs prior snapshot"),
                 unsafe_allow_html=True)
-    _chg_cards = []
-    for _c in _research.changes:
-        _amt = _c.amount
-        _val = format_inr_compact(_amt) if _amt is not None else "—"
-        _tone = "up" if (_amt or 0) > 0 else ("down" if (_amt or 0) < 0 else "neutral")
-        _note = _c.note or ""
-        if _c.kind == "invested_basis_change" and _c.cashflow_measurement is False:
-            _note = "NOT a cash-flow measurement; transaction history unavailable."
-        _chg_cards.append({
-            "label": _c.label,
-            "value": _val,
-            "sub": _note,
-            "tone": "neutral",
-        })
-    _changes_grid = "".join(
-        f'<div class="t-kpi t-kpi-tall t-kpi-tone-{_c.get("tone", "neutral")}">'
-        f'<div class="t-kpi-label">{_c["label"]}</div>'
-        f'<div class="t-kpi-value">{_c["value"]}</div>'
-        f'<div class="t-kpi-sub">{_c.get("sub", "")}</div></div>' for _c in _chg_cards[:8])
-    st.markdown(f'<div class="t-kpi-grid">{_changes_grid}</div>',
-                unsafe_allow_html=True)
+    _pnl_cs = [c for c in _research.changes
+               if getattr(c, "kind", "") != "invested_basis_change"]
+    _ibc_cs = [c for c in _research.changes
+               if getattr(c, "kind", "") == "invested_basis_change"]
+    if _pnl_cs:
+        st.caption("This run's P&L attribution — valuation drivers. Not cash moved.")
+        _chg_cards = []
+        for _c in _pnl_cs[:6]:
+            _amt = _c.amount
+            _val = format_inr_compact(_amt) if _amt is not None else "—"
+            _chg_cards.append({
+                "label": _c.label,
+                "value": _val,
+                "sub": "valuation attribution",
+                "tone": "up" if (_amt or 0) > 0 else ("down" if (_amt or 0) < 0 else "neutral"),
+            })
+        _changes_grid = "".join(
+            f'<div class="t-kpi t-kpi-tall t-kpi-tone-{_c.get("tone", "neutral")}">'
+            f'<div class="t-kpi-label">{_c["label"]}</div>'
+            f'<div class="t-kpi-value">{_c["value"]}</div>'
+            f'<div class="t-kpi-sub">{_c.get("sub", "")}</div></div>' for _c in _chg_cards)
+        st.markdown(f'<div class="t-kpi-grid">{_changes_grid}</div>',
+                    unsafe_allow_html=True)
+    if _ibc_cs:
+        st.caption("Invested-Basis Change vs prior snapshot — " + NOT_A_CASHFLOW_LABEL)
+        _ibc_cards = []
+        for _c in _ibc_cs[:4]:
+            _amt = _c.amount
+            _ibc_cards.append({
+                "label": _c.label,
+                "value": format_inr_compact(_amt) if _amt is not None else "—",
+                "sub": NOT_A_CASHFLOW_LABEL,
+                "tone": "neutral",
+            })
+        _ibc_grid = "".join(
+            f'<div class="t-kpi t-kpi-tall t-kpi-tone-{_c.get("tone", "neutral")}">'
+            f'<div class="t-kpi-label">{_c["label"]}</div>'
+            f'<div class="t-kpi-value">{_c["value"]}</div>'
+            f'<div class="t-kpi-sub">{_c.get("sub", "")}</div></div>' for _c in _ibc_cards)
+        st.markdown(f'<div class="t-kpi-grid">{_ibc_grid}</div>',
+                    unsafe_allow_html=True)
     st.caption("The invested difference between snapshots is the Invested-Basis Change — "
-               "there is no transaction history, so nothing on this page is a flow.")
+               "there is no transaction history, so nothing on this page is a flow. "
+               + NOT_A_CASHFLOW_LABEL)
 
 
 # ==================================================
@@ -270,21 +298,40 @@ except Exception:
 
 if _dev_rows:
     _mapped = [d for d in _dev_rows if d.get("Relevance") == "mapped"]
-    _shown = _mapped[:6] or _dev_rows[:6]
-    _cards = [ui_research_row(
-        title=str(_d.get("Development", "")),
-        meta=str(_d.get("Published") or ""),
-        body=f'{_d.get("Category")} · {_d.get("Source")}'
-             + (f' · affects {_d.get("Affected")}' if _d.get("Affected") != "—" else ""),
-        tag="MAPPED" if _d.get("Relevance") == "mapped" else "CONTEXT",
-        href=str(_d.get("Link") or ""),
-    ) for _d in _shown]
-    st.markdown(ui_research_grid(_cards), unsafe_allow_html=True)
+    _context = [d for d in _dev_rows if d.get("Relevance") != "mapped"]
+    if _mapped:
+        _cards = [ui_research_row(
+            title=str(_d.get("Development", "")),
+            meta=str(_d.get("Published") or ""),
+            body=f'{_d.get("Category")} · {_d.get("Source")}'
+                 + (f' · affects {_d.get("Affected")}' if _d.get("Affected") != "—" else ""),
+            tag="MAPPED",
+            href=str(_d.get("Link") or ""),
+        ) for _d in _mapped[:6]]
+        st.markdown(ui_research_grid(_cards), unsafe_allow_html=True)
+    else:
+        st.markdown(ui_empty(
+            "No developments mapped to a book identifier",
+            "Unmapped headlines are general context, not holdings or NRI/tax news. "
+            "Exact-match only — never fuzzy.",
+        ), unsafe_allow_html=True)
+    if _context:
+        with st.expander(f"General context · not mapped to your book ({len(_context)})",
+                         expanded=False):
+            _ctx_cards = [ui_research_row(
+                title=str(_d.get("Development", "")),
+                meta=str(_d.get("Published") or ""),
+                body=f'{_d.get("Category")} · {_d.get("Source")}',
+                tag="CONTEXT",
+                href=str(_d.get("Link") or ""),
+            ) for _d in _context[:8]]
+            st.markdown(ui_research_grid(_ctx_cards), unsafe_allow_html=True)
     with st.expander(f"Full developments table ({len(_dev_rows)} rows)"):
         import pandas as pd
         st.dataframe(pd.DataFrame(_dev_rows[:20]), hide_index=True, use_container_width=True)
     st.caption("Relevance uses exact identifier matching only — never fuzzy. Records are "
-               "observed news / gateway facts; they never alter any number here.")
+               "observed news / gateway facts; they never alter any number here. "
+               "Mapped cards are holdings or NRI-relevant only.")
     if _live_result is not None and _live_result.refreshed_at is not None:
         st.markdown(ui_pill(
             f"last refreshed {_live_result.refreshed_at:%d %b %Y %H:%M} UTC · {_live_result.status}",

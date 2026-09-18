@@ -24,11 +24,17 @@ _rates = st.session_state.get("cc_rates") or {}
 if _rates.get("usd_inr") is not None or _rates.get("gold_10g_inr") is not None:
     _rate_cards = []
     if _rates.get("usd_inr") is not None:
+        _fx_sub = _rates.get("usd_inr_source") or "Frankfurter"
+        if _rates.get("usd_inr_published"):
+            _fx_sub += f" · published {_rates['usd_inr_published']}"
         _rate_cards.append({"label": "USD/INR", "value": f"{_rates['usd_inr']:.2f}",
-                            "sub": "Command Center reference", "tone": "accent"})
+                            "sub": _fx_sub, "tone": "accent"})
     if _rates.get("gold_10g_inr") is not None:
+        _g_sub = _rates.get("gold_source") or "India spot reference"
+        if _rates.get("retrieved_at"):
+            _g_sub = f"{_g_sub} · retrieved {_rates['retrieved_at']}"
         _rate_cards.append({"label": "Gold ₹/10g", "value": f"{_rates['gold_10g_inr']:,.0f}",
-                            "sub": "India spot reference", "tone": "accent"})
+                            "sub": _g_sub, "tone": "accent"})
     if _rate_cards:
         st.markdown(kpi_cards(_rate_cards, cols=4), unsafe_allow_html=True)
 
@@ -36,7 +42,6 @@ CATEGORY_LABELS = {"holding": "Holding", "nri_tax": "NRI / Tax", "macro": "Marke
 ORDER = [
     ("holding", "Your holdings", "portfolio-relevant first"),
     ("nri_tax", "NRI / tax", "regulatory"),
-    ("macro", "Market backdrop", "context"),
 ]
 
 _sess_items = st.session_state.get("cc_news_items_full")
@@ -71,6 +76,13 @@ st.markdown(
 for cat, label, meta in ORDER:
     group = [i for i in items if i.get("category") == cat]
     if not group:
+        if cat == "nri_tax":
+            st.markdown(section_header_html(label, meta), unsafe_allow_html=True)
+            st.markdown(empty_state(
+                "No NRI / tax headlines this run",
+                "NRI / tax treatment is not modelled in the books. This feed is observations, "
+                "not tax advice. Missing stays missing — never filled with zero.",
+            ), unsafe_allow_html=True)
         continue
     st.markdown(section_header_html(label, meta), unsafe_allow_html=True)
     cards = []
@@ -89,6 +101,28 @@ for cat, label, meta in ORDER:
             badge=sentiment_mark(get_sentiment(item.get("title", ""))),
         ))
     st.markdown(research_grid(cards), unsafe_allow_html=True)
+
+_macro = [i for i in items if i.get("category") == "macro"]
+if _macro:
+    with st.expander(f"Market backdrop · not mapped to your book ({len(_macro)})", expanded=False):
+        st.caption("General market context — not mapped to a holding or NRI/tax identifier. "
+                   "Fetched with the rest of the tape; demoted here so it does not look like book news.")
+        cards = []
+        for item in _macro:
+            _title = str(item.get("title", ""))
+            _link = html.escape(str(item.get("link") or ""), quote=True)
+            _age = time_ago(item.get("published_dt"))
+            _query = str(item.get("query", "") or "")
+            _sub = str(item.get("source", "") or "")
+            _meta = " · ".join(x for x in [_sub, _age, _query] if x)
+            cards.append(research_row(
+                title=_title,
+                meta=_meta,
+                tag=CATEGORY_LABELS.get(item.get("category", ""), ""),
+                href=_link,
+                badge=sentiment_mark(get_sentiment(item.get("title", ""))),
+            ))
+        st.markdown(research_grid(cards), unsafe_allow_html=True)
 
 st.markdown("---")
 st.markdown(footnote(

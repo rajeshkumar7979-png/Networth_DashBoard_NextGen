@@ -4,7 +4,9 @@ import numpy as np
 import plotly.graph_objects as go
 from collections import defaultdict
 from datetime import datetime
+import json
 from lib.mf_health import analyze_fund, get_holdings_for_funds
+from lib.mf_holdings import HOLDINGS_META_CACHE
 from lib.theme import inject_css
 from lib.formatters import format_inr_compact
 from lib.ui import (
@@ -204,6 +206,7 @@ for r in ok_results:
         ))
 
 overlap_available = any(len({x[0] for x in apps}) > 1 for apps in stock_exposure.values())
+n_disclosed = sum(1 for r in ok_results if holdings_by_code.get(r["scheme_code"]))
 
 # Per-fund overlap = percentage of that fund's disclosed portfolio invested in
 # stocks that are also held by at least one other fund in this portfolio.
@@ -307,6 +310,26 @@ conc_label, conc_color = conc_bucket(top5_weight)
 # ==================================================
 st.markdown(section_header_html("Health at a glance", "portfolio"), unsafe_allow_html=True)
 
+def _holdings_as_of_label():
+    """Use committed holdings-meta as_of when present. Never invent today's date."""
+    try:
+        if not HOLDINGS_META_CACHE.exists():
+            return None
+        meta = json.loads(HOLDINGS_META_CACHE.read_text(encoding="utf-8"))
+        dates = sorted({
+            str(v.get("as_of")) for v in meta.values()
+            if isinstance(v, dict) and v.get("as_of")
+        })
+        if dates:
+            return dates[-1]
+    except Exception:
+        return None
+    return None
+
+_as_of = _holdings_as_of_label()
+_as_of_pill = (f"Holdings disclosed as of {_as_of}" if _as_of
+               else "Holdings as-of unknown (no meta cache)")
+
 b_label, _ = score_bucket(overall_health)
 ov_txt = f"{portfolio_overlap_pct:.0f}%" if portfolio_overlap_pct is not None else "N/A"
 ov_lbl, ov_cls = overlap_badge(portfolio_overlap_pct)
@@ -326,12 +349,20 @@ k_cards = [
 st.markdown(kpi_cards(k_cards, cols=5), unsafe_allow_html=True)
 st.markdown(
     '<div class="t-meta-row">'
-    + pill(f"Data as of {datetime.now().strftime('%d %b %Y')}", "info")
+    + pill(_as_of_pill, "info")
     + pill(f"{n_positions} positions · {n_schemes} unique schemes · {n_families} AMCs", "neutral")
+    + pill(f"overlap coverage {n_disclosed}/{n_schemes} schemes disclosed", "neutral")
     + pill("score /100 rescaled over scored pillars — cost excluded (no expense-ratio source)", "stale")
     + '</div>',
     unsafe_allow_html=True,
 )
+st.markdown(caption(
+    f"Overlap coverage: {n_disclosed}/{n_schemes} schemes have disclosed holdings. "
+    "Funds without disclosure sit in the portfolio-overlap denominator as unique "
+    "(zero overlapped rupees). 1Y / 3Y / 5Y are trailing CAGR via "
+    "trailing_return(hist, years) with years × 365.25 from the latest NAV — "
+    "not the roster Return %."),
+    unsafe_allow_html=True)
 
 # ==================================================
 # BREAKDOWN RADAR + OVERLAP DONUT + TOP OVERLAPPED STOCKS
@@ -495,7 +526,11 @@ lc1.markdown(caption(
     "pillar and is never filled with zero — there is no free source. Portfolio score is "
     "the unweighted mean of scheme scores."), unsafe_allow_html=True)
 lc2.markdown("**Overlap Impact**")
-lc2.markdown(caption("Share of a fund's disclosed holdings that also appear in your other funds. Shown only when holdings data is available."),
+lc2.markdown(caption(
+    "Per-fund overlap = sum of that fund's disclosed equity weights that also appear "
+    "in another family fund (denominator = that fund's disclosed portfolio weights). "
+    "Portfolio overlap = overlapped ₹ / total MF book; undisclosed funds sit in the "
+    "denominator as unique. Shown only when holdings data is available. Math unchanged."),
              unsafe_allow_html=True)
 lc3.markdown("**Score scale**")
 lc3.markdown(caption("80–100 Excellent · 60–79 Good · 40–59 Average · 0–39 Poor — text labels are the signal; colour only repeats them."),

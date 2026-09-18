@@ -8,6 +8,13 @@ import pandas as pd
 from lib.formatters import format_identity_value, format_inr_indian
 
 
+def test_inr_indian_grouping_matches_screenshot_defect():
+    """Streamlit NumberColumn ₹%d rendered ₹2767314. Indian grouping is required."""
+    assert format_inr_indian(2767314) == "₹27,67,314"
+    assert format_inr_indian(2767314, decimals=0) != "₹2767314"
+
+
+
 def test_identity_missing_is_em_dash():
     assert format_identity_value("Principal (native)", None) == "—"
     assert format_identity_value("ROI % p.a.", float("nan")) == "—"

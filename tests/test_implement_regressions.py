@@ -59,6 +59,7 @@ def test_item5_command_center_session_key_vocabulary_is_stable():
         "cc_rates",
         "cc_assets",
         "cc_research_intel",
+        "cc_recon_tests",
     ]
     assert all(k.startswith("cc_") for k in cc_keys)
 
@@ -95,3 +96,68 @@ def test_outlook_ladder_does_not_mix_booked_and_proceeds():
     assert "Maturity Amount (Native)" in src
     assert "proceeds" in src
     assert "booked" in src.lower()
+
+
+def test_phase_b_recon_count_currency_key_and_timestamps():
+    src = (ROOT / "pages" / "1_Command_Center.py").read_text(encoding="utf-8")
+    assert "Register row count = four-book row count" in src
+    assert "Register keys unique" in src
+    assert "FCNR product count = USD deposit count" in src
+    assert "INR FD count = non-USD deposit count" in src
+    assert "cc_recon_tests" in src
+    assert "usd_inr_published" in src
+    assert "retrieved_at" in src
+    assert "FCNR return · two parts" in src
+    assert "get_usd_inr_quote" in src
+
+
+def test_phase_b_intelligence_mapped_only_no_unmapped_fallback():
+    src = (ROOT / "pages" / "6_Intelligence.py").read_text(encoding="utf-8")
+    assert "or _dev_rows" not in src
+    assert "_mapped[:6] or" not in src
+    assert "not mapped to your book" in src
+    assert "invested_basis_change" in src
+    assert "NOT_A_CASHFLOW_LABEL" in src
+
+
+def test_phase_b_news_macro_demoted_from_primary_order():
+    src = (ROOT / "pages" / "4_News.py").read_text(encoding="utf-8")
+    assert '("macro", "Market backdrop"' not in src
+    assert "not mapped to your book" in src
+    assert "NRI / tax treatment is not modelled" in src
+
+
+def test_phase_b_holdings_fd_table_indian_grouping_and_two_returns():
+    src = (ROOT / "pages" / "3_Asset_Detail.py").read_text(encoding="utf-8")
+    assert 'format="₹%d"' not in src
+    assert '"Product"' in src and '"Account"' in src
+    assert "not annualized" in src
+    assert "NRI / tax treatment is not modelled" in src
+    assert "FCNR return · two parts" in src
+    assert "Interest Return (INR)" in src
+    assert "FX Gain/Loss (INR)" in src
+
+
+def test_phase_b_mf_health_overlap_disclosure_and_as_of():
+    src = (ROOT / "pages" / "5_MF_Health.py").read_text(encoding="utf-8")
+    assert "n_disclosed" in src
+    assert "disclosed" in src
+    assert "undisclosed" in src
+    assert "datetime.now()" not in src
+    assert "trailing_return" in src
+    assert "trailing CAGR" in src
+
+
+def test_phase_b_nri_tax_empty_state_on_desk_holdings_decisions():
+    for rel in ("pages/2_Deep_Health.py", "pages/3_Asset_Detail.py", "pages/8_Desk.py"):
+        src = (ROOT / rel).read_text(encoding="utf-8")
+        assert "NRI / tax treatment is not modelled" in src, rel
+
+
+def test_phase_b_desk_renders_recon_grid_and_timestamps():
+    src = (ROOT / "pages" / "8_Desk.py").read_text(encoding="utf-8")
+    assert "cc_recon_tests" in src
+    assert "usd_inr_published" in src
+    assert "invested_basis_change" in src
+    assert "NOT_A_CASHFLOW_LABEL" in src
+    assert 'class="recon-pass"' in src or "recon-pass" in src

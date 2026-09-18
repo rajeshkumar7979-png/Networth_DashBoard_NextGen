@@ -3,7 +3,7 @@ import pandas as pd
 
 from lib.formatters import format_inr
 from lib.theme import inject_css
-from lib.ui import page_header_html, section_header_html, banner, footnote, nav_shell, pill
+from lib.ui import page_header_html, section_header_html, banner, footnote, nav_shell, pill, empty_state
 
 inject_css()
 
@@ -341,6 +341,11 @@ else:
 
 st.markdown("---")
 st.markdown(section_header_html("Caveats", "05"), unsafe_allow_html=True)
+st.markdown(empty_state(
+    "NRI / tax treatment is not modelled",
+    "This sandbox does not apply FEMA, treaty, or tax treatment to any scenario. "
+    "Not tax advice. Missing stays missing — never filled with zero.",
+), unsafe_allow_html=True)
 st.markdown(
     '<div class="t-meta-row">'
     + pill("deterministic, not investment advice", "stale")
