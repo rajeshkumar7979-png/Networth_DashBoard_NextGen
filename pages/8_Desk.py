@@ -15,7 +15,7 @@ import pandas as pd
 import pytz
 
 from lib import theme
-from lib.formatters import format_inr_compact
+from lib.formatters import format_inr_compact, format_inr_indian
 from lib.intelligence.sources import gateway_status
 from lib.intelligence import live as intel_live
 from lib.register import aggregate_by_class, build_asset_register, family_level_sum
@@ -134,6 +134,18 @@ _book_cards.append({
     "value": format_inr_compact(_assets.get("total_assets")) if _assets.get("total_assets") else "—",
     "sub": "as computed by Command Center",
 })
+if _assets.get("has_liabilities"):
+    _book_cards.append({
+        "label": "Net worth",
+        "value": format_inr_compact(_assets.get("net_worth")) if _assets.get("net_worth") is not None else "—",
+        "sub": f"Assets − session liabilities {format_inr_compact(_assets.get('total_liabilities') or 0)}",
+    })
+else:
+    _book_cards.append({
+        "label": "Net worth",
+        "value": format_inr_compact(_assets.get("total_assets")) if _assets.get("total_assets") else "—",
+        "sub": "Net worth = total assets (no liabilities recorded)",
+    })
 _book_grid = "".join(
         f'<div class="t-kpi"><div class="t-kpi-label">{_c["label"]}</div>'
         f'<div class="t-kpi-value">{_c["value"]}</div>'
@@ -169,7 +181,7 @@ try:
     st.markdown(
         f'<div class="t-card">{_mark} — register total {format_inr_compact(_reg_total)} '
         f'vs Command Center total {format_inr_compact(_page_total)} '
-        f'(difference {_diff:,.2f} INR, tolerance ₹1). The register is rebuilt purely from the '
+        f'(difference {format_inr_indian(_diff, decimals=2)}, tolerance ₹1). The register is rebuilt purely from the '
         f'same four books; it never changes them.</div>',
         unsafe_allow_html=True)
     if _ok:
@@ -179,7 +191,19 @@ try:
             unsafe_allow_html=True)
     if _classes is not None and not _classes.empty:
         with st.expander("Class totals (register view)"):
-            st.dataframe(_classes, hide_index=True, use_container_width=True)
+            st.dataframe(
+                _classes,
+                hide_index=True,
+                use_container_width=True,
+                column_config={
+                    "Asset Class": st.column_config.TextColumn("Asset class"),
+                    "Current Value": st.column_config.NumberColumn(
+                        "Current (INR)", format="₹%.0f"),
+                    "Invested": st.column_config.NumberColumn(
+                        "Invested (INR)", format="₹%.0f"),
+                    "Data Backed": st.column_config.CheckboxColumn("Data backed"),
+                },
+            )
 except Exception as _recon_err:
     st.markdown(ui_unavailable("Reconciliation could not run", str(_recon_err)),
                 unsafe_allow_html=True)
@@ -210,7 +234,7 @@ if _gw_rows:
                                "ok" if _ok_n else "cache"), unsafe_allow_html=True)
 else:
     st.markdown(ui_caption("No gateway cache written yet — FRED/SEC fetch is on-demand from the "
-                           "Command Center's refresh action."))
+                           "Command Center's refresh action."), unsafe_allow_html=True)
 try:
     _lv_st = intel_live.live_status()
 except Exception:
@@ -237,7 +261,7 @@ if _export_parts:
                        data=_hold.to_csv(index=False).encode("utf-8"),
                        file_name="networth_holdings.csv", mime="text/csv")
 else:
-    st.markdown(ui_caption("No books in this session to export."))
+    st.markdown(ui_caption("No books in this session to export."), unsafe_allow_html=True)
 
 if _snapshot:
     _snap_json = json.dumps(_snapshot, default=str, indent=2)
@@ -245,7 +269,8 @@ if _snapshot:
                        data=_snap_json.encode("utf-8"),
                        file_name="intelligence_snapshot.json", mime="application/json")
 else:
-    st.markdown(ui_caption("Run Command Center once and the intelligence snapshot export appears here."))
+    st.markdown(ui_caption("Run Command Center once and the intelligence snapshot export appears here."),
+                unsafe_allow_html=True)
 
 history_path = "data/history.csv"
 if os.path.exists(history_path):

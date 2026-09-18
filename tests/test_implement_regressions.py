@@ -12,7 +12,12 @@ from __future__ import annotations
 
 import dataclasses
 
+from pathlib import Path
+
 from lib.intelligence.live.planner import NewsQuery, ResearchPlan
+
+
+ROOT = Path(__file__).resolve().parents[1]
 
 # ---------------------------------------------------------------------------
 # Item 7: the live planner exposes the canonical deterministic dataclasses.
@@ -61,3 +66,32 @@ def test_item5_command_center_session_key_vocabulary_is_stable():
     # cc_-prefixed vocabulary too (refreshed only by the explicit button):
     for k in cc_keys:
         assert k.isidentifier()
+
+
+def test_intelligence_raised_signals_are_briefing_not_snapshot():
+    """KPI 'Signals raised' must count the same briefing.signals the
+    'What matters now' cards render. Snapshot signal_levels can lag."""
+    src = (ROOT / "pages" / "6_Intelligence.py").read_text(encoding="utf-8")
+    assert 'getattr(_briefing, "signals"' in src
+    assert '_sig_raised' in src
+    assert "Still in force until" in src
+    assert "Invalidated by" not in src
+    assert 'signal_levels' not in src
+
+
+def test_command_hero_labels_total_assets_when_no_liabilities():
+    src = (ROOT / "pages" / "1_Command_Center.py").read_text(encoding="utf-8")
+    assert "no liabilities recorded" in src
+    assert "Family net worth" not in src
+    assert 'cc_assets' in src and '"total_assets"' in src
+    assert '"net_worth"' in src
+    assert "NOT_A_CASHFLOW_LABEL" in src
+
+
+def test_outlook_ladder_does_not_mix_booked_and_proceeds():
+    src = (ROOT / "pages" / "7_Outlook.py").read_text(encoding="utf-8")
+    assert "fillna(_fallback)" not in src
+    assert "_vals.fillna" not in src
+    assert "Maturity Amount (Native)" in src
+    assert "proceeds" in src
+    assert "booked" in src.lower()

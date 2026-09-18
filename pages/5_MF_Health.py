@@ -6,6 +6,7 @@ from collections import defaultdict
 from datetime import datetime
 from lib.mf_health import analyze_fund, get_holdings_for_funds
 from lib.theme import inject_css
+from lib.formatters import format_inr_compact
 from lib.ui import (
     page_header_html,
     section_header_html,
@@ -51,11 +52,13 @@ for row in mf_list:
     value = float(row.get("Current Value") or 0)
     weight = float(row.get("Weight %") or 0)
     scheme_code = row.get("Scheme Code")
-    raw_results.append(analyze_fund(
+    raw = analyze_fund(
         name, value, weight, scheme_code,
         cagr_1y=row.get("1Y %"), cagr_3y=row.get("3Y %"), cagr_5y=row.get("5Y %"),
         latest_nav=row.get("Current NAV"),
-    ))
+    )
+    raw["Owner"] = row.get("Owner") or ""
+    raw_results.append(raw)
 
 by_code = {}
 for r in raw_results:
@@ -64,16 +67,16 @@ for r in raw_results:
         continue
     prev = by_code.get(code)
     if prev is None:
-        _holder = r.get("holder_name") or r.get("Holder Name") or "family"
+        _holder = r.get("holder_name") or r.get("Holder Name") or r.get("Owner") or "family"
         r = dict(r)
         r["_holders"] = {_holder}
+        r["_positions"] = 1
         by_code[code] = r
         continue
     prev["current_value"] = float(prev.get("current_value") or 0) + float(r.get("current_value") or 0)
-    _holder = r.get("holder_name") or r.get("Holder Name") or "family"
+    _holder = r.get("holder_name") or r.get("Holder Name") or r.get("Owner") or "family"
     prev.setdefault("_holders", set()).add(_holder)
-    if r.get("weight_pct", 0) > prev.get("weight_pct", 0):
-        prev["weight_pct"] = r.get("weight_pct", 0)
+    prev["_positions"] = int(prev.get("_positions") or 1) + 1
     if not prev.get("fund_name"):
         prev["fund_name"] = r.get("fund_name")
 
@@ -84,6 +87,11 @@ if not ok_results:
     st.stop()
 
 total_value = sum(r["current_value"] for r in ok_results)
+n_positions = len(mf_list)
+n_schemes = len(ok_results)
+# Combined scheme weight vs the MF book (not the larger member's original weight).
+for r in ok_results:
+    r["weight_pct"] = (float(r["current_value"]) / total_value * 100.0) if total_value else 0.0
 
 # ==================================================
 # CATEGORY (reuse Command Center's category text via fund name heuristics
@@ -128,7 +136,7 @@ def consistency_score(m):
 def performance_score(m):
     c3 = m.get("cagr_3Y")
     if c3 is None:
-        return 12.5
+        return None
     if c3 > 0.18: return 25.0
     if c3 > 0.12: return 20.0
     if c3 > 0.08: return 14.0
@@ -145,7 +153,7 @@ def concentration_score(weight_pct):
 def risk_adjusted_score(m):
     c3, dd = m.get("cagr_3Y"), m.get("max_drawdown")
     if c3 is None or dd is None or dd == 0:
-        return 5.0
+        return None
     calmar = c3 / abs(dd)
     return float(np.clip(calmar * 8, 0, 10))
 
@@ -255,9 +263,15 @@ for r in ok_results:
     risk = risk_adjusted_score(m)
     ov_score = overlap_pillar_score(ov_pct)
 
-    parts = [perf, cons, conc, risk] + ([ov_score] if ov_score is not None else [])
-    max_parts = [25, 20, 15, 10] + ([20] if ov_score is not None else [])
-    total_100 = sum(parts) / sum(max_parts) * 100
+    scored = []
+    max_parts = []
+    for part, cap in ((perf, 25), (cons, 20), (conc, 15), (risk, 10), (ov_score, 20)):
+        if part is None:
+            continue
+        scored.append(part)
+        max_parts.append(cap)
+    denom = sum(max_parts)
+    total_100 = (sum(scored) / denom * 100) if denom else 0
 
     label, cls = overlap_badge(ov_pct)
     rows.append({
@@ -273,6 +287,7 @@ df = pd.DataFrame(rows).sort_values("Weight %", ascending=False)
 
 overall_health = round(df["Score"].mean())
 top5_weight = df.nlargest(5, "Weight %")["Weight %"].sum()
+n_families = int(df["AMC"].nunique())
 
 def score_bucket(s):
     if s >= 80: return "Excellent", "sc-excellent"
@@ -298,20 +313,22 @@ ov_lbl, ov_cls = overlap_badge(portfolio_overlap_pct)
 _ov_tone = {"": "", "badge-low": "up", "badge-mod": "", "badge-high": "warn", "badge-vhigh": "warn"}.get(ov_cls, "")
 _conc_tone = {"Low": "up", "Moderate": "warn", "High": "down"}.get(conc_label, "")
 k_cards = [
-    {"label": "MF Portfolio Value", "value": f"₹{total_value/1e7:.2f} Cr", "sub": "of total net worth"},
-    {"label": "No. of Funds", "value": f"{len(df)}", "sub": f"{df['AMC'].nunique()} fund families"},
-    {"label": "MF Health Score", "value": f"{overall_health}/100", "sub": b_label,
+    {"label": "MF book value", "value": format_inr_compact(total_value),
+     "sub": "sum of positions; unique schemes after merge"},
+    {"label": "Positions / schemes", "value": f"{n_positions} / {n_schemes}",
+     "sub": f"{n_families} fund families (AMCs)"},
+    {"label": "MF Health Score", "value": f"{overall_health}/100", "sub": b_label + " · cost excluded",
      "tone": "up" if b_label == "Excellent" else ("warn" if b_label == "Good" else "down")},
     {"label": "Portfolio Overlap", "value": ov_txt, "sub": ov_lbl, "tone": _ov_tone},
-    {"label": "Concentration Risk", "value": conc_label, "sub": f"Top 5 funds: {top5_weight:.1f}%",
+    {"label": "Concentration Risk", "value": conc_label, "sub": f"Top 5 schemes: {top5_weight:.1f}% of MF book",
      "tone": _conc_tone},
 ]
 st.markdown(kpi_cards(k_cards, cols=5), unsafe_allow_html=True)
 st.markdown(
     '<div class="t-meta-row">'
     + pill(f"Data as of {datetime.now().strftime('%d %b %Y')}", "info")
-    + pill(f"{len(df)} funds · {df['AMC'].nunique()} fund families", "neutral")
-    + pill("cost not scored — no free expense-ratio source", "stale")
+    + pill(f"{n_positions} positions · {n_schemes} unique schemes · {n_families} AMCs", "neutral")
+    + pill("score /100 rescaled over scored pillars — cost excluded (no expense-ratio source)", "stale")
     + '</div>',
     unsafe_allow_html=True,
 )
@@ -387,7 +404,7 @@ with c3:
                 st.markdown(
                     f"<div class='t-list-row'>"
                     f"<span class='t-list-name'>{rr['Stock']}</span>"
-                    f"<span class='t-list-meta'>{rr['In Funds']} funds · ₹{rr['Total Exposure']/1e5:.1f}L · {rr['% of MF Portfolio']:.1f}%</span>"
+                    f"<span class='t-list-meta'>{int(rr['In Funds'])} funds · {format_inr_compact(rr['Total Exposure'])} · {rr['% of MF Portfolio']:.1f}%</span>"
                     f"</div>", unsafe_allow_html=True)
         else:
             st.markdown(caption("No stock appears in more than one fund yet."), unsafe_allow_html=True)
@@ -471,8 +488,12 @@ else:
 st.markdown("---")
 lc1, lc2, lc3 = st.columns(3)
 lc1.markdown("**How we calculate MF Health Score**")
-lc1.markdown(caption("Performance (25) · Consistency (20) · Overlap (20, when available) · Concentration (15) · Risk Adjusted (10). "
-                     "Cost (expense ratio) is not scored — no free per-fund data source found."), unsafe_allow_html=True)
+lc1.markdown(caption(
+    "Each scheme: Performance 25 + Consistency 20 + Concentration 15 + Risk Adjusted 10 "
+    "+ Overlap 20 when disclosures exist. The sum is rescaled to /100 over that scheme’s "
+    "available denominator (70 without overlap, 90 with). Cost / expense ratio is not a "
+    "pillar and is never filled with zero — there is no free source. Portfolio score is "
+    "the unweighted mean of scheme scores."), unsafe_allow_html=True)
 lc2.markdown("**Overlap Impact**")
 lc2.markdown(caption("Share of a fund's disclosed holdings that also appear in your other funds. Shown only when holdings data is available."),
              unsafe_allow_html=True)

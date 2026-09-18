@@ -12,7 +12,7 @@ import pandas as pd
 from lib.theme import inject_css
 from lib.register import canonical_instrument_key
 from lib.roster import build_roster, instrument_summary, member_filter_options
-from lib.formatters import format_inr
+from lib.formatters import format_inr, format_identity_value
 from lib.ui import (
     caption,
     data_sheet,
@@ -85,7 +85,10 @@ if roster is None or len(roster) == 0:
 
 _total_assets = _num((assets.get("total_assets")) if isinstance(assets, dict) else None)
 if _total_assets is None:
-    _total_assets = _num(pd.to_numeric(roster["Current Value"], errors="coerce").sum())
+    st.markdown(caption(
+        "Contribution % of assets is unavailable until Command Center publishes total assets. "
+        "This page will not invent a second total from the roster."),
+        unsafe_allow_html=True)
 
 
 # ---------------------------------------------------------------------------
@@ -143,7 +146,15 @@ def _render_sleeve(kind):
         cols = ["Name", "Member", "Maturity", "Current Value", "Invested", "P&L", "Return %"]
     df = sub.copy()
     if kind == "FD":
-        df["Maturity"] = "—"
+        def _fmt_mat(v):
+            if v is None or (isinstance(v, float) and pd.isna(v)):
+                return "—"
+            s = str(v).strip()
+            if not s or s.lower() in {"nan", "nat", "none", "—"}:
+                return "—"
+            ts = pd.to_datetime(s, errors="coerce")
+            return ts.strftime("%d %b %Y") if pd.notna(ts) else s
+        df["Maturity"] = df["Maturity"].map(_fmt_mat) if "Maturity" in df.columns else "—"
     st.dataframe(df[cols].sort_values("Current Value", ascending=False),
                  hide_index=True, use_container_width=True,
                  column_config={
@@ -169,7 +180,7 @@ st.markdown("---")
 # ---------------------------------------------------------------------------
 st.markdown(section_header_html("Dossier", "one instrument, whole record"), unsafe_allow_html=True)
 
-_options = roster["Key"].tolist()
+_options = list(dict.fromkeys(roster["Key"].tolist()))
 if len(_options) > 60:
     _options = sorted(_options, key=lambda k: str(roster[roster["Key"] == k].iloc[0]["Name"]))
 _default = 0
@@ -183,8 +194,13 @@ choice = st.selectbox(
     "Instrument",
     _options,
     index=_default,
-    format_func=lambda k: f"{roster[roster['Key'] == k].iloc[0]['Name']} · "
-                          f"{roster[roster['Key'] == k].iloc[0]['Kind']}",
+    key="holdings_dossier_instrument",
+    format_func=lambda k: (
+        (lambda n, kind: f"{n} · {kind}" if n else f"{kind} · {k}")(
+            str(roster[roster["Key"] == k].iloc[0]["Name"] or "").strip(),
+            str(roster[roster["Key"] == k].iloc[0]["Kind"]),
+        )
+    ),
 )
 
 _positions = roster[roster["Key"] == choice]
@@ -243,12 +259,23 @@ for _idx, (__, row) in enumerate(_positions.iterrows()):
         else:
             fields = [("Account Number", "Account Number"), ("Holder Name", "Holder"),
                       ("Product", "Product"), ("Currency", "Currency"),
-                      ("ROI % p.a.", "ROI % p.a."), ("Maturity Date", "Maturity Date"),
-                      ("Principal Amount", "Principal (native)")]
+                      ("ROI %", "ROI % p.a."), ("ROI % p.a.", "ROI % p.a."),
+                      ("Maturity Date", "Maturity Date"),
+                      ("Principal (Native)", "Principal (native)"),
+                      ("Principal Amount", "Principal (native)"),
+                      ("Current Value (INR)", "Booked value (INR)"),
+                      ("Maturity Amount (Native)", "Maturity proceeds (native)")]
+        seen_labels = set()
         for col, label in fields:
+            if label in seen_labels:
+                continue
             value = rec.get(col)
-            if value is not None and not (isinstance(value, float) and value != value):
-                identity.append({"Field": label, "Value": str(value)})
+            if value is None or (isinstance(value, float) and value != value):
+                continue
+            seen_labels.add(label)
+            native = label.lower().endswith("(native)")
+            cur = rec.get("Currency") if native else None
+            identity.append({"Field": label, "Value": format_identity_value(label, value, currency=cur)})
     identity.append({"Field": "Register key", "Value": str(row["Key"])})
     identity.append({"Field": "Asset class", "Value": str(row["Class"])})
     if identity:

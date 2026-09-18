@@ -14,6 +14,7 @@ import pytz
 
 from lib import theme
 from lib.formatters import format_inr, format_inr_compact, safe_float
+import html as _html
 from lib.ui import (
     caption as ui_caption,
     empty_state as ui_empty,
@@ -65,12 +66,21 @@ _mat = _fd.copy()
 _mat["_days"] = pd.to_numeric(_fd["Days to Maturity"], errors="coerce")
 
 def _fd_meta(row):
+    """Booked value (this run's mark) vs contractual maturity proceeds.
+
+    FCNR proceeds stay in native USD — never converted at a guessed FX.
+    INR booked value is Current Value (INR); proceeds are Maturity Amount (Native).
+    """
     cur = str(row.get("Currency") or "").strip().upper()
-    amt_native = safe_float(row.get("Maturity Amount (Native)"), None)
+    proceeds = safe_float(row.get("Maturity Amount (Native)"), None)
+    booked = safe_float(row.get("Current Value (INR)"), None)
     if cur == "USD":
-        return ("FCNR USD", f"{amt_native:,.0f} USD" if amt_native else "USD (amount n/a)")
-    val_inr = safe_float(row.get("Current Value (INR)"), None)
-    return ("INR FD", format_inr(val_inr) if val_inr else "amount n/a")
+        proc = f"{proceeds:,.0f} USD proceeds" if proceeds else "USD proceeds n/a"
+        return ("FCNR USD", proc)
+    booked_s = format_inr(booked) if booked else "booked n/a"
+    if proceeds:
+        return ("INR FD", f"{booked_s} booked · {format_inr(proceeds)} proceeds")
+    return ("INR FD", f"{booked_s} booked")
 
 def _bucket_rows(days):
     if days < 0:
@@ -101,7 +111,8 @@ if nonempty:
         _cards = []
         if not _inr_rows.empty:
             tot_inr = float(pd.to_numeric(_inr_rows["Current Value (INR)"], errors="coerce").sum() or 0)
-            _cards.append((format_inr_compact(tot_inr) if tot_inr else "—", f"{len(_inr_rows)} FD{'s' if len(_inr_rows) > 1 else ''}"))
+            _cards.append((format_inr_compact(tot_inr) if tot_inr else "—",
+                           f"{len(_inr_rows)} FD{'s' if len(_inr_rows) > 1 else ''} · booked value"))
         if not _usd_rows.empty:
             _cards.append((f"{len(_usd_rows)} USD FD{'s' if len(_usd_rows) > 1 else ''}", "FCNR·USD"))
         for _val, _sub in _cards:
@@ -119,14 +130,16 @@ if nonempty:
             kind, amt = _fd_meta(r)
             rows.append((kind, f"{r.get('Holder Name')} · {_bucket_rows(r['_days'])}", amt))
     list_html = "".join(
-        f'<div class="t-list-row"><span class="t-list-name">{r[0]} · {r[1]}</span>'
-        f'<span class="t-list-meta">{r[2]}</span></div>' for r in rows)
+        f'<div class="t-list-row"><span class="t-list-name">{_html.escape(str(r[0]))} · {_html.escape(str(r[1]))}</span>'
+        f'<span class="t-list-meta">{_html.escape(str(r[2]))}</span></div>' for r in rows)
     st.markdown(f'<div class="t-list">{list_html}</div>', unsafe_allow_html=True)
     st.markdown(ui_caption(
-        "FCNR proceeds land in USD; the INR figure depends on the settlement rate, so it is "
-        "not shown here. Values use this run's computed current value."), unsafe_allow_html=True)
+        "Booked value = this run’s mark (Current Value INR). Maturity proceeds = the "
+        "contractual amount on the deposit. FCNR proceeds land in USD; the INR figure "
+        "depends on the settlement rate, so it is never guessed here."), unsafe_allow_html=True)
 else:
-    st.markdown(ui_caption("Nothing matures in the next 90 days — no calendar to draw."))
+    st.markdown(ui_caption("Nothing matures in the next 90 days — no calendar to draw."),
+                unsafe_allow_html=True)
 
 
 # --------------------------------------------------
@@ -142,34 +155,38 @@ _m12 = TODAY + pd.DateOffset(months=12)
 _ladder = _ladder[_ladder["_mat"] <= _m12]
 
 if _ladder.empty:
-    st.markdown(ui_caption("No maturities across the next 12 months."))
+    st.markdown(ui_caption("No maturities across the next 12 months."), unsafe_allow_html=True)
 else:
     _inr = _ladder[_ladder["Currency"].astype(str).str.strip().str.upper().fillna("INR") != "USD"]
     _usd = _ladder[_ladder["Currency"].astype(str).str.strip().str.upper() == "USD"]
 
     inr_rows = []
     for pm, grp in _inr.groupby("_ym"):
-        _native = grp.get("Maturity Amount (Native)")
-        _fallback = pd.to_numeric(_native, errors="coerce") if _native is not None else None
-        _vals = pd.to_numeric(grp["Current Value (INR)"], errors="coerce")
-        _total = (_vals.fillna(_fallback).sum() if _fallback is not None else _vals.sum())
+        # Contractual proceeds only — never mix booked Current Value into the
+        # "frees cash" ladder (those are different quantities).
+        if "Maturity Amount (Native)" in grp.columns:
+            _proc = pd.to_numeric(grp["Maturity Amount (Native)"], errors="coerce")
+            _total = float(_proc.dropna().sum()) if _proc.notna().any() else 0.0
+        else:
+            _total = 0.0
         inr_rows.append({"label": str(pm), "value": float(_total or 0)})
     if inr_rows:
         st.markdown(ui_ladder(inr_rows), unsafe_allow_html=True)
     else:
-        st.markdown(ui_caption("No INR FDs mature across the next 12 months."))
+        st.markdown(ui_caption("No INR FDs mature across the next 12 months."), unsafe_allow_html=True)
 
     if not _usd.empty:
         st.markdown("**FCNR (USD) — separate, because FX at maturity is unknown**")
         for _pm, _grp in _usd.groupby("_ym"):
             _amt = float(pd.to_numeric(_grp["Maturity Amount (Native)"], errors="coerce").dropna().sum() or 0)
-            _grp2 = pd.to_numeric(_grp["Maturity Amount (Native)"], errors="coerce")
             st.markdown(
-                f'<div class="t-list-row"><span class="t-list-name">{_pm} · FCNR USD</span>'
-                f'<span class="t-list-meta">{_amt:,.0f} USD</span></div>',
+                f'<div class="t-list-row"><span class="t-list-name">{_html.escape(str(_pm))} · FCNR USD</span>'
+                f'<span class="t-list-meta">{_amt:,.0f} USD proceeds</span></div>',
                 unsafe_allow_html=True)
-        st.markdown(ui_caption("Ladder bar widths use INR amounts only; USD is listed separately, "
-                               "never silently converted at a guessed rate."), unsafe_allow_html=True)
+    st.markdown(ui_caption(
+        "INR bars are contractual maturity proceeds (native INR), not this run’s booked value. "
+        "USD FCNR is listed separately as USD proceeds and is never converted at a guessed rate."),
+        unsafe_allow_html=True)
 
 
 # --------------------------------------------------
@@ -179,7 +196,7 @@ st.markdown(ui_section("Illustrative 5-year view", "your assumptions, not a fore
 
 _net = _assets.get("total_assets")
 if not _net:
-    st.markdown(ui_unavailable("Net worth not available",
+    st.markdown(ui_unavailable("Total assets not available",
                                "Publish cc_assets by opening the Command Center once."), unsafe_allow_html=True)
     st.stop()
 

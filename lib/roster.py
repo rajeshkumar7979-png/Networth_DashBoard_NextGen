@@ -33,7 +33,22 @@ def _name_of(row, kind):
         return _s(row, "Fund Name") or _s(row, "ISIN")
     if kind == "Stocks":
         return _s(row, "Company Name") or _s(row, "Symbol")
-    return _s(row, "Symbol")
+    if kind == "Gold":
+        return _s(row, "Symbol") or _s(row, "Company Name")
+    # FD / FCNR: the workbook has no Symbol column. Build a readable name
+    # from product + holder + account tail so the dossier selector is never blank.
+    product = _s(row, "Product")
+    currency = _s(row, "Currency").upper()
+    if not product:
+        product = "FCNR (USD)" if currency == "USD" else "INR FD"
+    elif product.upper() == "FCNR":
+        product = "FCNR (USD)"
+    holder = _s(row, "Holder Name")
+    if holder and not any(ch.isalpha() for ch in holder):
+        holder = ""
+    acct = _s(row, "Account Number")
+    bits = [b for b in (product, holder, acct) if b]
+    return " · ".join(bits) or "FD"
 
 
 def _member_of(row, kind):
@@ -118,6 +133,7 @@ def build_roster(mf_valid=None, stocks_valid=None, gold_valid=None, fd_valid=Non
             name_ = _name_of(record, kind)
             pnl = current - invested
             pct = (pnl / invested * 100.0) if invested else None
+            maturity = _s(record, "Maturity Date") if kind == "FD" else ""
             rows.append({
                 "Key": key,
                 "Name": name_,
@@ -128,12 +144,13 @@ def build_roster(mf_valid=None, stocks_valid=None, gold_valid=None, fd_valid=Non
                 "Invested": float(invested),
                 "P&L": float(pnl),
                 "Return %": pct,
+                "Maturity": maturity,
                 "Match Terms": _match_terms(record, kind, key, name_),
             })
     if not rows:
         return pd.DataFrame(columns=["Key", "Name", "Kind", "Class", "Member",
                                      "Current Value", "Invested", "P&L", "Return %",
-                                     "Match Terms"])
+                                     "Maturity", "Match Terms"])
     return pd.DataFrame(rows)
 
 

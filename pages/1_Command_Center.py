@@ -854,12 +854,14 @@ gold_pct = _pct(total_gold)
 # Backward-compatible: all deposits as share of NW (history still uses this key)
 fd_pct = _pct(total_fd)
 true_liquid_pct = _pct(total_true_liquid)
-# Deep Health defaults
+# Deep Health defaults. cc_net_worth is overwritten after the ledger runs so it
+# is Net Worth = Total Assets − Liabilities (equals assets when none recorded).
 st.session_state["cc_equity_pct"] = float(equity_pct)
 st.session_state["cc_liquid_pct"] = float(liquid_mf_pct)
 st.session_state["cc_inr_fd_pct"] = float(inr_fd_pct)
 st.session_state["cc_fcnr_pct"] = float(fcnr_pct)
 st.session_state["cc_gold_pct"] = float(gold_pct)
+st.session_state["cc_total_assets"] = float(total_networth)
 st.session_state["cc_net_worth"] = float(total_networth)
 
 # PHASE 1B — current P&L drivers (pure decomposition over the canonical register +
@@ -1020,9 +1022,9 @@ if fcnr_pct >= 15:
     ))
 if 3 <= gold_pct <= 15:
     flags.append(("info", "Gold allocation healthy",
-                   f"Gold (SGB + ETFs + FoFs) is {gold_pct:.1f}% of net worth — a reasonable diversifier."))
+                   f"Gold (SGB + ETFs + FoFs) is {gold_pct:.1f}% of total assets — a reasonable diversifier."))
 elif gold_pct > 15:
-    flags.append(("info", "Gold allocation is notable", f"Gold (SGB + ETFs + FoFs) is {gold_pct:.1f}% of net worth."))
+    flags.append(("info", "Gold allocation is notable", f"Gold (SGB + ETFs + FoFs) is {gold_pct:.1f}% of total assets."))
 if top5_mf_pct > 60:
     flags.append(("warning", "Mutual fund concentration", f"Top 5 funds are {top5_mf_pct:.1f}% of your MF portfolio."))
 if not stocks_valid.empty and top5_stock_pct > 65:
@@ -1161,12 +1163,13 @@ if log_snapshot and not history_df.empty:
 # Exports live on the Family Desk page (pages/8_Desk.py) inside the shared
 # "Run controls & exports" band. Command Center is briefing + compute only.
 
-# Prior-snapshot net worth (history.csv) for the hero delta. May be empty
-# on first runs; the hero then shows "current value this run".
+# Prior-snapshot assets (history.csv column is named net_worth — frozen schema)
+# for the hero delta. May be empty on first runs; the hero then shows this run only.
+# Default path upserts today's row first, so the prior snapshot is iloc[-2].
 _prev_nw = None
 try:
-    if _hist_sorted is not None and len(_hist_sorted) >= 2:
-        _prev_nw = float(_hist_sorted["net_worth"].iloc[-1])
+    if history_df is not None and len(history_df) >= 2 and "net_worth" in history_df.columns:
+        _prev_nw = float(history_df.sort_values("date")["net_worth"].iloc[-2])
 except Exception:
     _prev_nw = None
 _nw_delta = None
@@ -1176,6 +1179,9 @@ if _prev_nw and _prev_nw > 0:
 # Net-worth semantics: Total Assets − Liabilities (session-only, owned by Desk).
 _liab_value = float(st.session_state.get("cc_liabilities", 0.0) or 0.0)
 _ledger = compute_net_worth(total_networth, _liab_value)
+st.session_state["cc_total_assets"] = float(total_networth)
+st.session_state["cc_net_worth"] = float(_ledger["net_worth"])
+st.session_state["cc_has_liabilities"] = bool(_ledger["has_liabilities"])
 
 def _signed_compact(n):
     txt = format_inr_compact(n)
@@ -1248,15 +1254,29 @@ _kpi_html = ui_kpi_cards([
     {"label": "FCNR (USD book)", "value": f"{fcnr_pct:.1f}%",
      "sub": format_inr_compact(total_fcnr)},
 ], cols=4)
-st.markdown(ui_brief(
-    "Family net worth",
-    format_inr_compact(total_networth),
-    [
+if _ledger["has_liabilities"]:
+    _hero_kicker = "Net worth"
+    _hero_value = format_inr_compact(_ledger["net_worth"])
+    _hero_meta = [
+        {"text": f"Total assets {format_inr_compact(total_networth)}"},
+        {"text": f"Liabilities {format_inr_compact(_ledger['total_liabilities'])}"},
+        {"text": _signed_compact(total_pnl), "tone": "up" if total_pnl >= 0 else "down"},
+    ]
+    _hero_stance = f"{_stance} stance · assets − session liabilities"
+else:
+    _hero_kicker = "Total assets"
+    _hero_value = format_inr_compact(total_networth)
+    _hero_meta = [
         {"text": f"Invested {format_inr_compact(total_invested)}"},
         {"text": _signed_compact(total_pnl), "tone": "up" if total_pnl >= 0 else "down"},
         {"text": f"{_pnl_pct:+.1f}%", "tone": "up" if _pnl_pct >= 0 else "down"},
-    ],
-    f"{_stance} stance",
+    ]
+    _hero_stance = f"{_stance} stance · net worth = total assets (no liabilities recorded)"
+st.markdown(ui_brief(
+    _hero_kicker,
+    _hero_value,
+    _hero_meta,
+    _hero_stance,
     _ring,
     _strip,
     _kpi_html,
@@ -1346,17 +1366,20 @@ if _due_90 is not None and not _due_90.empty:
         else:
             _when = f"{_d}d"
         _cur = str(_r.get("Currency") or "").strip().upper()
-        _prod = "FCNR" if _cur == "USD" else (str(_r.get("Product") or "INR FD"))
+        _prod = "FCNR (USD)" if _cur == "USD" else (str(_r.get("Product") or "INR FD"))
         _amt = _r.get("Current Value (INR)")
+        _acct = str(_r.get("Account Number") or "").strip()
+        _name_bits = [_owner_short(_r.get("Holder Name")), _prod, _acct]
         _due_rows.append({
-            "name": f"{_owner_short(_r.get('Holder Name'))} · {_prod}",
-            "meta": _when,
+            "name": " · ".join(b for b in _name_bits if b) or _prod,
+            "meta": _when + " · booked value now",
             "amount": format_inr_compact(float(_amt)) if pd.notna(_amt) else "—",
         })
     st.markdown(
         '<div class="t-due-card">'
         f'<div class="t-due-sum">{len(_due_90)} deposit{"s" if len(_due_90) != 1 else ""} · '
-        f"{_html.escape(format_inr_compact(_due_sum))} needs a decision</div>"
+        f"{_html.escape(format_inr_compact(_due_sum))} booked value needs a decision"
+        " — this is this run’s mark, not contractual maturity proceeds</div>"
         + ui_due(_due_rows)
         + "</div>",
         unsafe_allow_html=True,
@@ -1742,12 +1765,12 @@ with st.expander("Books · recon & laboratory", expanded=False):
                     unsafe_allow_html=True)
 
     if _dt is not None:
-        _delta_cap = (f"Snapshot delta · Δ Current Value {_dt['delta_current']:,.0f} vs prior snapshot "
-                      f"· market / valuation change {_dt['market_valuation_change']:,.0f} "
-                      f"· Invested-Basis Change {_dt['invested_basis_change']:,.0f}. "
+        _delta_cap = (f"Snapshot delta · Δ Current Value {format_inr(_dt['delta_current'])} vs prior snapshot "
+                      f"· market / valuation change {format_inr(_dt['market_valuation_change'])} "
+                      f"· Invested-Basis Change {format_inr(_dt['invested_basis_change'])}. "
                       + NOT_A_CASHFLOW_LABEL)
     elif _delta is not None and not _delta.get("available"):
-        _delta_cap = (f"{_delta['reason']} (|Δ| ≈ ₹{_delta['unattributed_abs']:,.0f}). "
+        _delta_cap = (f"{_delta['reason']} (|Δ| ≈ {format_inr(_delta['unattributed_abs'])}). "
                       + NOT_A_CASHFLOW_LABEL)
     else:
         _delta_cap = ("Add a second snapshot (a later run) to see the Δ Current Value vs "
@@ -1808,6 +1831,7 @@ try:
                 "Current Value": value,
                 "Weight %": weight,
                 "Scheme Code": scheme_code,
+                "Owner": str(row["Owner"]) if "Owner" in mf_valid.columns else "",
             })
         st.session_state["mf_holdings_for_health"] = records
 except Exception:
@@ -1825,6 +1849,9 @@ try:
     }
     st.session_state["cc_assets"] = {
         "total_assets": float(total_networth),
+        "total_liabilities": float(_ledger["total_liabilities"]),
+        "net_worth": float(_ledger["net_worth"]),
+        "has_liabilities": bool(_ledger["has_liabilities"]),
         "total_invested": float(total_invested),
         "total_pnl": float(total_pnl),
         "equity_pct": float(equity_pct),

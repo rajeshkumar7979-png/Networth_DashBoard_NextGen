@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 
+from lib.formatters import format_inr
 from lib.theme import inject_css
 from lib.ui import page_header_html, section_header_html, banner, footnote, nav_shell, pill
 
@@ -22,8 +23,9 @@ st.markdown(page_header_html(
 default_amount = float(st.session_state.get("matured_fd_amount", 0) or 0)
 if default_amount > 0:
     st.markdown(banner(
-        f"<b>Decision on the desk</b> · Command Center flagged a matured amount of "
-        f"₹{default_amount:,.0f}. This section works out where it could sit.",
+        f"<b>Decision on the desk</b> · Command Center flagged a matured "
+        f"<b>booked value</b> of {format_inr(default_amount)}. That is this run’s mark "
+        f"of deposits with ≤14 days to maturity — not contractual maturity proceeds.",
         "warn"), unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------------
@@ -35,11 +37,11 @@ st.markdown(section_header_html("Money to move", "01"),
 col1, col2 = st.columns(2)
 with col1:
     decision_amount = st.number_input(
-        "Amount available (₹)",
+        "Amount available (₹) — booked value to place",
         min_value=0,
         value=int(default_amount) if default_amount > 0 else 0,
         step=50000,
-        help="Auto-filled if Command Center detected a matured FD.",
+        help="Auto-filled from Command Center with the booked (current) value of deposits maturing within 14 days, not the contractual maturity proceeds.",
     )
 with col2:
     days_to_need = st.selectbox(
@@ -101,7 +103,7 @@ else:
 # ---------------------------------------------------------------------------
 # 03 · ASSUMPTIONS — current weights (prefer Command Center numbers)
 # ---------------------------------------------------------------------------
-st.markdown(section_header_html("Current allocation & net worth", "03"),
+st.markdown(section_header_html("Current allocation & total assets", "03"),
             unsafe_allow_html=True)
 
 # Read from Command Center when it has run; otherwise start from NEUTRAL zero
@@ -112,11 +114,13 @@ _def_liq = float(st.session_state.get("cc_liquid_pct", 0.0) or 0.0)
 _def_inr = float(st.session_state.get("cc_inr_fd_pct", 0.0) or 0.0)
 _def_fcnr = float(st.session_state.get("cc_fcnr_pct", 0.0) or 0.0)
 _def_gold = float(st.session_state.get("cc_gold_pct", 0.0) or 0.0)
-_def_nw = float(st.session_state.get("cc_net_worth", 0.0) or 0.0)
+_def_nw = float(st.session_state.get("cc_total_assets")
+               or st.session_state.get("cc_net_worth", 0.0) or 0.0)
 
-st.caption("Enter your current approximate weights. They are pre-filled from the "
-           "Command Center only when it has already run (no fabricated portfolio here — "
-           "without a run start from zero). Gold is kept constant across scenarios.")
+st.caption("Weights and the rupee base are pre-filled from the Command Center only when it has already run "
+           "(no fabricated portfolio — without a run they start at zero). The rupee base is "
+           "**Total Assets**, not Net Worth: the workbook has no liabilities sheet. "
+           "Gold is kept constant across scenarios.")
 
 c1, c2, c3, c4, c5 = st.columns(5)
 with c1:
@@ -130,17 +134,18 @@ with c4:
 with c5:
     curr_gold = st.number_input("Gold %", 0.0, 100.0, float(round(_def_gold, 1)), 0.5)
 
-total_nw = st.number_input("Current Net Worth (₹)", min_value=0.0,
-                           value=float(round(_def_nw, 0)), step=100000.0)
+total_nw = st.number_input("Current Total Assets (₹)", min_value=0.0,
+                           value=float(round(_def_nw, 0)), step=100000.0,
+                           help="Sandbox assumption. Prefill is Command Center total assets. Net Worth = Total Assets − session liabilities (Desk); they match when no liabilities are recorded.")
 
 mode = st.radio(
     "What is this amount?",
     [
-        "Already inside net worth (reallocation) — e.g. matured FD still counted in NW",
-        "New money outside net worth (injection)",
+        "Already inside total assets (reallocation) — e.g. matured FD still counted in the books",
+        "New money outside total assets (injection)",
     ],
     index=0,
-    help="Matured FDs detected by Command Center are usually still inside NW until you redeploy them.",
+    help="Matured FDs flagged by Command Center are usually still inside total assets until you redeploy them.",
 )
 is_reallocation = mode.startswith("Already inside")
 
@@ -200,7 +205,7 @@ def _apply_move(eq, liq, inr, fcnr, gold, amount, target: str, source: str | Non
         "INR FD %": pct(buckets["INR FD"]),
         "FCNR %": pct(buckets["FCNR"]),
         "Gold %": pct(buckets["Gold"]),
-        "New NW (₹)": int(round(new_nw, 0)),
+        "New total assets (₹)": int(round(new_nw, 0)),
     }
 
 
@@ -221,14 +226,14 @@ if decision_amount > 0 and total_nw > 0:
 
     if is_reallocation:
         st.caption(
-            f"Reallocation of ₹{decision_amount:,.0f} out of {source_bucket} "
-            f"(net worth stays ≈ ₹{total_nw:,.0f})."
+            f"Reallocation of {format_inr(decision_amount)} out of {source_bucket} "
+            f"(total assets stay ≈ {format_inr(total_nw)})."
         )
         src = source_bucket
     else:
         st.caption(
-            f"Injection of ₹{decision_amount:,.0f} of new money "
-            f"(net worth rises from ₹{total_nw:,.0f})."
+            f"Injection of {format_inr(decision_amount)} of new money "
+            f"(total assets rise from {format_inr(total_nw)})."
         )
         src = None
 
@@ -285,7 +290,7 @@ if decision_amount > 0 and total_nw > 0:
                 "INR FD %": pct(buckets["INR FD"]),
                 "FCNR %": pct(buckets["FCNR"]),
                 "Gold %": pct(buckets["Gold"]),
-                "New NW (₹)": int(round(new_nw, 0)),
+                "New total assets (₹)": int(round(new_nw, 0)),
             }
         else:
             row = {"Scenario": label}
@@ -300,12 +305,27 @@ if decision_amount > 0 and total_nw > 0:
         "INR FD %": round(curr_inr_fd, 1),
         "FCNR %": round(curr_fcnr, 1),
         "Gold %": round(curr_gold, 1),
-        "New NW (₹)": int(round(total_nw, 0)),
+        "New total assets (₹)": int(round(total_nw, 0)),
     }
     out = pd.DataFrame([baseline] + scenarios)
 
-    st.caption("Each row is the same decision, routed differently. Weights after the move.")
-    st.dataframe(out, use_container_width=True, hide_index=True)
+    st.caption("Each row is the same decision, routed differently. Weights after the move. "
+               "The rupee column is total assets (the sandbox base), not net worth.")
+    _disp = out.copy()
+    _disp["New total assets (₹)"] = _disp["New total assets (₹)"].map(lambda n: format_inr(n))
+    st.dataframe(
+        _disp,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "Equity %": st.column_config.NumberColumn("Equity %", format="%.1f%%"),
+            "Liquid %": st.column_config.NumberColumn("Liquid %", format="%.1f%%"),
+            "INR FD %": st.column_config.NumberColumn("INR FD %", format="%.1f%%"),
+            "FCNR %": st.column_config.NumberColumn("FCNR %", format="%.1f%%"),
+            "Gold %": st.column_config.NumberColumn("Gold %", format="%.1f%%"),
+            "New total assets (₹)": st.column_config.TextColumn("New total assets (₹)"),
+        },
+    )
 
     _wt_cols = ["Equity %", "Liquid %", "INR FD %", "FCNR %", "Gold %"]
     st.bar_chart(out.set_index("Scenario")[_wt_cols], height=320)
@@ -316,7 +336,7 @@ if decision_amount > 0 and total_nw > 0:
             st.caption(f"Note: “{r['Scenario']}” weights sum to {s:.1f}% (rounding or capped source).")
             break
 else:
-    st.markdown("<div class='t-empty'><b>Enter an amount and net worth above</b> "
+    st.markdown("<div class='t-empty'><b>Enter an amount and total assets above</b> "
                 "to see the impact of each scenario.</div>", unsafe_allow_html=True)
 
 st.markdown("---")
@@ -324,7 +344,7 @@ st.markdown(section_header_html("Caveats", "05"), unsafe_allow_html=True)
 st.markdown(
     '<div class="t-meta-row">'
     + pill("deterministic, not investment advice", "stale")
-    + pill("reallocation keeps net worth flat", "info")
+    + pill("reallocation keeps total assets flat", "info")
     + pill("weights are your inputs", "neutral")
     + '</div>',
     unsafe_allow_html=True,

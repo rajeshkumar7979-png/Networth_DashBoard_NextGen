@@ -93,9 +93,10 @@ def test_lookup_empty_on_missing_symbol_and_never_fuzzy():
 def test_roster_handles_empty_books():
     empty = pd.DataFrame(columns=["Key", "Name", "Kind", "Class", "Member",
                                   "Current Value", "Invested", "P&L",
-                                  "Return %", "Match Terms"])
+                                  "Return %", "Maturity", "Match Terms"])
     roster = build_roster()
     assert roster is not None and len(roster) == 0
+    assert "Maturity" in roster.columns
     assert lookup_roster(empty, "X") is not None
     assert len(lookup_roster(empty, "X")) == 0
 
@@ -133,3 +134,26 @@ def test_member_filter_options_on_frozen_books_is_clean_and_sorted():
 def test_member_filter_options_handles_empty_inputs():
     assert member_filter_options(None) == []
     assert member_filter_options(pd.DataFrame(columns=["Member"])) == []
+
+
+def test_fd_roster_names_are_product_holder_account_never_blank():
+    """Workbook FD has no Symbol column. Names must be Product · Holder · Account
+    so the dossier selector is never a blank ' · FD'."""
+    roster = build_roster(**_books())
+    fd = roster[roster["Kind"] == "FD"]
+    assert len(fd) == len(FROZEN_BOOKS["fd"])
+    names = fd["Name"].astype(str).str.strip()
+    assert (names != "").all()
+    assert (~names.isin(["—", "-", "FD", "nan", "None"])).all()
+    abc = fd[fd["Key"] == "acct:ABC123"]
+    assert len(abc) == 1
+    assert abc["Name"].iloc[0] == "INR FD · Mrs. KAVITA KHANDELWAL · ABC123"
+    fcnr = fd[fd["Key"] == "acct:ABC136"]
+    assert len(fcnr) == 1
+    assert fcnr["Name"].iloc[0] == "FCNR (USD) · Mr. RAJESH KUMAR · ABC136"
+
+
+def test_fd_roster_carries_maturity_date_from_the_book():
+    roster = build_roster(**_books())
+    abc = roster[roster["Key"] == "acct:ABC123"].iloc[0]
+    assert str(abc["Maturity"]).startswith("2027-01-16")

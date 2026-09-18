@@ -12,6 +12,7 @@
 # ==================================================
 import streamlit as st
 from datetime import datetime
+import html as _html
 import pytz
 import pandas as pd
 
@@ -73,6 +74,13 @@ if _briefing is None and _research is None and _snapshot is None:
 # A — POSTURE (aggregate readout)
 # ==================================================
 st.markdown(ui_section("Posture", "evidence & signals"), unsafe_allow_html=True)
+
+# Count signals from the briefing itself (canonical). Snapshot is a compact
+# handoff that can lag or omit 'watch' keys — never use it as the raised count.
+_all_sigs = list(getattr(_briefing, "signals", ()) or ()) if _briefing is not None else []
+_sig_raised = [s for s in _all_sigs if getattr(s, "level", "info") in ("critical", "warn", "watch")]
+_sig_info = [s for s in _all_sigs if getattr(s, "level", "info") == "info"]
+
 _posture = []
 _coverage_pct = (_snapshot or {}).get("coverage_pct")
 _posture.append({
@@ -86,13 +94,25 @@ if _research is not None:
         "value": f"{_research.evidence_count}",
         "sub": f"{_research.mapped_count} mapped to portfolio",
     })
-_sig_levels = (_snapshot or {}).get("signal_levels") or {}
-_sig_elevated = sum(int(v) for k, v in _sig_levels.items() if k not in ("info",))
 _posture.append({
     "label": "Signals raised",
-    "value": f"{_sig_elevated}",
-    "sub": "non-info deterministic signals",
+    "value": f"{len(_sig_raised)}",
+    "sub": "critical / warn / watch — info notes are demoted",
 })
+_cc_assets = st.session_state.get("cc_assets") or {}
+if _cc_assets.get("total_assets"):
+    if _cc_assets.get("has_liabilities"):
+        _posture.append({
+            "label": "Net worth",
+            "value": format_inr_compact(_cc_assets.get("net_worth")),
+            "sub": f"Total assets {format_inr_compact(_cc_assets.get('total_assets'))} − session liabilities",
+        })
+    else:
+        _posture.append({
+            "label": "Total assets",
+            "value": format_inr_compact(_cc_assets.get("total_assets")),
+            "sub": "Net worth = total assets (no liabilities recorded)",
+        })
 if _rates.get("usd_inr") is not None:
     _posture.append({
         "label": "USD/INR",
@@ -111,14 +131,6 @@ if _cohort is not None and _cohort.has_records:
         "value": f"{_cohort.record_count}",
         "sub": "cached news / gateway records",
     })
-if _research is not None and _research.totals:
-    _nw = _research.totals.get("net_worth") or _research.totals.get("total_assets")
-    if _nw:
-        _posture.append({
-            "label": "Net worth",
-            "value": format_inr_compact(_nw),
-            "sub": "this run's computed total",
-        })
 if _posture:
     _posture_grid = "".join(
         f'<div class="t-kpi"><div class="t-kpi-label">{_p["label"]}</div>'
@@ -129,26 +141,43 @@ if _posture:
 
 
 # ==================================================
-# B — WHAT MATTERS NOW (prioritised, evidence-backed)
+# B — WHAT MATTERS NOW (raised signals only; info notes demoted)
 # ==================================================
-st.markdown(ui_section("What matters now", "facts first, never advice"), unsafe_allow_html=True)
+st.markdown(ui_section("What matters now", "raised signals only"), unsafe_allow_html=True)
+
+if _sig_raised:
+    _watch = []
+    for _s in _sig_raised:
+        _lv = {"critical": "critical", "warn": "warning", "watch": "warning"}.get(
+            getattr(_s, "level", "info"), "warning")
+        _until = getattr(_s, "invalidation", "") or "the rule no longer fires"
+        _watch.append({
+            "level": _lv,
+            "title": _s.label,
+            "body": _s.message,
+            "what": f"Still in force until: {_until}",
+        })
+    st.markdown(ui_watch(_watch), unsafe_allow_html=True)
+else:
+    st.markdown(ui_empty(
+        "No signals raised this run.",
+        "Info-level notes and research questions are listed below — they are not raised signals.",
+    ), unsafe_allow_html=True)
 
 _risk_rows = []
-_sig_noninfo = []
-if _briefing is not None:
-    _sig_noninfo = [s for s in getattr(_briefing, "signals", ()) or ()
-                    if getattr(s, "level", "info") != "info"]
-_sig_titles = {str(getattr(s, "label", "")).strip().lower() for s in _sig_noninfo}
-
+_sig_titles = {str(getattr(s, "label", "")).strip().lower() for s in _sig_raised}
 if _research is not None:
     for _c in _research.risks:
         if str(_c.title or "").strip().lower() in _sig_titles:
             continue
+        if str(getattr(_c, "strength", "")).lower() == "insufficient":
+            continue
         _badge = ui_badge(f"STRENGTH {_c.strength.upper()}", "warning")
+        _until = _c.invalidation or "the evidence changes"
         _risk_rows.append(ui_research_row(
             title=_c.title,
             badge=_badge,
-            meta=f"{len(_c.evidence_ids)} evidence · invalidated by: {_c.invalidation}",
+            meta=f"{len(_c.evidence_ids)} evidence · still in force until: {_until}",
             body=_c.statement,
             tag="RISK",
         ))
@@ -157,27 +186,25 @@ if _research is not None:
         if _gaps:
             st.caption("Insufficient evidence (never invented): " + " · ".join(_gaps[:6]))
 
-if _briefing is not None and _sig_noninfo:
-    _watch = []
-    for _s in _sig_noninfo:
-        _lv = {"critical": "critical", "warn": "warning", "watch": "info"}.get(_s.level, "info")
-        _watch.append({
-            "level": _lv,
-            "title": _s.label,
-            "body": _s.message,
-            "what": f"Invalidated by: {_s.invalidation or 'evidence refresh'}",
-        })
-    st.markdown(ui_watch(_watch), unsafe_allow_html=True)
-
 if _risk_rows:
-    with st.expander(f"Further research risks ({len(_risk_rows)})", expanded=not _sig_noninfo):
+    with st.expander(f"Further research risks ({len(_risk_rows)}) — not counted as raised signals",
+                     expanded=False):
         st.markdown(ui_research_grid(_risk_rows), unsafe_allow_html=True)
+
+if _sig_info:
+    with st.expander(f"Standing notes ({len(_sig_info)}) — info, not raised", expanded=False):
+        for _s in _sig_info:
+            _until = getattr(_s, "invalidation", "") or ""
+            _meta = f"Still in force until: {_until}" if _until else "info"
+            st.markdown(ui_research_row(
+                title=_s.label, body=_s.message, meta=_meta, tag="NOTE",
+            ), unsafe_allow_html=True)
 
 _questions = []
 if _research is not None:
     _questions = list(_research.research_needs)[:4]
 if _questions:
-    st.markdown("**Decision-support questions** — things worth asking before you move money")
+    st.markdown("**Decision-support questions** — things worth asking before you move money. Not signals.")
     _q_rows = [ui_research_row(
         title=_q.title,
         badge=ui_badge("QUESTIONS", "info"),
@@ -320,7 +347,7 @@ if _research is not None:
     _synth = _research.synthesis
 if _synth is not None:
     st.markdown(ui_section("Research synthesis", str(_synth.model)), unsafe_allow_html=True)
-    st.markdown(f'<div class="t-card t-card-summary">{_synth.summary}</div>',
+    st.markdown(f'<div class="t-card t-card-summary">{_html.escape(str(_synth.summary))}</div>',
                 unsafe_allow_html=True)
     if _synth.claims:
         for _cl in _synth.claims:
