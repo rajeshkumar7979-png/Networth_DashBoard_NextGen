@@ -32,11 +32,12 @@
 #     Streamlit's default sidebar chrome/chevron is hidden by theme CSS so the
 #     rail is always expanded.
 #   * Mobile (<992px): a fixed bottom bar of exactly five items
-#     (Command Outlook Holdings Funds Desk), built from st.page_link elements
-#     inside st.container(key="nb_mobile_bar"). The key becomes the CSS class
-#     "st-key-nb_mobile_bar" (Streamlit st.container contract), so theme.py can
-#     dock it to the bottom of the viewport without owning this DOM. A Pulse
-#     link lives top-right in st-container(key="nb_topbar").
+#     (Command Outlook Holdings Funds Desk). Items are SIBLING st.page_link /
+#     badge elements inside st.container(key="nb_mobile_bar") — never
+#     st.columns. Streamlit stacks columns below ~640px on iPhone Chrome, which
+#     turned the bar into a vertical list overlapping the briefing. theme.py
+#     flex-rows the siblings and docks the container to the viewport bottom.
+#     A Pulse link lives top-right in st-container(key="nb_topbar").
 #   * The CURRENT page renders as a static .nb-active badge (never a self-link)
 #     in both the rail and the bar.
 #
@@ -101,7 +102,7 @@ def _group_label(group):
     return f'<div class="nb-group-label">{_html.escape(group)}</div>'
 
 
-def safe_page_link(page, label, help=None):
+def safe_page_link(page, label, help=None, icon=None, use_container_width=None):
     """st.page_link that degrades to a no-op outside a registered navigation.
 
     Page links resolve only against the pages st.navigation registered in
@@ -112,7 +113,20 @@ def safe_page_link(page, label, help=None):
     resolves, because app.py registers exactly the paths in PAGE_FILES.
     """
     try:
-        st.page_link(page, label=label, help=help)
+        kwargs = {"label": label}
+        if help:
+            kwargs["help"] = help
+        if icon:
+            kwargs["icon"] = icon
+        if use_container_width is not None:
+            kwargs["use_container_width"] = use_container_width
+        st.page_link(page, **kwargs)
+    except TypeError:
+        # Streamlit <1.30 has no use_container_width / icon on page_link.
+        try:
+            st.page_link(page, label=label, help=help)
+        except StreamlitPageNotFoundError:
+            pass
     except StreamlitPageNotFoundError:
         pass
 
@@ -133,32 +147,31 @@ def nav_shell(current="command"):
     therefore the Command Center context) intact.
     """
     # Mobile top brand + Pulse link (theme hides nb_topbar >=992px).
+    # No st.columns — iPhone Chrome stacks Streamlit columns into a list.
     with st.container(key="nb_topbar"):
-        _top_left, _top_right = st.columns([3, 1], vertical_alignment="center")
-        with _top_left:
-            st.markdown(
-                '<div class="nb-topbar">'
-                '<span class="nb-top-kicker">Northline</span>'
-                '<span class="nb-top-name">Family desk</span>'
-                "</div>",
-                unsafe_allow_html=True,
-            )
-        with _top_right:
-            with st.container(key="nb_pulse_link"):
-                safe_page_link(PAGE_FILES["pulse"], label="Pulse",
-                               help="Open Pulse")
+        st.markdown(
+            '<div class="nb-topbar">'
+            '<span class="nb-top-kicker">Northline</span>'
+            '<span class="nb-top-name">Family desk</span>'
+            "</div>",
+            unsafe_allow_html=True,
+        )
+        with st.container(key="nb_pulse_link"):
+            safe_page_link(PAGE_FILES["pulse"], label="Pulse",
+                           help="Open Pulse")
 
-    # Mobile bottom bar — exactly five items, pinned by the container key.
-    # page_link's icon param only accepts emoji, so the geometric glyphs are
-    # carried INSIDE the label text (plain text glyphs matching the badge).
+    # Mobile bottom bar — exactly five sibling items, pinned by the container
+    # key. NEVER st.columns: Streamlit's <640px breakpoint stacks columns and
+    # the five links cover the briefing (Gold sleeve). theme.py flex-rows the
+    # siblings into a real iPhone tab bar.
     with st.container(key="nb_mobile_bar"):
-        _cols = st.columns(len(_MOBILE_ITEMS))
-        for _col, (slug, label, short, glyph) in zip(_cols, _MOBILE_ITEMS):
+        for slug, label, short, glyph in _MOBILE_ITEMS:
             if slug == current:
-                _col.markdown(_active_badge(short, glyph, mobile=True),
-                              unsafe_allow_html=True)
+                st.markdown(_active_badge(short, glyph, mobile=True),
+                            unsafe_allow_html=True)
             else:
-                safe_page_link(PAGE_FILES[slug], label=f"{glyph}  {short}")
+                safe_page_link(PAGE_FILES[slug], label=f"{glyph}  {short}",
+                               help=f"Open {label}", use_container_width=True)
 
     # Desktop rail — st.sidebar styled by theme.py as the brand rail.
     with st.sidebar:

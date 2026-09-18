@@ -298,9 +298,11 @@ def hero_metrics(primary, supporting=(), foot=""):
     return f'<div class="t-hero">{"".join(main)}{side_html}</div>'
 
 
-def briefing_hero(kicker, value, meta_bits, stance, ring_html, strip_html):
+def briefing_hero(kicker, value, meta_bits, stance, ring_html, strip_html, kpis_html=""):
     """Northline combined briefing card: family net worth + ring + five-sleeve strip.
-    meta_bits: list of dict(text, tone=None) rendered as 'Invested · P&L · %'."""
+    meta_bits: list of dict(text, tone=None) rendered as 'Invested · P&L · %'.
+    kpis_html: optional KPI grid that sits beside the ring on desktop and
+    hides on the iPhone briefing so the hero stays a single centred number."""
     metas = []
     for i, bit in enumerate(meta_bits or ()):
         if i:
@@ -311,6 +313,7 @@ def briefing_hero(kicker, value, meta_bits, stance, ring_html, strip_html):
     stance_html = (
         f'<div class="t-stance-mini">{_esc(stance)}</div>' if stance else ""
     )
+    kpis_block = f'<div class="t-brief-kpis">{kpis_html}</div>' if kpis_html else ""
     return (
         '<div class="t-brief">'
         '<div class="t-brief-top">'
@@ -321,8 +324,12 @@ def briefing_hero(kicker, value, meta_bits, stance, ring_html, strip_html):
         f'{stance_html}'
         '</div>'
         f'<div class="t-brief-ring">{ring_html}</div>'
+        f'{kpis_block}'
         '</div>'
+        '<div class="t-brief-alloc">'
+        '<div class="t-brief-alloc-lbl">Asset allocation</div>'
         f'<div class="t-brief-strip">{strip_html}</div>'
+        '</div>'
         '</div>'
     )
 
@@ -549,9 +556,18 @@ def weight_strip(parts, total=None):
         if v <= 0:
             continue
         pct = v / denominator * 100.0
+        if pct >= 11:
+            inlabel = (
+                f'<span class="t-strip-in"><span class="t-strip-in-name">{_esc(label)}</span>'
+                f'<span class="t-strip-in-pct">{pct:.0f}%</span></span>'
+            )
+        elif pct >= 7:
+            inlabel = f'<span class="t-strip-in"><span class="t-strip-in-pct">{pct:.0f}%</span></span>'
+        else:
+            inlabel = ""
         segs.append(
             f'<div class="t-strip-seg" style="flex:0 0 {pct:.2f}%;background:{color}" '
-            f'title="{_esc_attr(label)}: {v:,.0f}"></div>'
+            f'title="{_esc_attr(label)}: {v:,.0f}">{inlabel}</div>'
         )
         legend.append(
             f'<div class="t-sleeve">'

@@ -1229,7 +1229,7 @@ st.markdown(ui_status_dots([
     {"label": "FX", "on": fx_on},
 ]), unsafe_allow_html=True)
 
-_ring = ui_ring(health_score, label=health_label, size=96, stroke=7)
+_ring = ui_ring(health_score, label="Health", sub=health_label, size=120, stroke=8)
 _strip = ui_strip([
     {"label": "Equity", "value": total_equity},
     {"label": "Liquid MF", "value": total_liquid_mf},
@@ -1237,6 +1237,17 @@ _strip = ui_strip([
     {"label": "FCNR", "value": total_fcnr},
     {"label": "Gold", "value": total_gold},
 ], total=total_networth)
+_eq_hint = "Below a 40% growth mix" if equity_pct < 35 else "Near target"
+_kpi_html = ui_kpi_cards([
+    {"label": "Invested", "value": format_inr_compact(total_invested),
+     "sub": "Book cost"},
+    {"label": "Total P&L", "value": _signed_compact(total_pnl),
+     "sub": f"{_pnl_pct:+.1f}%", "tone": "up" if total_pnl >= 0 else "down"},
+    {"label": "Equity ex-liquid", "value": f"{equity_pct:.1f}%",
+     "sub": _eq_hint, "tone": "down" if equity_pct < 35 else "up"},
+    {"label": "FCNR (USD book)", "value": f"{fcnr_pct:.1f}%",
+     "sub": format_inr_compact(total_fcnr)},
+], cols=4)
 st.markdown(ui_brief(
     "Family net worth",
     format_inr_compact(total_networth),
@@ -1248,6 +1259,7 @@ st.markdown(ui_brief(
     f"{_stance} stance",
     _ring,
     _strip,
+    _kpi_html,
 ), unsafe_allow_html=True)
 
 _brief_parts = []
@@ -1287,25 +1299,33 @@ if _n_crit:
 st.markdown(f'<p class="t-brief-copy">{_html.escape(" ".join(_brief_parts))}</p>',
             unsafe_allow_html=True)
 
-_eq_hint = "Below a 40% growth mix" if equity_pct < 35 else "Near target"
-st.markdown(ui_kpi_cards([
-    {"label": "Health", "value": f"{health_score:.0f} / 100", "sub": health_label,
-     "tone": "warn" if health_score < 55 else ("up" if health_score >= 75 else "")},
-    {"label": "Equity ex-liquid", "value": f"{equity_pct:.1f}%",
-     "sub": _eq_hint, "tone": "down" if equity_pct < 35 else "up"},
-    {"label": "FCNR (USD book)", "value": f"{fcnr_pct:.1f}%",
-     "sub": format_inr_compact(total_fcnr)},
-    {"label": "USD / INR",
-     "value": f"{usd_inr:.2f}" if usd_inr else "—",
-     "sub": "Frankfurter · Yahoo fallback"},
-], cols=4), unsafe_allow_html=True)
-
-# Visible briefing attention (string pinned by smoke tests).
+# Visible briefing attention (string pinned by smoke tests). Two insight cards
+# on the first screen — real flags first, allocation notes fill any gap.
 st.markdown(ui_section("What deserves attention", f"{min(len(flags), 6)} items"),
             unsafe_allow_html=True)
-_attention_items = [{"level": lv, "title": ti, "body": bd} for lv, ti, bd in flags[:6]]
+_attention_items = [{"level": lv, "title": ti, "body": bd} for lv, ti, bd in flags[:2]]
+if len(_attention_items) < 2 and equity_pct < 35:
+    _attention_items.append({
+        "level": "info",
+        "tag": "ALLOCATION",
+        "title": "Equity allocation light",
+        "body": (
+            f"Equity is {equity_pct:.1f}% of the book — conservative, with room "
+            f"to add risk if the family wants growth. Within a defensive stance."
+        ),
+    })
+if len(_attention_items) < 2 and fcnr_pct >= 30:
+    _attention_items.append({
+        "level": "info",
+        "tag": "CURRENCY",
+        "title": "FCNR concentration",
+        "body": (
+            f"FCNR is {fcnr_pct:.1f}% — a USD deposit book marked to INR, not rupee cash. "
+            f"Review concentration over time."
+        ),
+    })
 if _attention_items:
-    st.markdown(ui_attn(_attention_items), unsafe_allow_html=True)
+    st.markdown(ui_attn(_attention_items[:2]), unsafe_allow_html=True)
 else:
     st.markdown(ui_empty("Nothing flagged right now.",
                          "No warning, risk or decision-support item this run."),
@@ -1588,103 +1608,6 @@ except Exception:
 pulse_rows = build_market_pulse_rows()
 
 # ==================================================
-# ==================================================
-# MARKET PULSE — 8 compact tiles, always visible
-# ==================================================
-st.markdown(ui_section("Market pulse"), unsafe_allow_html=True)
-pulse_cards = []
-_gold10g_txt = None
-_silver_txt = None
-for row in pulse_rows:
-    if row["Value"] is None:
-        val = "—"
-        chg = None
-        sub = "no quote this run"
-    else:
-        val = row["fmt"].format(row["Value"])
-        chg = row["Chg %"]
-        sub = None
-        if chg is not None:
-            sub = f"{chg:+.2f}%"
-        if str(row.get("Market")) == "GOLD ₹/10g":
-            _gold10g_txt = val
-        if str(row.get("Market")) == "SILVER ₹/kg":
-            _silver_txt = val
-    ath = row.get("ATH %")
-    if ath is not None:
-        sub = f"{sub + ' · ' if sub else ''}{ath:.1f}% ATH"
-    pulse_cards.append({
-        "label": row["Market"],
-        "value": val,
-        "sub": sub or "",
-        "tone": "up" if (chg is not None and chg >= 0)
-                else ("down" if (chg is not None and chg < 0) else ""),
-    })
-st.markdown(ui_kpi_cards(pulse_cards, cols=4), unsafe_allow_html=True)
-_pulse_cap = "Free delayed marks"
-if _gold10g_txt:
-    _pulse_cap += f" · Gold ₹{_gold10g_txt} / 10g"
-if _silver_txt:
-    _pulse_cap += f" · Silver ₹{_silver_txt} / kg"
-st.markdown(ui_caption(_pulse_cap), unsafe_allow_html=True)
-
-# ==================================================
-# PULSE — six headlines
-# ==================================================
-st.markdown(ui_section("Pulse", "portfolio tape"), unsafe_allow_html=True)
-if news_items:
-    _sent_by_title = {}
-    if groups:
-        for g in groups:
-            for it in g.get("items") or ():
-                _sent_by_title[str(it.get("title") or "").strip().lower()] = g.get("sentiment")
-    _news_rows = []
-    for _n in news_items[:6]:
-        _title = str(_n.get("title") or "")
-        _src = str(_n.get("source") or _n.get("query") or "Wire")
-        _age = str(_n.get("published") or "")[:16]
-        _news_rows.append({
-            "title": _title,
-            "meta": " · ".join(p for p in (_src, _age) if p),
-            "href": str(_n.get("link") or ""),
-            "sentiment": _sent_by_title.get(_title.strip().lower(), "neutral"),
-        })
-    st.markdown(ui_news(_news_rows), unsafe_allow_html=True)
-    safe_page_link("pages/4_News.py", label="Full tape →")
-else:
-    st.markdown(ui_empty("No news this run",
-                         "Google News returned nothing for the portfolio names."),
-                unsafe_allow_html=True)
-
-# ==================================================
-# FCNR return split
-# ==================================================
-st.markdown(ui_section("FCNR return split"), unsafe_allow_html=True)
-st.markdown(ui_kpi_cards([
-    {"label": "FCNR interest (INR)", "value": format_inr_compact(total_fcnr_interest),
-     "sub": "Accrued on USD principal"},
-    {"label": "FCNR FX (INR)", "value": format_inr_compact(total_fx_gain),
-     "sub": "Vs deposit-date USD/INR"},
-    {"label": "Total FCNR return",
-     "value": format_inr_compact(float(total_fcnr_interest or 0) + float(total_fx_gain or 0)),
-     "sub": "Interest + FX, mark-to-market"},
-], cols=4), unsafe_allow_html=True)
-
-# ==================================================
-# DRILL HOOKS — same-session page links (never raw anchors)
-# ==================================================
-_drills = [
-    ("pages/7_Outlook.py", "Outlook · maturity ladder"),
-    ("pages/3_Asset_Detail.py", "Holdings · every line"),
-    ("pages/5_MF_Health.py", "Funds · quality, overlap"),
-    ("pages/2_Deep_Health.py", "Decision desk"),
-    ("pages/4_News.py", "Full tape"),
-]
-with st.container(key="nb_drill_links"):
-    for _page, _label in _drills:
-        safe_page_link(_page, label=_label)
-
-# ==================================================
 # FOOTER — provenance & data status
 # ==================================================
 src = "AMFI live" if (len(amfi_navs) and not amfi_cache_date) else (f"AMFI cache {amfi_cache_date}" if amfi_cache_date else "AMFI offline")
@@ -1707,6 +1630,79 @@ st.markdown('<div class="t-footnote">NRI-aware books. Not investment advice.</di
 # still rendered so AppTest (which surfaces expander markdown) stays green.
 # ==================================================
 with st.expander("Books · recon & laboratory", expanded=False):
+    st.markdown(ui_section("Market pulse"), unsafe_allow_html=True)
+    pulse_cards = []
+    _gold10g_txt = None
+    _silver_txt = None
+    for row in pulse_rows:
+        if row["Value"] is None:
+            val = "—"
+            chg = None
+            sub = "no quote this run"
+        else:
+            val = row["fmt"].format(row["Value"])
+            chg = row["Chg %"]
+            sub = None
+            if chg is not None:
+                sub = f"{chg:+.2f}%"
+            if str(row.get("Market")) == "GOLD ₹/10g":
+                _gold10g_txt = val
+            if str(row.get("Market")) == "SILVER ₹/kg":
+                _silver_txt = val
+        ath = row.get("ATH %")
+        if ath is not None:
+            sub = f"{sub + ' · ' if sub else ''}{ath:.1f}% ATH"
+        pulse_cards.append({
+            "label": row["Market"],
+            "value": val,
+            "sub": sub or "",
+            "tone": "up" if (chg is not None and chg >= 0)
+                    else ("down" if (chg is not None and chg < 0) else ""),
+        })
+    st.markdown(ui_kpi_cards(pulse_cards, cols=4), unsafe_allow_html=True)
+    _pulse_cap = "Free delayed marks"
+    if _gold10g_txt:
+        _pulse_cap += f" · Gold ₹{_gold10g_txt} / 10g"
+    if _silver_txt:
+        _pulse_cap += f" · Silver ₹{_silver_txt} / kg"
+    st.markdown(ui_caption(_pulse_cap), unsafe_allow_html=True)
+
+    st.markdown(ui_section("Pulse", "portfolio tape"), unsafe_allow_html=True)
+    if news_items:
+        _sent_by_title = {}
+        if groups:
+            for g in groups:
+                for it in g.get("items") or ():
+                    _sent_by_title[str(it.get("title") or "").strip().lower()] = g.get("sentiment")
+        _news_rows = []
+        for _n in news_items[:6]:
+            _title = str(_n.get("title") or "")
+            _src = str(_n.get("source") or _n.get("query") or "Wire")
+            _age = str(_n.get("published") or "")[:16]
+            _news_rows.append({
+                "title": _title,
+                "meta": " · ".join(p for p in (_src, _age) if p),
+                "href": str(_n.get("link") or ""),
+                "sentiment": _sent_by_title.get(_title.strip().lower(), "neutral"),
+            })
+        st.markdown(ui_news(_news_rows), unsafe_allow_html=True)
+        safe_page_link("pages/4_News.py", label="Full tape →")
+    else:
+        st.markdown(ui_empty("No news this run",
+                             "Google News returned nothing for the portfolio names."),
+                    unsafe_allow_html=True)
+
+    st.markdown(ui_section("FCNR return split"), unsafe_allow_html=True)
+    st.markdown(ui_kpi_cards([
+        {"label": "FCNR interest (INR)", "value": format_inr_compact(total_fcnr_interest),
+         "sub": "Accrued on USD principal"},
+        {"label": "FCNR FX (INR)", "value": format_inr_compact(total_fx_gain),
+         "sub": "Vs deposit-date USD/INR"},
+        {"label": "Total FCNR return",
+         "value": format_inr_compact(float(total_fcnr_interest or 0) + float(total_fx_gain or 0)),
+         "sub": "Interest + FX, mark-to-market"},
+    ], cols=4), unsafe_allow_html=True)
+
     st.markdown(ui_section("Reconciliation"), unsafe_allow_html=True)
     for _name, _ok, _detail in recon_tests:
         _mark = "PASS" if _ok else "✗ FAIL"

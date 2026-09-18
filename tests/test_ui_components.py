@@ -21,6 +21,9 @@ from lib.ui import (
     research_grid,
     unavailable,
     evidence_trail,
+    briefing_hero,
+    weight_strip,
+    score_ring,
 )
 from lib.intelligence.model import FactKind
 
@@ -170,3 +173,41 @@ def test_unavailable_and_evidence_trail():
     assert "t-unavailable" in unavailable("No holdings data", "insufficient evidence")
     trail = evidence_trail(["SOURCE FRED", "", "retrieved 2h ago"])
     assert "t-evidence-bit" in trail and "SOURCE FRED" in trail and "retrieved 2h ago" in trail
+
+
+def test_briefing_hero_carries_kpis_and_alloc_label():
+    html = briefing_hero(
+        "Family net worth", "₹2.54 Cr",
+        [{"text": "Invested ₹2.24 Cr"}, {"text": "+₹30.81 L", "tone": "up"}],
+        "Defensive stance",
+        '<div class="t-ring-wrap"></div>',
+        '<div class="t-strip"></div>',
+        '<div class="t-kpi-grid t-kpi-grid-4"></div>',
+    )
+    assert "t-brief-kpis" in html and "t-brief-alloc-lbl" in html
+    assert "Asset allocation" in html
+    assert "₹2.54 Cr" in html and "Defensive stance" in html
+    six = briefing_hero("K", "V", [], "", "", "")
+    assert "t-brief-kpis" not in six
+
+
+def test_weight_strip_in_bar_labels_for_wide_sleeves():
+    html = weight_strip([
+        {"label": "Equity", "value": 45},
+        {"label": "Liquid MF", "value": 20},
+        {"label": "INR FD", "value": 18},
+        {"label": "FCNR", "value": 12},
+        {"label": "Gold", "value": 5},
+    ], total=100)
+    assert "t-strip-in" in html and "t-strip-in-name" in html
+    assert "Equity" in html and "FCNR" in html
+    # Gold at 5% is too thin for an in-bar name, but still in the legend.
+    assert html.count('class="t-sleeve"') == 5
+
+
+def test_score_ring_bands():
+    ok = score_ring(80, label="HEALTH")
+    warn = score_ring(65, label="ADEQUATE")
+    urgent = score_ring(40, label="WEAK")
+    assert "t-ring-ok" in ok and "t-ring-warn" in warn and "t-ring-urgent" in urgent
+    assert "65" in warn
