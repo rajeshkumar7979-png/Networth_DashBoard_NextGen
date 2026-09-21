@@ -140,14 +140,8 @@ def provider_is_configured(config: AIConfig) -> bool:
     return not provider_requires_key(config.provider)
 
 
-def _streamlit_secret(key_name: str) -> Optional[str]:
-    """Read one `[ai]` value from Streamlit's native secrets.
-
-    Returns None (never raises) when not running inside a Streamlit script run,
-    when no `[ai]` section exists, or when the value is missing/empty — the
-    caller then falls back to the environment. The secret value itself is never
-    echoed anywhere by this module.
-    """
+def _streamlit_secrets_root() -> Optional[Mapping]:
+    """Return st.secrets inside a live Streamlit run, else None. Never raises."""
     try:
         import streamlit as st
     except ImportError:  # scripts, pytest, plain module imports
@@ -156,24 +150,61 @@ def _streamlit_secret(key_name: str) -> Optional[str]:
     try:
         if runtime is None or not runtime.exists():
             return None
-        section = st.secrets.get("ai", {})
+        return st.secrets
     except Exception:
         return None
-    # Streamlit returns an AttrDict (a Mapping, not a dict subclass).
-    if not isinstance(section, Mapping):
+
+
+def _mapping_get(root, *keys) -> Optional[str]:
+    cur = root
+    for key in keys:
+        if not isinstance(cur, Mapping):
+            return None
+        cur = cur.get(key)
+    if cur is None or isinstance(cur, Mapping):
         return None
-    value = section.get(key_name)
-    if value is None:
-        return None
-    text = str(value).strip()
+    text = str(cur).strip()
     return text or None
+
+
+def _streamlit_secret(key_name: str) -> Optional[str]:
+    """Read one AI config value from Streamlit's native secrets.
+
+    Accepts the documented ``[ai] KEY`` table plus the shapes people actually
+    paste into Cloud Secrets (top-level ``AI_API_KEY`` / ``GROQ_API_KEY``, or
+    a ``[groq]`` table). Returns None (never raises) outside a Streamlit
+    script run. The secret value itself is never echoed anywhere by this
+    module.
+    """
+    secrets = _streamlit_secrets_root()
+    if secrets is None:
+        return None
+    paths: tuple[tuple[str, ...], ...]
+    if key_name == ENV_AI_API_KEY:
+        paths = (
+            ("ai", ENV_AI_API_KEY),
+            ("ai", "GROQ_API_KEY"),
+            ("ai", "api_key"),
+            ("groq", "AI_API_KEY"),
+            ("groq", "GROQ_API_KEY"),
+            ("groq", "api_key"),
+            (ENV_AI_API_KEY,),
+            ("GROQ_API_KEY",),
+        )
+    else:
+        paths = (("ai", key_name), (key_name,))
+    for path in paths:
+        value = _mapping_get(secrets, *path)
+        if value is not None:
+            return value
+    return None
 
 
 def load_ai_config(env=None) -> AIConfig:
     """Build AIConfig from an environment mapping (defaults to os.environ).
 
     Precedence inside a running Streamlit script run:
-        st.secrets["ai"][KEY]  >  explicit `env` mapping  >  os.environ.
+        st.secrets (see _streamlit_secret)  >  explicit `env` mapping  >  os.environ.
     Outside a Streamlit runtime, secrets are never read (no accidental key use
     in scripts/tests, and no error when Streamlit is not installed).
     """
@@ -182,7 +213,9 @@ def load_ai_config(env=None) -> AIConfig:
         _secret = _streamlit_secret(_key)
         if _secret is not None:
             env[_key] = _secret
-    api_key = str(env.get(ENV_AI_API_KEY, "") or "").strip()
+    api_key = str(
+        env.get(ENV_AI_API_KEY, "") or env.get("GROQ_API_KEY", "") or ""
+    ).strip()
     explicit_provider = str(env.get(ENV_AI_PROVIDER, "") or "").strip()
     explicit_base = str(env.get(ENV_AI_BASE_URL, "") or "").strip()
     explicit_model = str(env.get(ENV_AI_MODEL, "") or "").strip()

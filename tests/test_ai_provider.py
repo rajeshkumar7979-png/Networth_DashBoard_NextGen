@@ -294,6 +294,35 @@ def test_load_ai_config_ignores_garbage_values():
     assert cfg.max_evidence_catalog == 20
 
 
+def test_load_ai_config_reads_top_level_and_groq_secret_shapes(monkeypatch):
+    """Cloud Secrets pastes often skip the [ai] table. Still select Groq."""
+    import streamlit as st
+
+    monkeypatch.setattr(st.runtime, "exists", lambda: True)
+    monkeypatch.setattr(st, "secrets", {"AI_API_KEY": "gsk_top_level"})
+    cfg = ai.load_ai_config({})
+    assert cfg.api_key == "gsk_top_level"
+    assert cfg.provider == "groq"
+    assert cfg.model == "openai/gpt-oss-20b"
+
+    monkeypatch.setattr(st, "secrets", {"GROQ_API_KEY": "gsk_alias"})
+    cfg = ai.load_ai_config({})
+    assert cfg.api_key == "gsk_alias"
+    assert cfg.provider == "groq"
+
+    monkeypatch.setattr(st, "secrets", {"groq": {"api_key": "gsk_table"}})
+    cfg = ai.load_ai_config({})
+    assert cfg.api_key == "gsk_table"
+    assert cfg.provider == "groq"
+
+
+def test_load_ai_config_groq_env_alias_without_streamlit():
+    cfg = ai.load_ai_config({"GROQ_API_KEY": "gsk_from_env"})
+    assert cfg.api_key == "gsk_from_env"
+    assert cfg.provider == "groq"
+    assert cfg.model == "openai/gpt-oss-20b"
+
+
 def test_load_ai_config_reads_streamlit_secrets(monkeypatch):
     """st.secrets['ai'] wins over the environment inside a Streamlit run."""
     import streamlit as st

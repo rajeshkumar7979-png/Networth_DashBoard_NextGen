@@ -315,6 +315,8 @@ def get_holdings_for_funds(codes, force_refresh=False):
             if not name:
                 continue
             weight = h.get("weight_pct") if h.get("weight_pct") is not None else h.get("weight")
+            if weight is None:
+                weight = h.get("pct_nav")
             try:
                 weight = float(weight) if weight is not None else None
             except (TypeError, ValueError):

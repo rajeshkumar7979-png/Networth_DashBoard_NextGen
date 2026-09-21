@@ -3,8 +3,8 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 from collections import defaultdict
-from datetime import datetime
 import json
+import time
 from lib.mf_health import analyze_fund, get_holdings_for_funds
 from lib.mf_holdings import HOLDINGS_META_CACHE
 from lib.theme import inject_css, PLOTLY_LAYOUT
@@ -349,21 +349,29 @@ def _holdings_as_of_label():
     """Use committed holdings-meta as_of when present. Never invent today's date."""
     try:
         if not HOLDINGS_META_CACHE.exists():
-            return None
+            return None, None
         meta = json.loads(HOLDINGS_META_CACHE.read_text(encoding="utf-8"))
         dates = sorted({
-            str(v.get("as_of")) for v in meta.values()
+            str(v.get("as_of"))[:10] for v in meta.values()
             if isinstance(v, dict) and v.get("as_of")
         })
-        if dates:
-            return dates[-1]
+        pulled = sorted({
+            str(v.get("retrieved_at"))[:10] for v in meta.values()
+            if isinstance(v, dict) and v.get("retrieved_at")
+        })
+        as_of = dates[-1] if dates else None
+        if dates and dates[0] != dates[-1]:
+            as_of = f"{dates[0]} to {dates[-1]}"
+        retrieved = pulled[-1] if pulled else None
+        return as_of, retrieved
     except Exception:
-        return None
-    return None
+        return None, None
 
-_as_of = _holdings_as_of_label()
+
+_as_of, _retrieved = _holdings_as_of_label()
 _as_of_pill = (f"Holdings disclosed as of {_as_of}" if _as_of
                else "Holdings as-of unknown (no meta cache)")
+_pulled_pill = (f"Last pulled {_retrieved}" if _retrieved else None)
 
 b_label, _ = score_bucket(overall_health)
 ov_txt = f"{portfolio_overlap_pct:.0f}%" if portfolio_overlap_pct is not None else "N/A"
@@ -386,6 +394,7 @@ st.markdown(kpi_cards(k_cards, cols=5), unsafe_allow_html=True)
 st.markdown(
     '<div class="t-meta-row">'
     + pill(_as_of_pill, "info")
+    + (pill(_pulled_pill, "neutral") if _pulled_pill else "")
     + pill(f"{n_positions} positions · {n_schemes} unique schemes · {n_families} AMCs", "neutral")
     + pill(f"overlap coverage {n_disclosed}/{n_schemes} schemes disclosed", "neutral")
     + pill("score /100 rescaled over scored pillars — cost excluded (no expense-ratio source)", "stale")
@@ -397,8 +406,10 @@ st.markdown(caption(
     "Funds without disclosure sit in the portfolio-overlap denominator as unique "
     "(zero overlapped rupees). 1Y / 3Y / 5Y are trailing CAGR via "
     "trailing_return(hist, years) with years × 365.25 from the latest NAV — "
-    "not the roster Return %."),
-    unsafe_allow_html=True)
+    "not the roster Return %. "
+    "as_of is the AMC statutory filing date, not when this desk last pulled. "
+    "SEBI monthly books are due by the 10th of the next month; this page never invents a later book."
+), unsafe_allow_html=True)
 
 # ==================================================
 # BREAKDOWN RADAR + OVERLAP DONUT + TOP OVERLAPPED STOCKS
@@ -478,10 +489,15 @@ with c3:
     else:
         st.markdown(caption("Holdings data unavailable — cache is empty and mfdata.in hasn't returned data. "
                        "As a manual check meanwhile, try overlapiq.in with your fund list."), unsafe_allow_html=True)
-    force = st.button("„ Refresh holdings now (may be slow)", width="stretch")
+    force = st.button("Refresh holdings now (once an hour)", width="stretch")
     if force:
-        get_holdings_for_funds(codes, force_refresh=True)
-        st.rerun()
+        last = float(st.session_state.get("mf_holdings_refresh_ts") or 0)
+        if time.time() - last < 3600:
+            st.warning("Holdings refresh is capped at once an hour so we do not lock the statutory feed.")
+        else:
+            st.session_state["mf_holdings_refresh_ts"] = time.time()
+            get_holdings_for_funds(codes, force_refresh=True)
+            st.rerun()
 
 # ==================================================
 # BOOKS AT A GLANCE — category / AMC / look-through / pairwise

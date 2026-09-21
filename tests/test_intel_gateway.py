@@ -257,6 +257,17 @@ def test_fred_missing_key_unavailable_without_network(monkeypatch, cache_dir):
     assert calls == []
 
 
+def test_fred_api_key_reads_top_level_secret(monkeypatch):
+    import streamlit as st
+
+    import lib.intelligence.sources.fred as fred
+
+    monkeypatch.setattr(st.runtime, "exists", lambda: True)
+    monkeypatch.setattr(st, "secrets", {"FRED_API_KEY": "top-level-fred"})
+    monkeypatch.delenv("FRED_API_KEY", raising=False)
+    assert fred._api_key() == "top-level-fred"
+
+
 def test_fred_api_key_reads_streamlit_secrets_first(monkeypatch):
     """Inside a Streamlit runtime, st.secrets['fred']['FRED_API_KEY'] wins over
     the environment — AGENTS.md §8 credentials come from secrets/env only."""

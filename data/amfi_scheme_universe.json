@@ -1,5 +1,5 @@
 {
-  "fetched_at": "2026-09-18T04:42:53+00:00",
+  "fetched_at": "2026-09-21T14:33:55+00:00",
   "rows": [
     {
       "scheme_code": "135762",
@@ -46662,46 +46662,6 @@
       "category": "Open Ended Schemes(Hybrid Scheme - Multi Asset Allocation)"
     },
     {
-      "scheme_code": "152056",
-      "isin_primary": "INF740KA1TE9",
-      "isin_secondary": "",
-      "scheme_name": "DSP Multi Asset Allocation Fund",
-      "nav": null,
-      "nav_date": "Growth",
-      "amc": "DSP Mutual Fund",
-      "category": "Open Ended Schemes(Hybrid Scheme - Multi Asset Allocation)"
-    },
-    {
-      "scheme_code": "152055",
-      "isin_primary": "INF740KA1TF6",
-      "isin_secondary": "INF740KA1TG4",
-      "scheme_name": "DSP Multi Asset Allocation Fund",
-      "nav": null,
-      "nav_date": "IDCW",
-      "amc": "DSP Mutual Fund",
-      "category": "Open Ended Schemes(Hybrid Scheme - Multi Asset Allocation)"
-    },
-    {
-      "scheme_code": "152053",
-      "isin_primary": "INF740KA1TB5",
-      "isin_secondary": "",
-      "scheme_name": "DSP Multi Asset Allocation Fund",
-      "nav": null,
-      "nav_date": "Growth",
-      "amc": "DSP Mutual Fund",
-      "category": "Open Ended Schemes(Hybrid Scheme - Multi Asset Allocation)"
-    },
-    {
-      "scheme_code": "152054",
-      "isin_primary": "INF740KA1TC3",
-      "isin_secondary": "INF740KA1TD1",
-      "scheme_name": "DSP Multi Asset Allocation Fund",
-      "nav": null,
-      "nav_date": "IDCW",
-      "amc": "DSP Mutual Fund",
-      "category": "Open Ended Schemes(Hybrid Scheme - Multi Asset Allocation)"
-    },
-    {
       "scheme_code": "151792",
       "isin_primary": "INF754K01RS8",
       "isin_secondary": "",
@@ -51119,6 +51079,46 @@
       "nav": null,
       "nav_date": "IDCW",
       "amc": "Canara Robeco Mutual Fund",
+      "category": "Open Ended Schemes(Hybrid Schemes - Multi Asset Allocation Fund)"
+    },
+    {
+      "scheme_code": "152056",
+      "isin_primary": "INF740KA1TE9",
+      "isin_secondary": "",
+      "scheme_name": "DSP Multi Asset Allocation Fund",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "DSP Mutual Fund",
+      "category": "Open Ended Schemes(Hybrid Schemes - Multi Asset Allocation Fund)"
+    },
+    {
+      "scheme_code": "152055",
+      "isin_primary": "INF740KA1TF6",
+      "isin_secondary": "INF740KA1TG4",
+      "scheme_name": "DSP Multi Asset Allocation Fund",
+      "nav": null,
+      "nav_date": "IDCW",
+      "amc": "DSP Mutual Fund",
+      "category": "Open Ended Schemes(Hybrid Schemes - Multi Asset Allocation Fund)"
+    },
+    {
+      "scheme_code": "152053",
+      "isin_primary": "INF740KA1TB5",
+      "isin_secondary": "",
+      "scheme_name": "DSP Multi Asset Allocation Fund",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "DSP Mutual Fund",
+      "category": "Open Ended Schemes(Hybrid Schemes - Multi Asset Allocation Fund)"
+    },
+    {
+      "scheme_code": "152054",
+      "isin_primary": "INF740KA1TC3",
+      "isin_secondary": "INF740KA1TD1",
+      "scheme_name": "DSP Multi Asset Allocation Fund",
+      "nav": null,
+      "nav_date": "IDCW",
+      "amc": "DSP Mutual Fund",
       "category": "Open Ended Schemes(Hybrid Schemes - Multi Asset Allocation Fund)"
     },
     {
@@ -76469,6 +76469,16 @@
       "nav": null,
       "nav_date": "",
       "amc": "ICICI Prudential Mutual Fund",
+      "category": "Open Ended Schemes(Life Cycle Funds - Life Cycle Fund with Maturity of 5 Years)"
+    },
+    {
+      "scheme_code": "154697",
+      "isin_primary": "INF0R8F01240",
+      "isin_secondary": "",
+      "scheme_name": "Zerodha Life Cycle Fund 2031",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Zerodha Mutual Fund",
       "category": "Open Ended Schemes(Life Cycle Funds - Life Cycle Fund with Maturity of 5 Years)"
     },
     {

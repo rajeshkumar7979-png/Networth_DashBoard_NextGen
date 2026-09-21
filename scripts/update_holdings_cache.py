@@ -3,10 +3,12 @@
 
 Phase 1 rules:
 - Resolve AMFI scheme code from the portfolio's ISIN using official AMFI NAVAll.
-- Prefer AMC-statutory holdings via fund-disclosures.
+- Prefer AMC-statutory holdings via the OpenFin GitHub/jsDelivr CDN
+  (kushagra-agarwal-a/fund-holdings-data). The old Vercel API is gone.
 - Fall back to mfdata.in family holdings.
 - Never truncate holdings to top-N.
 - Never replace a previously good cache entry with an empty/failed response.
+- Never invent a filing month the source did not publish.
 - Write per-fund provenance/quality metadata separately.
 """
 

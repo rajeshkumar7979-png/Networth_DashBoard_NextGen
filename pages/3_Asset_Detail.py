@@ -8,6 +8,7 @@
 # ==================================================
 import streamlit as st
 import pandas as pd
+import time
 
 from lib.theme import inject_css
 from lib.register import canonical_instrument_key
@@ -975,11 +976,21 @@ for _idx, (__, row) in enumerate(_positions.iterrows()):
         )
     else:
         _ai_bits += (
-            "On Streamlit Cloud there is no local Ollama. Add Streamlit secret "
-            "[ai] AI_API_KEY (Groq). Without it the button fails closed and the dossier numbers stay."
+            "On Streamlit Cloud there is no local Ollama. Paste the TOML below into "
+            "Streamlit Cloud → App settings → Secrets. Top-level keys work; "
+            "do not put the key in the GitHub repo. Without a Groq key the button "
+            "fails closed and the dossier numbers stay."
         )
     st.markdown(caption(_ai_bits), unsafe_allow_html=True)
     if not _ai_ready:
+        st.code(
+            'AI_API_KEY = "gsk_..."\n'
+            'AI_PROVIDER = "groq"\n'
+            'AI_MODEL = "openai/gpt-oss-20b"\n'
+            "\n"
+            'FRED_API_KEY = "..."\n',
+            language="toml",
+        )
         st.markdown(caption(
             "No AI provider is configured (local Ollama or an API key in secrets). "
             "The numbers above stay the source of truth."
@@ -1004,13 +1015,37 @@ for _idx, (__, row) in enumerate(_positions.iterrows()):
                 f"? Restate verified numbers. Do not invent PE, RSI, "
                 f"XIRR, tax or a buy/sell. Say where evidence is thin."
             )
-            with st.spinner("AI is reading the verified brief…"):
-                _out = intel_ai.run_ai_research(
-                    brief=_brief,
-                    facts=getattr(_briefing, "facts", ()) or (),
-                    evidence=getattr(_briefing, "evidence", ()) or (),
-                    question=_q,
-                )
+            _cache_store = st.session_state.setdefault("holdings_ai_hour", {})
+            _ck = "|".join((
+                str(row.get("Key") or ""),
+                str(getattr(_brief, "as_of", "") or ""),
+                str(getattr(_brief, "evidence_count", 0) or 0),
+                str(getattr(_ai_cfg, "provider", "") or ""),
+                "key" if getattr(_ai_cfg, "api_key", "") else "nokey",
+            ))
+            _hit = _cache_store.get(_ck) if isinstance(_cache_store, dict) else None
+            _reuse = (
+                isinstance(_hit, dict)
+                and (time.time() - float(_hit.get("ts") or 0) < 3600)
+                and _hit.get("out") is not None
+            )
+            if _reuse:
+                _out = _hit["out"]
+                st.markdown(caption(
+                    "Reusing the last hour's interpretation — API budget is one Groq hit per instrument per hour."
+                ), unsafe_allow_html=True)
+            else:
+                with st.spinner("AI is reading the verified brief…"):
+                    _out = intel_ai.run_ai_research(
+                        brief=_brief,
+                        facts=getattr(_briefing, "facts", ()) or (),
+                        evidence=getattr(_briefing, "evidence", ()) or (),
+                        question=_q,
+                    )
+                _st = str(getattr(_out, "status", "") or "")
+                _prov = str(getattr(_out, "provider", "") or "")
+                if _st == "ok" or (_st == "failed" and _prov == "groq"):
+                    _cache_store[_ck] = {"ts": time.time(), "out": _out}
             st.session_state[_ai_key + "_out"] = _out
     _stored = st.session_state.get(_ai_key + "_out")
     if _stored is not None:
@@ -1031,25 +1066,31 @@ for _idx, (__, row) in enumerate(_positions.iterrows()):
         else:
             _label = getattr(_stored, "status_label", None) or _status or "unavailable"
             _reason = str(getattr(_stored, "reason", "") or "").strip()
-            _hint = ollama_failure_hint(_reason)
-            if "HTTPConnectionPool" in _reason or "Errno 111" in _reason:
-                _reason = _hint or (
-                    "Ollama is not running. This Streamlit host has no local Ollama. "
-                    "Add Streamlit secret [ai] AI_API_KEY (Groq) to interpret here."
-                )
-            elif _hint:
-                _reason = _hint + (
-                    " This Streamlit host has no local Ollama. "
-                    "Add Streamlit secret [ai] AI_API_KEY (Groq) to interpret here."
-                )
+            _already_clean = (
+                "ollama is not running on this host" in _reason.lower()
+                or "add streamlit secret" in _reason.lower()
+            )
+            if not _already_clean:
+                _hint = ollama_failure_hint(_reason)
+                if "HTTPConnectionPool" in _reason or "Errno 111" in _reason:
+                    _reason = _hint or (
+                        "Ollama is not running. This Streamlit host has no local Ollama. "
+                        "Add Streamlit secret AI_API_KEY (Groq) to interpret here."
+                    )
+                elif _hint:
+                    _reason = _hint + (
+                        " This Streamlit host has no local Ollama. "
+                        "Add Streamlit secret AI_API_KEY (Groq) to interpret here."
+                    )
             _line = f"AI did not produce a grounded reading — {_label}."
             if _reason:
                 _line += f" {_reason}"
             if _status == "not_configured":
-                _line += " Configure a Groq key in Streamlit secrets [ai] AI_API_KEY. The numbers above stay the source of truth."
+                if "configure a groq key" not in _line.lower():
+                    _line += " Configure a Groq key in Streamlit secrets AI_API_KEY. The numbers above stay the source of truth."
             elif _status == "insufficient_evidence":
                 _line += " Open Command Center so the research brief has evidence; AI will not invent it."
-            else:
+            elif "unchanged" not in _line.lower():
                 _line += " The deterministic dossier above is unchanged."
             st.markdown(caption(_line), unsafe_allow_html=True)
 

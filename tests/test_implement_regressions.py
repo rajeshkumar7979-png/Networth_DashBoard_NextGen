@@ -126,6 +126,9 @@ def test_phase_c_holdings_performance_columns():
     assert "Interpret this instrument (opt-in AI)" in src
     assert "never on load" in src
     assert "run_ai_research" in src
+    assert "holdings_ai_hour" in src
+    assert "The deterministic dossier above is unchanged." in src
+
 
 
 def test_mf_health_lookthrough_charts_and_pairwise():

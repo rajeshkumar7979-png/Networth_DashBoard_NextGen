@@ -36,12 +36,12 @@ _MISSING = {"", ".", "n/a"}
 
 
 def _streamlit_fred_key() -> Optional[str]:
-    """Read `[fred]` FRED_API_KEY from Streamlit's native secrets.
+    """Read FRED_API_KEY from Streamlit's native secrets.
 
-    Returns None (never raises) outside a running Streamlit script run, when no
-    `[fred]` section exists, or when the value is missing/empty — the caller
-    then falls back to the environment. Scripts and pytest never touch the
-    secrets file. The key is never echoed anywhere by this module.
+    Accepts ``[fred] FRED_API_KEY`` (documented) and a top-level
+    ``FRED_API_KEY`` (the shape Cloud Secrets pastes often take). Returns
+    None (never raises) outside a running Streamlit script run. The key is
+    never echoed anywhere by this module.
     """
     try:
         import streamlit as st
@@ -51,17 +51,26 @@ def _streamlit_fred_key() -> Optional[str]:
     try:
         if runtime is None or not runtime.exists():
             return None
-        section = st.secrets.get("fred", {})
+        secrets = st.secrets
     except Exception:
         return None
-    # Streamlit returns an AttrDict (a Mapping, not a dict subclass).
-    if not isinstance(section, Mapping):
-        return None
-    value = section.get("FRED_API_KEY")
-    if value is None:
-        return None
-    text = str(value).strip()
-    return text or None
+
+    def _one(*keys) -> Optional[str]:
+        cur = secrets
+        for key in keys:
+            if not isinstance(cur, Mapping):
+                return None
+            cur = cur.get(key)
+        if cur is None or isinstance(cur, Mapping):
+            return None
+        text = str(cur).strip()
+        return text or None
+
+    return (
+        _one("fred", "FRED_API_KEY")
+        or _one("fred", "api_key")
+        or _one("FRED_API_KEY")
+    )
 
 
 def _api_key() -> str:
