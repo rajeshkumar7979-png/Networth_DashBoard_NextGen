@@ -957,18 +957,28 @@ for _idx, (__, row) in enumerate(_positions.iterrows()):
 
     st.markdown(section_header_html("AI interpretation", "opt-in · never on load"),
                 unsafe_allow_html=True)
-    st.markdown(caption(
-        "AI restates verified facts from the Command Center research brief. "
-        "It never computes a rupee, never invents XIRR, PE or a trade, and never runs when this page opens. "
-        "On Streamlit Cloud there is no local Ollama. Interpret needs a Groq key in secrets "
-        "[ai] AI_API_KEY — without it the button fails closed and the dossier numbers stay."
-    ), unsafe_allow_html=True)
     _ai_key = f"holdings_ai_{row['Key']}_{_idx}"
     try:
         _ai_cfg = load_ai_config()
         _ai_ready = provider_is_configured(_ai_cfg)
     except Exception:
+        _ai_cfg = None
         _ai_ready = False
+    _ai_bits = (
+        "AI restates verified facts from the Command Center research brief. "
+        "It never computes a rupee, never invents XIRR, PE or a trade, and never runs when this page opens. "
+    )
+    if _ai_ready and getattr(_ai_cfg, "provider", "") == "groq":
+        _ai_bits += (
+            f"This host is wired to Groq ({getattr(_ai_cfg, 'model', '')}). "
+            "Open Command Center once so the research brief exists — Interpret will not invent one."
+        )
+    else:
+        _ai_bits += (
+            "On Streamlit Cloud there is no local Ollama. Add Streamlit secret "
+            "[ai] AI_API_KEY (Groq). Without it the button fails closed and the dossier numbers stay."
+        )
+    st.markdown(caption(_ai_bits), unsafe_allow_html=True)
     if not _ai_ready:
         st.markdown(caption(
             "No AI provider is configured (local Ollama or an API key in secrets). "

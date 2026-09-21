@@ -15,7 +15,7 @@ from typing import Optional, Protocol
 
 import requests
 
-from lib.intelligence.ai.config import AIConfig, _KEYLESS_PROVIDERS, redact
+from lib.intelligence.ai.config import AIConfig, AI_HTTP_USER_AGENT, _KEYLESS_PROVIDERS, redact
 from lib.intelligence.ai.schema import OUTPUT_SCHEMA, OUTPUT_NAME
 
 # Requests-style timeout tuple: (connect, read).
@@ -196,6 +196,8 @@ class OpenAICompatClient:
         headers = {
             "Authorization": f"Bearer {key}",
             "Content-Type": "application/json",
+            "User-Agent": AI_HTTP_USER_AGENT,
+            "Accept": "application/json",
         }
         want_schema = bool(request.json_schema) and self._config.structured_output
         modes = ("json_schema", "json_object") if want_schema else ("json_object",)

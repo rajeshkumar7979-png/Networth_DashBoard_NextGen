@@ -201,8 +201,18 @@ def test_load_ai_config_key_without_provider_selects_groq():
     assert cfg.api_key == "gsk_test_not_a_real_key"
     assert cfg.provider == "groq"
     assert cfg.base_url == "https://api.groq.com/openai/v1"
-    assert cfg.model == "llama-3.3-70b-versatile"
+    assert cfg.model == "openai/gpt-oss-20b"
     assert cfg.timeout_seconds == 60.0
+    assert cfg.max_tokens == 2048
+
+
+def test_load_ai_config_remaps_retired_groq_llama():
+    cfg = ai.load_ai_config({
+        "AI_API_KEY": "gsk_test_not_a_real_key",
+        "AI_PROVIDER": "groq",
+        "AI_MODEL": "llama-3.3-70b-versatile",
+    })
+    assert cfg.model == "openai/gpt-oss-20b"
 
 
 def test_load_ai_config_explicit_ollama_keeps_ollama_even_with_key():

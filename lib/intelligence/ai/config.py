@@ -38,20 +38,14 @@ _AI_ENV_KEYS = (
 )
 
 # Default provider: Groq — genuine free/developer tier (no credit card) and a
-# stable OpenAI-compatible chat/completions API. Default model is Groq's current
-# stable workhorse llama-3.3-70b-versatile (131k context, 32k max output; the
-# previous default mixtral-8x7b-32768 and llama-3.1-70b-versatile have been
-# discontinued by Groq). Note: Groq's `json_schema` Structured Outputs (strict
-# mode) are supported only on a few models (openai/gpt-oss-20b, gpt-oss-120b,
-# qwen3.8-27b); llama-3.3-70b-versatile accepts JSON Object mode but not
-# json_schema, so the client's existing single 400-degrade retry runs it in
-# `json_object` mode instead (the prompts already spell out the JSON shape, so
-# the tolerant parser still recovers the fields).
-# openai/gpt-oss-120b remains selectable via AI_MODEL when true json_schema is
-# wanted (its scalar fields can drift and return objects — parse.py recovers
-# those). The AI layer is provider-neutral: these values are only defaults and
-# can be overridden for any OpenAI-compatible endpoint (OpenAI, Groq,
-# OpenRouter, Together, LM Studio, vLLM, ...).
+# stable OpenAI-compatible chat/completions API. Groq retired the Llama 3.x
+# chat ids (llama-3.3-70b-versatile, llama-3.1-70b-versatile, mixtral-8x7b-32768).
+# Current default is openai/gpt-oss-20b (json_object; json_schema is accepted on
+# gpt-oss-20b / gpt-oss-120b / qwen/qwen3.8-27b). The client's 400-degrade retry
+# still falls back to json_object. openai/gpt-oss-120b remains selectable via
+# AI_MODEL when a larger model is wanted (scalar fields can drift to objects —
+# parse.py recovers those). The AI layer is provider-neutral: these values are
+# only defaults and can be overridden for any OpenAI-compatible endpoint.
 DEFAULT_PROVIDER = "ollama_local"
 DEFAULT_BASE_URL = "http://localhost:11434/v1"
 DEFAULT_MODEL = "llama3.1:8b"
@@ -72,7 +66,17 @@ OLLAMA_TIMEOUT_SECONDS = 180.0
 
 GROQ_PROVIDER = "groq"
 GROQ_BASE_URL = "https://api.groq.com/openai/v1"
-GROQ_MODEL = "llama-3.3-70b-versatile"
+GROQ_MODEL = "openai/gpt-oss-20b"
+# Ids Groq has already 404'd. load_ai_config remaps these to GROQ_MODEL so an
+# old secrets.toml (or the TOML we previously handed the operator) still talks.
+GROQ_RETIRED_MODELS = frozenset({
+    "llama-3.3-70b-versatile",
+    "llama-3.1-70b-versatile",
+    "llama-3.1-8b-instant",
+    "mixtral-8x7b-32768",
+    "gemma2-9b-it",
+})
+AI_HTTP_USER_AGENT = "NorthlineFamilyDesk/1.0"
 
 # Providers that require no API key (local inference servers).
 _KEYLESS_PROVIDERS = frozenset({OLLAMA_LOCAL_PROVIDER})
@@ -184,6 +188,7 @@ def load_ai_config(env=None) -> AIConfig:
     explicit_model = str(env.get(ENV_AI_MODEL, "") or "").strip()
     # A key with no explicit provider is Groq — Streamlit Cloud has no Ollama.
     # Local Ollama stays the default only when no key is configured.
+    default_max_tokens = DEFAULT_MAX_TOKENS
     if explicit_provider:
         provider = explicit_provider
     elif api_key:
@@ -194,6 +199,7 @@ def load_ai_config(env=None) -> AIConfig:
         base_url = explicit_base or GROQ_BASE_URL
         model = explicit_model or GROQ_MODEL
         default_timeout = 60.0
+        default_max_tokens = 2048
     elif provider == OLLAMA_LOCAL_PROVIDER:
         base_url = explicit_base or OLLAMA_BASE_URL
         model = explicit_model or OLLAMA_MODEL
@@ -202,6 +208,8 @@ def load_ai_config(env=None) -> AIConfig:
         base_url = explicit_base or DEFAULT_BASE_URL
         model = explicit_model or DEFAULT_MODEL
         default_timeout = DEFAULT_TIMEOUT_SECONDS
+    if provider == GROQ_PROVIDER and model in GROQ_RETIRED_MODELS:
+        model = GROQ_MODEL
     return AIConfig(
         api_key=api_key,
         provider=provider,
@@ -209,7 +217,7 @@ def load_ai_config(env=None) -> AIConfig:
         model=model,
         timeout_seconds=_env_float(
             env.get(ENV_AI_TIMEOUT_SECONDS), default_timeout),
-        max_tokens=_env_int(env.get(ENV_AI_MAX_TOKENS), DEFAULT_MAX_TOKENS),
+        max_tokens=_env_int(env.get(ENV_AI_MAX_TOKENS), default_max_tokens),
         temperature=_env_float(env.get(ENV_AI_TEMPERATURE), DEFAULT_TEMPERATURE),
         structured_output=_env_bool(
             env.get(ENV_AI_STRUCTURED_OUTPUT), DEFAULT_STRUCTURED_OUTPUT),
