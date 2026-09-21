@@ -178,13 +178,37 @@ def load_ai_config(env=None) -> AIConfig:
         _secret = _streamlit_secret(_key)
         if _secret is not None:
             env[_key] = _secret
+    api_key = str(env.get(ENV_AI_API_KEY, "") or "").strip()
+    explicit_provider = str(env.get(ENV_AI_PROVIDER, "") or "").strip()
+    explicit_base = str(env.get(ENV_AI_BASE_URL, "") or "").strip()
+    explicit_model = str(env.get(ENV_AI_MODEL, "") or "").strip()
+    # A key with no explicit provider is Groq — Streamlit Cloud has no Ollama.
+    # Local Ollama stays the default only when no key is configured.
+    if explicit_provider:
+        provider = explicit_provider
+    elif api_key:
+        provider = GROQ_PROVIDER
+    else:
+        provider = DEFAULT_PROVIDER
+    if provider == GROQ_PROVIDER:
+        base_url = explicit_base or GROQ_BASE_URL
+        model = explicit_model or GROQ_MODEL
+        default_timeout = 60.0
+    elif provider == OLLAMA_LOCAL_PROVIDER:
+        base_url = explicit_base or OLLAMA_BASE_URL
+        model = explicit_model or OLLAMA_MODEL
+        default_timeout = OLLAMA_TIMEOUT_SECONDS
+    else:
+        base_url = explicit_base or DEFAULT_BASE_URL
+        model = explicit_model or DEFAULT_MODEL
+        default_timeout = DEFAULT_TIMEOUT_SECONDS
     return AIConfig(
-        api_key=str(env.get(ENV_AI_API_KEY, "") or "").strip(),
-        provider=str(env.get(ENV_AI_PROVIDER, "") or "").strip() or DEFAULT_PROVIDER,
-        base_url=str(env.get(ENV_AI_BASE_URL, "") or "").strip() or DEFAULT_BASE_URL,
-        model=str(env.get(ENV_AI_MODEL, "") or "").strip() or DEFAULT_MODEL,
+        api_key=api_key,
+        provider=provider,
+        base_url=base_url,
+        model=model,
         timeout_seconds=_env_float(
-            env.get(ENV_AI_TIMEOUT_SECONDS), DEFAULT_TIMEOUT_SECONDS),
+            env.get(ENV_AI_TIMEOUT_SECONDS), default_timeout),
         max_tokens=_env_int(env.get(ENV_AI_MAX_TOKENS), DEFAULT_MAX_TOKENS),
         temperature=_env_float(env.get(ENV_AI_TEMPERATURE), DEFAULT_TEMPERATURE),
         structured_output=_env_bool(

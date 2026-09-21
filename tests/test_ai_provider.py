@@ -195,6 +195,26 @@ def test_load_ai_config_defaults_no_key():
     assert cfg.structured_output is True
 
 
+def test_load_ai_config_key_without_provider_selects_groq():
+    """A Groq key on Cloud must not still target localhost Ollama."""
+    cfg = ai.load_ai_config({"AI_API_KEY": "gsk_test_not_a_real_key"})
+    assert cfg.api_key == "gsk_test_not_a_real_key"
+    assert cfg.provider == "groq"
+    assert cfg.base_url == "https://api.groq.com/openai/v1"
+    assert cfg.model == "llama-3.3-70b-versatile"
+    assert cfg.timeout_seconds == 60.0
+
+
+def test_load_ai_config_explicit_ollama_keeps_ollama_even_with_key():
+    cfg = ai.load_ai_config({
+        "AI_API_KEY": "gsk_test_not_a_real_key",
+        "AI_PROVIDER": "ollama_local",
+    })
+    assert cfg.provider == "ollama_local"
+    assert cfg.base_url == "http://localhost:11434/v1"
+    assert cfg.model == "llama3.1:8b"
+
+
 def test_default_model_config_is_valid_and_degrades_to_json_object(monkeypatch):
     """The default model id is a live Ollama local model and "Run AI research" works."""
     assert ai.DEFAULT_MODEL == "llama3.1:8b"
@@ -276,6 +296,8 @@ def test_load_ai_config_reads_streamlit_secrets(monkeypatch):
     assert cfg.api_key == "s3cret-from-toml"
     assert cfg.configured is True
     assert cfg.model == "stealth-model"
+    assert cfg.provider == "groq"
+    assert "api.groq.com" in cfg.base_url
 
 
 def test_load_ai_config_ignores_secrets_outside_runtime(monkeypatch):
