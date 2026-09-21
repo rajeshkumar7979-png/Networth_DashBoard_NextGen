@@ -11,10 +11,10 @@ GOLDENS = {
     "blank_currency_rows": 10,
     "fd_usd_principal": 109132.34,
     "fd_inr_principal": 3562870.00,
-    "mf_rows": 26,
-    "mf_invested": 7388311.90,
+    "mf_rows": 25,
+    "mf_invested": 7168423.41,
     "stocks_rows": 36,
-    "stocks_invested": 1435113.80,
+    "stocks_invested": 1458796.97,
     "gold_stock_symbols": ["SGBSEP31II-GB", "SGBMR29XII-GB", "GOLDBEES"],
 }
 

@@ -12,7 +12,6 @@ EXPECTED_WORKBOOK_CATEGORIES = {
     "EDELWEISS MID CAP FUND - DIRECT PLAN": "Mid Cap",
     "HDFC Gold ETF Fund of Fund": "Gold",
     "HDFC LIQUID FUND - DIRECT PLAN": "Liquid",
-    "HDFC LIQUID FUND-DIRECT PLAN-GROWTH OPTION": "Liquid",
     "HDFC Large Cap Fund Growth - Regular": "Large Cap",
     "HDFC MID CAP FUND - DIRECT PLAN - GROWTH OPTION": "Mid Cap",
     "ICICI PRUDENTIAL INFRASTRUCTURE FUND - DIRECT PLAN": "Sectoral/Thematic",
