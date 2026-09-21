@@ -140,8 +140,18 @@ def ollama_failure_hint(reason: Optional[str]) -> Optional[str]:
     if not reason:
         return None
     lowered = str(reason).lower()
-    if "timed out" in lowered:
+    if "timed out" in lowered or "timeout" in lowered:
         return OLLAMA_TIMEOUT_HINT
-    if "localhost:11434" in lowered or "connect" in lowered:
+    markers = (
+        "localhost:11434",
+        "127.0.0.1:11434",
+        "connection refused",
+        "httpconnectionpool",
+        "errno 111",
+        "max retries",
+        "could not reach the ollama",
+        "failed to establish a new connection",
+    )
+    if any(m in lowered for m in markers):
         return OLLAMA_NOT_RUNNING_HINT
     return None

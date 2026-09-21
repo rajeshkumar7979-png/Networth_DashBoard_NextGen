@@ -204,6 +204,12 @@ def test_outlook_today_is_not_inside_next_30():
 def test_holdings_dossier_uses_company_name_not_raw_isin_label():
     src = (ROOT / "pages" / "3_Asset_Detail.py").read_text(encoding="utf-8")
     assert "_dossier_label" in src
-    assert "Also inside family funds" in src
+    assert "Load company tape" in src
+    assert "Not this holding" in src
+    assert "direct stock holding" in src
+    assert "Company health" in src
+    assert "st.expander" in src
+    assert "Also inside family funds" not in src
+    assert "what this desk does not have" not in src
     assert "of family assets" in src
     assert "status_label" in src

@@ -197,6 +197,11 @@ def test_failure_hint_not_running():
     assert health.ollama_failure_hint(
         "AI provider unreachable: could not connect to localhost:11434") \
         == health.OLLAMA_NOT_RUNNING_HINT
+    blob = (
+        "HTTPConnectionPool(host='localhost', port=11434): Max retries exceeded "
+        "(Caused by NewConnectionError('[Errno 111] Connection refused'))"
+    )
+    assert health.ollama_failure_hint(blob) == health.OLLAMA_NOT_RUNNING_HINT
 
 
 def test_failure_hint_unknown_reason_returns_none():

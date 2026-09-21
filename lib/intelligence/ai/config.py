@@ -70,12 +70,17 @@ OLLAMA_BASE_URL = "http://localhost:11434/v1"
 OLLAMA_MODEL = "llama3.1:8b"
 OLLAMA_TIMEOUT_SECONDS = 180.0
 
+GROQ_PROVIDER = "groq"
+GROQ_BASE_URL = "https://api.groq.com/openai/v1"
+GROQ_MODEL = "llama-3.3-70b-versatile"
+
 # Providers that require no API key (local inference servers).
 _KEYLESS_PROVIDERS = frozenset({OLLAMA_LOCAL_PROVIDER})
 
 # Cascade: when the primary provider fails with a retriable network error
 # (timeout, connection refused) and no explicit client was injected, try the
-# fallback. Only wired for Groq → Ollama; other providers have no fallback.
+# fallback. Groq → Ollama (keyless). Ollama → Groq only when an API key is
+# present (handled in pipeline._fallback_config).
 _FALLBACK_PROVIDER: dict[str, str] = {
     "groq": OLLAMA_LOCAL_PROVIDER,
     "openai_compat": OLLAMA_LOCAL_PROVIDER,

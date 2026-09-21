@@ -25,6 +25,7 @@ from lib.returns import (
 from lib.intelligence.exposure import load_holdings_cache, _normalize_holdings
 from lib.intelligence import ai as intel_ai
 from lib.intelligence.ai.config import load_ai_config, provider_is_configured
+from lib.intelligence.ai.health import ollama_failure_hint
 from lib.ui import (
     caption,
     data_sheet,
@@ -37,9 +38,40 @@ from lib.ui import (
     tone_for,
 )
 from lib.instrument_names import extract_isin, looks_like_isin
+from lib.company_tape import fetch_yahoo_equity, yahoo_ticker
 from lib.intelligence.live import development_rows
 
 inject_css()
+
+
+@st.cache_data(ttl=21600, show_spinner=False)
+def _yahoo_tape(symbol: str, exchange: str):
+    """Opt-in company tape. Cached 6h. Never called until the button is pressed."""
+    return fetch_yahoo_equity(symbol, exchange)
+
+
+def _tape_cards(rows, cols=4):
+    cards = []
+    for row in rows:
+        v = row.get("value")
+        sub = row.get("sub") or ""
+        label = row.get("label") or ""
+        if isinstance(v, str):
+            shown = v
+        elif label == "Market cap" and isinstance(v, (int, float)) and v >= 1e5:
+            shown = format_inr(v)
+        elif sub == "%" or label in {
+            "Profit margin", "ROE", "Dividend yield", "vs SMA 50", "In 52-week range",
+        }:
+            shown = f"{float(v):.1f}%"
+        elif label in {
+            "Trailing P/E", "Forward P/E", "Price / Book", "RSI-14", "Beta", "Debt / Equity",
+        }:
+            shown = f"{float(v):.1f}"
+        else:
+            shown = f"{float(v):,.2f}"
+        cards.append({"label": label, "value": shown, "sub": sub if sub != "%" else "Yahoo"})
+    return kpi_cards(cards, cols=cols) if cards else ""
 
 nav_shell("holdings")
 st.markdown(page_header_html(
@@ -507,6 +539,8 @@ for _idx, (__, row) in enumerate(_positions.iterrows()):
     st.markdown(
         '<div class="t-meta-row">'
         + pill(str(row["Kind"]), "info")
+        + (pill("direct stock holding", "accent") if str(row["Kind"]) == "Stocks" else "")
+        + (pill("mutual fund scheme", "accent") if str(row["Kind"]) == "MF" else "")
         + pill(str(row["Class"]), "neutral")
         + pill(str(row["Member"]) if len(str(row["Member"])) > 0 else "member n/a", "neutral")
         + (pill(f"{contrib:.1f}% of family assets", "positive") if contrib is not None else "")
@@ -721,7 +755,7 @@ for _idx, (__, row) in enumerate(_positions.iterrows()):
                 "Look-through is no data, not zero. Refresh holdings from Funds if the cache is stale."),
                 unsafe_allow_html=True)
 
-    st.markdown(section_header_html("Health · this line in the book", "what the register actually knows"),
+    st.markdown(section_header_html("Health · this line in YOUR book", "register cost — not the company's PE"),
                 unsafe_allow_html=True)
     _kind = str(row["Kind"])
     _last = _num(rec.get("Current Price"))
@@ -761,40 +795,109 @@ for _idx, (__, row) in enumerate(_positions.iterrows()):
             "sub": "trailing NAV CAGR, not your XIRR",
         })
     st.markdown(kpi_cards(_health_cards, cols=4), unsafe_allow_html=True)
+    if _kind == "Stocks":
+        st.markdown(caption(
+            "These four cards are YOUR line in the register (cost, mark, weight). "
+            "They are not this company's PE, RSI or moving averages — that tape is the next block."
+        ), unsafe_allow_html=True)
 
     if _kind == "Stocks":
         _isin = extract_isin(rec.get("ISIN"), rec.get("Company Name"), row.get("Key"))
-        _also = _family_funds_holding(_isin) if _isin else []
-        st.markdown(section_header_html("Also inside family funds", "look-through, same ISIN"),
+        _sym = str(rec.get("Symbol") or row.get("Key") or "").strip()
+        _exch = str(rec.get("Exchange") or "NSE").strip() or "NSE"
+
+        st.markdown(section_header_html(
+            f"Company health · {_sym or 'this issuer'}",
+            "Yahoo tape for the company — opt-in, never on load"),
+            unsafe_allow_html=True)
+        st.markdown(caption(
+            f"You are still on the direct stock line "
+            f"({_sym or 'this ticker'} · {row['Member']} · "
+            f"{rec.get('Quantity') or 'n/a'} shares). "
+            "PE, book, RSI-14 and SMAs are the company's published tape, not your cost basis. "
+            "Fetch is a button — this page never calls Yahoo when it opens."
+        ), unsafe_allow_html=True)
+        _tape_key = f"holdings_tape_{row['Key']}"
+        _load_tape = st.button(
+            f"Load company tape for {_sym or 'this stock'} (Yahoo, opt-in)",
+            key=_tape_key,
+            help="Calls Yahoo Finance once for this ticker. Cached six hours. Never on page load.",
+        )
+        if _load_tape:
+            with st.spinner(f"Fetching {yahoo_ticker(_sym, _exch)} from Yahoo…"):
+                st.session_state[_tape_key + "_data"] = _yahoo_tape(_sym, _exch)
+        _tape = st.session_state.get(_tape_key + "_data")
+        if _tape and _tape.get("ok"):
+            if _tape.get("name"):
+                st.markdown(caption(
+                    f"Yahoo name: {_tape.get('name')} · ticker {_tape.get('ticker') or _sym}."
+                ), unsafe_allow_html=True)
+            _funda = (_tape.get("fundamentals") or {}).get("rows") or []
+            _tech = (_tape.get("technicals") or {}).get("rows") or []
+            if _funda:
+                st.markdown(caption(
+                    "Fundamentals — " + (_tape.get("fundamentals") or {}).get("note", "")),
                     unsafe_allow_html=True)
-        if _also:
-            _also_rows = []
-            for item in _also:
-                w = item.get("Weight %")
-                _also_rows.append({
-                    "Fund": item["Fund"],
-                    "Member": item.get("Owner") or "",
-                    "Weight in that fund": f"{w:.2f}%" if isinstance(w, (int, float)) else "—",
-                })
-            st.dataframe(pd.DataFrame(_also_rows), hide_index=True, use_container_width=True)
+                st.markdown(_tape_cards(_funda, cols=4), unsafe_allow_html=True)
+            else:
+                st.markdown(caption(
+                    "Yahoo published no fundamental fields for this ticker this run. "
+                    "PE stays missing — not zero."),
+                    unsafe_allow_html=True)
+            if _tech:
+                _as = (_tape.get("technicals") or {}).get("as_of")
+                st.markdown(caption(
+                    "Technicals — "
+                    + ((_tape.get("technicals") or {}).get("note") or "")
+                    + (f" Last bar {_as}." if _as else "")),
+                    unsafe_allow_html=True)
+                st.markdown(_tape_cards(_tech, cols=4), unsafe_allow_html=True)
             st.markdown(caption(
-                f"{len(_also)} scheme(s) in this family's MF book disclose {_isin or 'this ISIN'}. "
-                "Weight is the fund's statutory portfolio, not your rupee mix. Direct holding above is extra."),
+                f"Source: {_tape.get('source') or 'Yahoo'} · ticker {_tape.get('ticker') or _sym} "
+                f"· retrieved {_tape.get('retrieved_at') or '—'}. Not a buy/sell."),
+                unsafe_allow_html=True)
+        elif _tape and not _tape.get("ok"):
+            st.markdown(caption(
+                str(_tape.get("error") or "Yahoo tape unavailable this run.")
+                + " Company PE/RSI stay missing."),
                 unsafe_allow_html=True)
         else:
             st.markdown(caption(
-                "No family fund in the committed holdings cache discloses this ISIN. "
-                "That is 'not in the look-through', not 'zero overlap'."),
-                unsafe_allow_html=True)
+                f"Company PE, book, RSI-14 and SMAs for {_sym or 'this ticker'} are not in the workbook. "
+                "Press the button to load Yahoo's tape. Until then they stay missing — never a guessed PE."
+            ), unsafe_allow_html=True)
 
-        st.markdown(section_header_html("Fundamentals · technicals", "what this desk does not have"),
-                    unsafe_allow_html=True)
-        st.markdown(caption(
-            "PE, book value, earnings, shareholding, RSI, moving averages and candle patterns "
-            "are not in the workbook and there is no NSE/BSE fundamentals or charting feed on this desk. "
-            "SEC EDGAR covers US filers only. Missing stays missing — never a guessed PE or a buy/sell from candles. "
-            "Health above is this line in YOUR book (cost, mark, days held, family weight, fund overlap)."),
-            unsafe_allow_html=True)
+        _also = _family_funds_holding(_isin) if _isin else []
+        with st.expander(
+            "Not this holding — family funds that also own this ISIN (look-through overlap)",
+            expanded=False,
+        ):
+            st.markdown(caption(
+                f"This dossier is the direct {_sym or 'stock'} line "
+                f"({rec.get('Quantity') or 'n/a'} shares on the Stocks sleeve). "
+                "The schemes below are mutual funds in the family book that disclose the same ISIN. "
+                "They are overlap — they are not this holding, and this is not the Funds page."
+            ), unsafe_allow_html=True)
+            if _also:
+                _also_rows = []
+                for item in _also:
+                    w = item.get("Weight %")
+                    _also_rows.append({
+                        "Family fund (not this holding)": item["Fund"],
+                        "Member": item.get("Owner") or "",
+                        "Weight in that fund": f"{w:.2f}%" if isinstance(w, (int, float)) else "—",
+                    })
+                st.dataframe(pd.DataFrame(_also_rows), hide_index=True, use_container_width=True)
+                st.markdown(caption(
+                    f"{len(_also)} scheme-row(s) disclose {_isin or 'this ISIN'}. "
+                    "Weight is the fund's statutory portfolio, not your rupee mix. "
+                    "The direct holding above is extra."
+                ), unsafe_allow_html=True)
+            else:
+                st.markdown(caption(
+                    "No family fund in the committed holdings cache discloses this ISIN. "
+                    "That is 'not in the look-through', not 'zero overlap'."
+                ), unsafe_allow_html=True)
     elif _kind == "MF":
         st.markdown(caption(
             "Scheme 1Y/3Y/5Y and Nifty bars come from the Command Center NAV path. "
@@ -856,7 +959,9 @@ for _idx, (__, row) in enumerate(_positions.iterrows()):
                 unsafe_allow_html=True)
     st.markdown(caption(
         "AI restates verified facts from the Command Center research brief. "
-        "It never computes a rupee, never invents XIRR, PE or a trade, and never runs when this page opens."
+        "It never computes a rupee, never invents XIRR, PE or a trade, and never runs when this page opens. "
+        "On Streamlit Cloud there is no local Ollama. Interpret needs a Groq key in secrets "
+        "[ai] AI_API_KEY — without it the button fails closed and the dossier numbers stay."
     ), unsafe_allow_html=True)
     _ai_key = f"holdings_ai_{row['Key']}_{_idx}"
     try:
@@ -916,11 +1021,22 @@ for _idx, (__, row) in enumerate(_positions.iterrows()):
         else:
             _label = getattr(_stored, "status_label", None) or _status or "unavailable"
             _reason = str(getattr(_stored, "reason", "") or "").strip()
+            _hint = ollama_failure_hint(_reason)
+            if "HTTPConnectionPool" in _reason or "Errno 111" in _reason:
+                _reason = _hint or (
+                    "Ollama is not running. This Streamlit host has no local Ollama. "
+                    "Add Streamlit secret [ai] AI_API_KEY (Groq) to interpret here."
+                )
+            elif _hint:
+                _reason = _hint + (
+                    " This Streamlit host has no local Ollama. "
+                    "Add Streamlit secret [ai] AI_API_KEY (Groq) to interpret here."
+                )
             _line = f"AI did not produce a grounded reading — {_label}."
             if _reason:
                 _line += f" {_reason}"
             if _status == "not_configured":
-                _line += " Configure a local Ollama endpoint or an API key in secrets. The numbers above stay the source of truth."
+                _line += " Configure a Groq key in Streamlit secrets [ai] AI_API_KEY. The numbers above stay the source of truth."
             elif _status == "insufficient_evidence":
                 _line += " Open Command Center so the research brief has evidence; AI will not invent it."
             else:

@@ -28,13 +28,18 @@ from lib.intelligence.ai.config import (
     ENV_AI_API_KEY,
     AIConfig,
     _FALLBACK_PROVIDER,
+    GROQ_BASE_URL,
+    GROQ_MODEL,
+    GROQ_PROVIDER,
     OLLAMA_BASE_URL,
+    OLLAMA_LOCAL_PROVIDER,
     OLLAMA_MODEL,
     OLLAMA_TIMEOUT_SECONDS,
     load_ai_config,
     provider_is_configured,
     redact,
 )
+from lib.intelligence.ai.health import check_ollama_health, ollama_failure_hint
 from lib.intelligence.ai.model import (
     STATUS_FAILED,
     STATUS_INSUFFICIENT,
@@ -79,11 +84,24 @@ def _has_research_content(brief) -> bool:
 
 
 def _fallback_config(primary_config: AIConfig) -> Optional[AIConfig]:
-    """Build an AIConfig for the local fallback provider, if one exists.
+    """Build an AIConfig for the wired fallback, if one exists.
 
-    Returns None when the primary provider has no wired fallback or is already
-    the fallback (no cascading beyond one level).
+    Groq/openai_compat → keyless Ollama. Ollama → Groq only when a key is
+    already on the primary config (Streamlit secrets / AI_API_KEY). Returns
+    None when there is nowhere to cascade.
     """
+    if primary_config.provider == OLLAMA_LOCAL_PROVIDER and primary_config.api_key.strip():
+        return AIConfig(
+            api_key=primary_config.api_key,
+            provider=GROQ_PROVIDER,
+            base_url=GROQ_BASE_URL,
+            model=GROQ_MODEL,
+            timeout_seconds=min(float(primary_config.timeout_seconds or 60), 60.0),
+            max_tokens=primary_config.max_tokens,
+            temperature=primary_config.temperature,
+            structured_output=primary_config.structured_output,
+            max_evidence_catalog=primary_config.max_evidence_catalog,
+        )
     fallback_name = _FALLBACK_PROVIDER.get(primary_config.provider)
     if not fallback_name or fallback_name == primary_config.provider:
         return None
@@ -98,6 +116,38 @@ def _fallback_config(primary_config: AIConfig) -> Optional[AIConfig]:
         structured_output=primary_config.structured_output,
         max_evidence_catalog=primary_config.max_evidence_catalog,
     )
+
+
+def _clean_reason(exc, config: AIConfig, *, rewrite_local: bool = False) -> str:
+    raw = redact(str(exc), getattr(config, "api_key", None))
+    lowered = raw.lower()
+    urllib_blob = (
+        "httpconnectionpool" in lowered
+        or "max retries" in lowered
+        or "errno 111" in lowered
+        or "connection refused" in lowered
+    )
+    if rewrite_local and getattr(config, "provider", "") == OLLAMA_LOCAL_PROVIDER:
+        hint = ollama_failure_hint(raw)
+        if hint and "taking too long" in hint.lower():
+            return hint
+        if hint or urllib_blob:
+            return (
+                "Ollama is not running on this host. "
+                "Add Streamlit secret [ai] AI_API_KEY (Groq) to interpret here. "
+                "The deterministic dossier is unchanged."
+            )
+    if urllib_blob:
+        return (
+            "AI provider is unreachable from this host. "
+            "The deterministic dossier is unchanged."
+        )
+    return raw
+
+
+def _ollama_is_up() -> bool:
+    probe = check_ollama_health()
+    return bool(probe.get("ok"))
 
 
 def run_ai_research(
@@ -149,7 +199,6 @@ def run_ai_research(
             fallback_used=True,
         )
 
-    cli = client if client is not None else build_client(config)
     ctx = build_context(brief=brief, question=question,
                         max_evidence=config.max_evidence_catalog)
     messages = (
@@ -165,10 +214,47 @@ def run_ai_research(
 
     start = time.perf_counter()
     response = None
+    cli = client
+
+    # Local Ollama is keyless, so provider_is_configured is True even on a
+    # host with nothing listening on :11434 (Streamlit Cloud). Probe first
+    # on the default path so we never wait 180s or dump urllib internals.
+    if client is None and config.provider == OLLAMA_LOCAL_PROVIDER and not _ollama_is_up():
+        fb_cfg = _fallback_config(config)
+        if fb_cfg is not None:
+            try:
+                fb_cli = build_client(fb_cfg)
+                response = fb_cli.complete(request, api_key=fb_cfg.api_key)
+            except Exception as exc:
+                return AIOutcome(
+                    status=STATUS_FAILED,
+                    created_at=now,
+                    reason=_clean_reason(exc, fb_cfg, rewrite_local=False),
+                    provider=fb_cfg.provider,
+                    model=fb_cfg.model,
+                    fallback_used=True,
+                )
+        if response is None:
+            return AIOutcome(
+                status=STATUS_FAILED,
+                created_at=now,
+                reason=_clean_reason(
+                    "Could not reach the Ollama server on localhost:11434.",
+                    config,
+                    rewrite_local=True,
+                ),
+                provider=config.provider,
+                model=config.model,
+                fallback_used=True,
+            )
+
+    if response is None:
+        cli = client if client is not None else build_client(config)
 
     # --- primary provider --------------------------------------------------
     try:
-        response = cli.complete(request, api_key=config.api_key)
+        if response is None:
+            response = cli.complete(request, api_key=config.api_key)
     except (AIProviderTimeout, AIProviderUnavailable) as exc:
         # Retriable network error: try the wired fallback when no explicit
         # client was injected (the CC button path uses client=None).
@@ -180,14 +266,14 @@ def run_ai_research(
                     "failure", config.provider, fb_cfg.provider)
                 try:
                     fb_cli = build_client(fb_cfg)
-                    response = fb_cli.complete(request, api_key="")
+                    response = fb_cli.complete(request, api_key=fb_cfg.api_key)
                 except Exception:  # fallback also failed — fall through
                     pass
         if response is None:
             return AIOutcome(
                 status=STATUS_FAILED,
                 created_at=now,
-                reason=redact(str(exc), config.api_key),
+                reason=_clean_reason(exc, config, rewrite_local=(client is None)),
                 provider=config.provider,
                 model=config.model,
                 fallback_used=True,
@@ -196,7 +282,7 @@ def run_ai_research(
         return AIOutcome(
             status=STATUS_FAILED,
             created_at=now,
-            reason=redact(str(exc), config.api_key),
+            reason=_clean_reason(exc, config, rewrite_local=(client is None)),
             provider=config.provider,
             model=config.model,
             fallback_used=True,
@@ -205,9 +291,12 @@ def run_ai_research(
         return AIOutcome(
             status=STATUS_FAILED,
             created_at=now,
-            reason=redact(
+            reason=_clean_reason(
                 f"Unexpected AI provider failure: "
-                f"{type(exc).__name__}: {exc}", config.api_key),
+                f"{type(exc).__name__}: {exc}",
+                config,
+                rewrite_local=(client is None),
+            ),
             provider=getattr(cli, "provider", config.provider),
             model=getattr(cli, "model", config.model),
             fallback_used=True,

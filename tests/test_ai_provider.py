@@ -796,13 +796,16 @@ def test_run_not_configured_no_network(monkeypatch):
         raise AssertionError("network call while not configured")
 
     monkeypatch.setattr(aiclient.requests, "post", boom)
+    from lib.intelligence.ai import pipeline as ai_pipe
+    monkeypatch.setattr(ai_pipe, "_ollama_is_up", lambda: False)
     out = ai.run_ai_research(
         brief=_brief(), config=ai.AIConfig(api_key=""),
         facts=_facts())
     assert out.status == "failed"
     assert out.fallback_used is True
-    assert "network call while not configured" in (out.reason or "")
-    assert len(calls) == 1
+    assert calls == []
+    assert "HTTPConnectionPool" not in (out.reason or "")
+    assert "Ollama is not running" in (out.reason or "")
 
 
 def test_run_insufficient_evidence_no_network(monkeypatch):
@@ -924,6 +927,7 @@ def test_ai_research_cascade_fails_when_ollama_unavailable(monkeypatch):
 def test_ai_research_ollama_primary_is_keyless(monkeypatch):
     from lib.intelligence.ai import pipeline as ai_pipe
 
+    monkeypatch.setattr(ai_pipe, "_ollama_is_up", lambda: True)
     monkeypatch.setattr(
         ai_pipe, "build_client",
         lambda cfg: _LocalFakeClient(response_text=json.dumps(SAMPLE)))
@@ -934,6 +938,70 @@ def test_ai_research_ollama_primary_is_keyless(monkeypatch):
                                   client=None, facts=_facts(), now=NOW)
     assert out.status == "ok"
     assert out.provider == ai.OLLAMA_LOCAL_PROVIDER
+
+
+def test_ai_research_ollama_down_without_key_does_not_dump_urllib(monkeypatch):
+    from lib.intelligence.ai import pipeline as ai_pipe
+
+    monkeypatch.setattr(ai_pipe, "_ollama_is_up", lambda: False)
+    cfg = ai.AIConfig(api_key="", provider=ai.OLLAMA_LOCAL_PROVIDER,
+                      base_url=ai.OLLAMA_BASE_URL, model=ai.OLLAMA_MODEL)
+    out = ai_pipe.run_ai_research(brief=_brief(), config=cfg,
+                                  client=None, facts=_facts(), now=NOW)
+    assert out.status == "failed"
+    assert "HTTPConnectionPool" not in (out.reason or "")
+    assert "Errno 111" not in (out.reason or "")
+    assert "Ollama is not running" in (out.reason or "")
+    assert "AI_API_KEY" in (out.reason or "")
+
+
+def test_ai_research_ollama_complete_exception_scrubs_urllib(monkeypatch):
+    from lib.intelligence.ai import pipeline as ai_pipe
+
+    class Boom:
+        provider = ai.OLLAMA_LOCAL_PROVIDER
+        model = "llama3.1:8b"
+
+        def complete(self, request, api_key=""):
+            raise Exception(
+                "HTTPConnectionPool(host='localhost', port=11434): Max retries "
+                "exceeded (Caused by NewConnectionError('[Errno 111] Connection "
+                "refused'))"
+            )
+
+    monkeypatch.setattr(ai_pipe, "_ollama_is_up", lambda: True)
+    monkeypatch.setattr(ai_pipe, "build_client", lambda cfg: Boom())
+    cfg = ai.AIConfig(api_key="", provider=ai.OLLAMA_LOCAL_PROVIDER,
+                      base_url=ai.OLLAMA_BASE_URL, model=ai.OLLAMA_MODEL)
+    out = ai_pipe.run_ai_research(brief=_brief(), config=cfg,
+                                  client=None, facts=_facts(), now=NOW)
+    assert out.status == "failed"
+    assert "HTTPConnectionPool" not in (out.reason or "")
+    assert "Errno 111" not in (out.reason or "")
+    assert "localhost:11434" not in (out.reason or "")
+    assert "Ollama is not running" in (out.reason or "")
+
+
+def test_ai_research_ollama_down_with_key_cascades_to_groq(monkeypatch):
+    from lib.intelligence.ai import pipeline as ai_pipe
+
+    built = []
+
+    def _build(cfg):
+        built.append(cfg.provider)
+        if cfg.provider == "groq":
+            return _LocalFakeClient(response_text=json.dumps(SAMPLE))
+        raise AssertionError(f"should not build {cfg.provider} when ollama is down")
+
+    monkeypatch.setattr(ai_pipe, "_ollama_is_up", lambda: False)
+    monkeypatch.setattr(ai_pipe, "build_client", _build)
+    out = ai_pipe.run_ai_research(
+        brief=_brief(),
+        config=ai.AIConfig(api_key=API_KEY, provider=ai.OLLAMA_LOCAL_PROVIDER,
+                           base_url=ai.OLLAMA_BASE_URL, model=ai.OLLAMA_MODEL),
+        client=None, facts=_facts(), now=NOW)
+    assert out.status == "ok"
+    assert built == ["groq"]
 
 
 def test_run_malformed_response_classified():
