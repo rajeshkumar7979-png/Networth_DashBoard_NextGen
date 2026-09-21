@@ -109,6 +109,18 @@ def test_phase_b_recon_count_currency_key_and_timestamps():
     assert "retrieved_at" in src
     assert "FCNR return · two parts" in src
     assert "get_usd_inr_quote" in src
+    assert "(member, key)" in src
+    assert "News pulse · holdings + NRI" in src
+    assert "Books at a glance" in src
+    assert "flags[:8]" in src
+
+
+def test_phase_c_holdings_performance_columns():
+    src = (ROOT / "pages" / "3_Asset_Detail.py").read_text(encoding="utf-8")
+    assert "vs Nifty50 1Y" in src
+    assert "Interest Return (INR)" in src
+    assert "Days left" in src
+    assert "1Y / 3Y / 5Y" in src
 
 
 def test_phase_b_intelligence_mapped_only_no_unmapped_fallback():

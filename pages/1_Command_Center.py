@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import yfinance as yf
 import requests
 import feedparser
@@ -9,6 +10,9 @@ import os
 import re
 import time
 import html as _html
+import plotly.graph_objects as go
+import plotly.express as px
+from plotly.subplots import make_subplots
 from lib.formatters import safe_float, format_inr_indian, format_inr, format_inr_compact
 from lib.portfolio import load_excel as load_data
 from lib.valuation import _safe_maturity_amount, compute_fd_current_native, compute_fcnr_attribution
@@ -1029,8 +1033,15 @@ if register is not None:
     ))
     recon_tests.append((
         "Register keys unique",
-        bool(register["Key"].is_unique) if "Key" in register.columns else False,
-        f"{int(register['Key'].nunique()) if 'Key' in register.columns else 0} unique / {_n_reg} rows",
+        (
+            int(register[["Member", "Key"]].astype(str).drop_duplicates().shape[0]) == _n_reg
+            if {"Member", "Key"} <= set(register.columns) else False
+        ),
+        (
+            f"{int(register[['Member', 'Key']].astype(str).drop_duplicates().shape[0])} "
+            f"(member, key) pairs / {_n_reg} rows"
+            if {"Member", "Key"} <= set(register.columns) else "member/key columns missing"
+        ),
     ))
     _reg_src = register.groupby("Source").size().to_dict() if "Source" in register.columns else {}
     for _src, _n_page in (("MF", _n_mf), ("Stocks", _n_stocks), ("Gold", _n_gold), ("FD", _n_fd)):
@@ -1390,7 +1401,11 @@ if total_fcnr:
          "value": format_inr_compact(total_fx_gain),
          "sub": "Principal × (today − deposit-date FX)",
          "tone": "up" if (total_fx_gain or 0) >= 0 else "down"},
-    ], cols=2), unsafe_allow_html=True)
+        {"label": "Total FCNR return",
+         "value": format_inr_compact(float(total_fcnr_interest or 0) + float(total_fx_gain or 0)),
+         "sub": "Interest + FX, mark-to-market",
+         "tone": "up" if (float(total_fcnr_interest or 0) + float(total_fx_gain or 0)) >= 0 else "down"},
+    ], cols=3), unsafe_allow_html=True)
     st.markdown(ui_caption(
         "FCNR is a USD deposit book. Native principal and maturity proceeds stay in USD — "
         "never converted at a guessed settlement rate. The INR figures are this run's "
@@ -1399,11 +1414,11 @@ if total_fcnr:
         "within ₹1 (lib/valuation)."
     ), unsafe_allow_html=True)
 
-# Visible briefing attention (string pinned by smoke tests). Two insight cards
-# on the first screen — real flags first, allocation notes fill any gap.
-st.markdown(ui_section("What deserves attention", f"{min(len(flags), 6)} items"),
+# Visible briefing attention (string pinned by smoke tests). Up to eight
+# tiles — same set the original Command Center showed, responsive grid.
+st.markdown(ui_section("What deserves attention", f"{len(flags)} items"),
             unsafe_allow_html=True)
-_attention_items = [{"level": lv, "title": ti, "body": bd} for lv, ti, bd in flags[:2]]
+_attention_items = [{"level": lv, "title": ti, "body": bd} for lv, ti, bd in flags[:8]]
 if len(_attention_items) < 2 and equity_pct < 35:
     _attention_items.append({
         "level": "info",
@@ -1425,7 +1440,7 @@ if len(_attention_items) < 2 and fcnr_pct >= 30:
         ),
     })
 if _attention_items:
-    st.markdown(ui_attn(_attention_items[:2]), unsafe_allow_html=True)
+    st.markdown(ui_attn(_attention_items[:8]), unsafe_allow_html=True)
 else:
     st.markdown(ui_empty("Nothing flagged right now.",
                          "No warning, risk or decision-support item this run."),
@@ -1709,6 +1724,239 @@ except Exception:
 
 # ---- Market pulse tiles (free delayed sources, TTL-cached) ----
 pulse_rows = build_market_pulse_rows()
+
+_PLOT_CFG = {"displayModeBar": False, "responsive": True}
+
+
+def _apply_plotly(fig, height=230):
+    fig.update_layout(
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(color="#8b93a4", family="IBM Plex Sans, Segoe UI, sans-serif", size=11),
+        height=height,
+        margin=dict(t=8, b=8, l=8, r=8),
+    )
+    return fig
+
+
+# Market pulse on the briefing (original Command first-screen tape).
+st.markdown(ui_section("Market pulse", "delayed marks · ATH from Yahoo"),
+            unsafe_allow_html=True)
+_pulse_html = []
+for row in pulse_rows:
+    if row["Value"] is None:
+        chg_html = '<div class="pulse-chg-na">—</div>'
+        val = "—"
+    else:
+        val = row["fmt"].format(row["Value"])
+        chg = row["Chg %"]
+        if chg is None:
+            chg_html = '<div class="pulse-chg-na">—</div>'
+        elif chg >= 0:
+            chg_html = f'<div class="pulse-chg-up">{chg:+.2f}%</div>'
+        else:
+            chg_html = f'<div class="pulse-chg-dn">{chg:+.2f}%</div>'
+    ath = row.get("ATH %")
+    ath_html = f'<div class="pulse-chg-na" style="font-size:0.68rem">{ath:.1f}% from ATH</div>' if ath is not None else ""
+    _pulse_html.append(
+        f'<div class="pulse-card"><div class="pulse-label">{_html.escape(str(row["Market"]))}</div>'
+        f'<div class="pulse-val">{_html.escape(str(val))}</div>{chg_html}{ath_html}</div>'
+    )
+if _pulse_html:
+    st.markdown(f'<div class="pulse-grid">{"".join(_pulse_html)}</div>', unsafe_allow_html=True)
+    st.markdown(ui_caption(
+        "Free delayed marks · Gold ₹/10g & Silver ₹/kg · day change vs prior close · ATH from Yahoo"
+    ), unsafe_allow_html=True)
+
+# Processed news sentiments — original Command grouping (asset + tone), not raw RSS.
+st.markdown(ui_section("News pulse · holdings + NRI", "processed sentiment"),
+            unsafe_allow_html=True)
+_chip_groups = []
+for g in (groups or []):
+    cat = g.get("category")
+    asset = str(g.get("asset") or "")
+    _au = asset.upper()
+    if cat in ("holding", "nri_tax"):
+        _chip_groups.append(g)
+    elif cat == "macro" and any(k in _au for k in ("SENSEX", "NIFTY", "NASDAQ", "USD", "INR")):
+        _chip_groups.append(g)
+if _chip_groups:
+    _sent_lbl = {"red": "Negative", "green": "Positive", "neutral": "Neutral"}
+    _chips = []
+    for g in _chip_groups[:9]:
+        sent = g.get("sentiment") or "neutral"
+        tone = "t-sent-down" if sent == "red" else ("t-sent-up" if sent == "green" else "")
+        _chips.append(
+            f'<div class="t-sent-chip {tone}">'
+            f'<span class="t-sent-name">{_html.escape(str(g.get("asset") or ""))}</span>'
+            f'<span class="t-sent-lbl">{_sent_lbl.get(sent, "Neutral")}</span></div>'
+        )
+    st.markdown(f'<div class="t-sent-grid">{"".join(_chips)}</div>', unsafe_allow_html=True)
+    safe_page_link("pages/4_News.py", label="Full tape →")
+    st.markdown(ui_caption(
+        "One chip per holding / NRI term. Tone is a keyword heuristic on grouped headlines, "
+        "not a verified fact. Raw RSS stays on Pulse."
+    ), unsafe_allow_html=True)
+else:
+    st.markdown(ui_empty("No holdings or NRI/tax headlines this run",
+                         "Market backdrop, if any, is not shown as a named sentiment."),
+                unsafe_allow_html=True)
+
+# Charts — original Command density, same numbers, responsive columns.
+st.markdown(ui_section("Books at a glance", "health · mix · members · concentration"),
+            unsafe_allow_html=True)
+try:
+    _g1, _g2 = st.columns(2)
+    with _g1:
+        st.markdown(ui_caption("Portfolio health breakdown"), unsafe_allow_html=True)
+        _bd = pd.DataFrame({"Factor": list(factor_scores.keys()),
+                            "Score": list(factor_scores.values())})
+        _colors = ["#e15d5d" if s < 55 else ("#d4a054" if s < 75 else "#3cba8c")
+                   for s in _bd["Score"]]
+        _fh = go.Figure(go.Bar(
+            x=_bd["Score"], y=_bd["Factor"], orientation="h",
+            marker_color=_colors,
+            text=[f"{s:.0f}" for s in _bd["Score"]], textposition="outside",
+        ))
+        _fh.update_xaxes(range=[0, 105], showgrid=False)
+        st.plotly_chart(_apply_plotly(_fh, 220), width="stretch", config=_PLOT_CFG)
+        _why = []
+        if factor_scores.get("Liquidity", 100) < 50:
+            _why.append(
+                f"Deployable liquidity is {true_liquid_pct:.1f}% of assets "
+                f"(liquid MF + deposits maturing ≤90d). Long FCNR is not cash."
+            )
+        if factor_scores.get("Allocation", 100) < 40:
+            _why.append(
+                f"Equity (ex-liquid) is {equity_pct:.1f}% — NRI books often run lower by design."
+            )
+        if factor_scores.get("Concentration", 100) < 60:
+            _why.append("Top holdings concentration is elevated.")
+        if factor_scores.get("Performance", 100) < 55:
+            _why.append("Trailing fund performance vs Nifty50 is mixed.")
+        if fcnr_pct > 0:
+            _why.append(
+                f"FCNR is {fcnr_pct:.1f}% — USD principal + interest + INR FX vs deposit-date rate."
+            )
+        if not _why:
+            _why.append("No single factor is dragging hard — score is moderate overall.")
+        st.markdown(
+            '<div class="t-card"><b>Why score is '
+            + _html.escape(f"{health_score:.0f}")
+            + "? (NRI view)</b><ul class='t-list'>"
+            + "".join(f"<li>{_html.escape(x)}</li>" for x in _why)
+            + "</ul></div>",
+            unsafe_allow_html=True,
+        )
+    with _g2:
+        st.markdown(ui_caption("Asset allocation · NRI books"), unsafe_allow_html=True)
+        _alloc = pd.DataFrame({
+            "Asset": ["Equity", "Liquid MF", "INR FD", "FCNR (USD)", "Gold"],
+            "Value": [total_equity, total_liquid_mf, total_inr_fd, total_fcnr, total_gold],
+        })
+        _alloc = _alloc[_alloc["Value"] > 0].reset_index(drop=True)
+        _pie_colors = [theme.SLEEVE_COLORS.get(a, "#8b93a4")
+                       if a in theme.SLEEVE_COLORS
+                       else {"FCNR (USD)": theme.SLEEVE_COLORS["FCNR"]}.get(a, "#8b93a4")
+                       for a in _alloc["Asset"]]
+        _fp = px.pie(_alloc, values="Value", names="Asset", hole=0.62,
+                     color_discrete_sequence=_pie_colors)
+        _fp.update_traces(textposition="inside", textinfo="percent", textfont_size=12)
+        _fp.update_layout(annotations=[dict(
+            text=f"{format_inr_compact(total_networth)}<br>assets",
+            x=0.5, y=0.5, font_size=13, showarrow=False, font_color="#eceef2",
+        )])
+        st.plotly_chart(_apply_plotly(_fp, 230), width="stretch", config=_PLOT_CFG)
+    _g3, _g4 = st.columns(2)
+    with _g3:
+        st.markdown(ui_caption("By family member"), unsafe_allow_html=True)
+        if owner_map:
+            _odf = pd.DataFrame([
+                {"Member": _owner_short(k) or k, "Value": v}
+                for k, v in owner_map.items()
+            ])
+            _fm = px.bar(_odf, x="Member", y="Value", color_discrete_sequence=["#8fa4c4"])
+            st.plotly_chart(_apply_plotly(_fm, 230), width="stretch", config=_PLOT_CFG)
+        else:
+            st.markdown(ui_caption("No member split this run."), unsafe_allow_html=True)
+    with _g4:
+        st.markdown(ui_caption("Top 5 stock concentration"), unsafe_allow_html=True)
+        if not stocks_valid.empty and total_stocks > 0:
+            _top5 = stocks_valid.nlargest(5, "Current Value")[["Symbol", "Current Value"]].copy()
+            _other = max(float(total_stocks) - float(_top5["Current Value"].sum()), 0)
+            _pie_df = pd.concat([
+                _top5.rename(columns={"Symbol": "Name", "Current Value": "Value"}),
+                pd.DataFrame([{"Name": "Others", "Value": _other}]),
+            ], ignore_index=True)
+            _ft5 = px.pie(_pie_df, values="Value", names="Name", hole=0.55,
+                          color_discrete_sequence=["#8fa4c4", "#d4a054", "#6b8cce",
+                                                   "#e15d5d", "#4aa88a", "#5c6578"])
+            _ft5.update_traces(textposition="inside", textinfo="percent", textfont_size=11)
+            _ft5.update_layout(
+                showlegend=True,
+                legend=dict(orientation="h", y=-0.15, font=dict(size=10, color="#8b93a4")),
+                annotations=[dict(
+                    text=f"{top5_stock_pct:.0f}%<br>Top 5",
+                    x=0.5, y=0.5, font_size=13, showarrow=False, font_color="#eceef2",
+                )],
+            )
+            st.plotly_chart(_apply_plotly(_ft5, 250), width="stretch", config=_PLOT_CFG)
+        else:
+            st.markdown(ui_caption("No stock holdings for concentration."), unsafe_allow_html=True)
+    _g5, _g6 = st.columns(2)
+    with _g5:
+        st.markdown(ui_caption("MF category mix · overlap proxy"), unsafe_allow_html=True)
+        if not mf_valid.empty and "Category" in mf_valid.columns:
+            _cat = (mf_valid.groupby("Category")["Current Value"].sum()
+                    .reset_index().sort_values("Current Value", ascending=True))
+            _fc = px.bar(_cat, x="Current Value", y="Category", orientation="h",
+                         color_discrete_sequence=["#4aa88a"])
+            st.plotly_chart(_apply_plotly(_fc, 260), width="stretch", config=_PLOT_CFG)
+            st.markdown(ui_caption(
+                "Category mix is a proxy, not stock-level overlap. Genuine overlap is on Funds."
+            ), unsafe_allow_html=True)
+        else:
+            st.markdown(ui_caption("No MF book for category mix."), unsafe_allow_html=True)
+    with _g6:
+        st.markdown(ui_caption("History"), unsafe_allow_html=True)
+        if history_df is None or history_df.empty:
+            st.markdown(ui_caption(
+                "Building history — open this app on a few different days to see trends."
+            ), unsafe_allow_html=True)
+        elif len(history_df) < 2:
+            st.dataframe(history_df.round(2), hide_index=True, use_container_width=True)
+            st.markdown(ui_caption(
+                "Building history — a second day unlocks the trend strip."
+            ), unsafe_allow_html=True)
+        else:
+            _hs = history_df.sort_values("date")
+            _fhst = make_subplots(rows=1, cols=1)
+            _fhst.add_trace(go.Scatter(
+                x=_hs["date"], y=_hs["net_worth"],
+                line=dict(color="#8fa4c4", width=2), name="Assets",
+            ))
+            if "equity_pct" in _hs.columns:
+                _fhst.add_trace(go.Scatter(
+                    x=_hs["date"], y=_hs["equity_pct"],
+                    line=dict(color="#4aa88a", width=2), name="Equity %", yaxis="y2",
+                ))
+            _fhst.update_layout(
+                yaxis2=dict(overlaying="y", side="right", showgrid=False),
+                showlegend=True,
+                legend=dict(orientation="h", y=-0.2, font=dict(size=10, color="#8b93a4")),
+            )
+            st.plotly_chart(_apply_plotly(_fhst, 240), width="stretch", config=_PLOT_CFG)
+            st.dataframe(history_df.round(2), hide_index=True, use_container_width=True)
+except Exception as _chart_err:
+    st.markdown(ui_caption(f"Glance charts unavailable this run: {_chart_err}"),
+                unsafe_allow_html=True)
+
+if integrity_issues:
+    _sev_order = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3}
+    _iss = sorted(integrity_issues, key=lambda x: _sev_order.get(x[0], 9))
+    with st.expander(f"Data integrity check — {len(_iss)} issue(s) found", expanded=False):
+        for sev, msg in _iss:
+            st.markdown(f"**{sev}** — {msg}")
 
 # ==================================================
 # FOOTER — provenance & data status

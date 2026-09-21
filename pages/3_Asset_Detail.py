@@ -162,6 +162,11 @@ with tabs[0]:
 _map = {"Mutual funds": "MF", "Stocks": "Stocks", "Gold": "Gold", "FDs": "FD"}
 
 
+def _fmt_pct_cell(v):
+    n = _num(v)
+    return f"{n:.1f}%" if n is not None else "—"
+
+
 def _render_sleeve(kind):
     sub = _show[_show["Kind"] == kind]
     if sub.empty:
@@ -179,7 +184,8 @@ def _render_sleeve(kind):
             ts = pd.to_datetime(s, errors="coerce")
             return ts.strftime("%d %b %Y") if pd.notna(ts) else s
         df["Maturity"] = df["Maturity"].map(_fmt_mat) if "Maturity" in df.columns else "—"
-        products, accounts = [], []
+        products, accounts, ccys, rois, days = [], [], [], [], []
+        prin_n, prin_i, val_n, interest, fx, days_num = [], [], [], [], [], []
         for _, r in df.iterrows():
             recs = _raw_records_for(books, "FD", str(r["Key"]))
             rec = recs[0] if recs else {}
@@ -188,28 +194,109 @@ def _render_sleeve(kind):
                 product = "FCNR (USD)"
             products.append(product)
             accounts.append(str(rec.get("Account Number") or ""))
+            ccys.append(str(rec.get("Currency") or ""))
+            _roi = _num(rec.get("ROI %"))
+            rois.append(f"{_roi:.2f}%" if _roi is not None else "—")
+            _d = _num(rec.get("Days to Maturity"))
+            days.append(str(int(_d)) if _d is not None else "—")
+            days_num.append(_d)
+            _cur = str(rec.get("Currency") or "").strip().upper()
+            prin_n.append(format_identity_value(
+                "Principal (native)", rec.get("Principal (Native)"),
+                currency=_cur or None))
+            prin_i.append(_fmt_inr(rec.get("Principal (INR, at deposit FX)")))
+            val_n.append(format_identity_value(
+                "Value (native)", rec.get("Current Value (Native)"),
+                currency=_cur or None))
+            interest.append(_fmt_inr(rec.get("Interest Return (INR)")))
+            fx.append(_fmt_inr(rec.get("FX Gain/Loss (INR)")))
         df["Product"] = products
         df["Account"] = accounts
-        view = _money_view(df).sort_values("Current Value", ascending=False)
+        df["Ccy"] = ccys
+        df["Principal"] = prin_n
+        df["Principal INR"] = prin_i
+        df["ROI"] = rois
+        df["Days left"] = days
+        df["Value (native)"] = val_n
+        df["Interest"] = interest
+        df["FX P&L"] = fx
+        df["_days"] = days_num
+        view = _money_view(df).sort_values("_days", ascending=True, na_position="last")
         st.dataframe(
-            view[["Product", "Account", "Member", "Maturity",
-                  "Booked", "Invested ₹", "P&L ₹", "Return"]],
+            view[["Product", "Account", "Member", "Ccy", "Principal", "Principal INR",
+                  "ROI", "Days left", "Value (native)", "Booked", "Interest", "FX P&L",
+                  "Maturity"]],
             hide_index=True, use_container_width=True,
             column_config={
                 "Product": st.column_config.TextColumn("Product", width="small"),
                 "Account": st.column_config.TextColumn("Account", width="small"),
                 "Member": st.column_config.TextColumn("Member", width="medium"),
-                "Maturity": st.column_config.TextColumn("Maturity", width="small"),
-                "Booked": st.column_config.TextColumn("Booked (INR)", width="small"),
-                "Invested ₹": st.column_config.TextColumn("Invested (INR)", width="small"),
-                "P&L ₹": st.column_config.TextColumn("P&L", width="small"),
-                "Return": st.column_config.TextColumn("Return %", width="small"),
+                "Ccy": st.column_config.TextColumn("Ccy", width="small"),
+                "Principal": st.column_config.TextColumn("Principal", width="small"),
+                "Principal INR": st.column_config.TextColumn("Principal INR", width="small"),
+                "ROI": st.column_config.TextColumn("ROI %", width="small"),
+                "Days left": st.column_config.TextColumn("Days left", width="small"),
+                "Value (native)": st.column_config.TextColumn("Value (native)", width="small"),
+                "Booked": st.column_config.TextColumn("Value (INR)", width="small"),
+                "Interest": st.column_config.TextColumn("Interest", width="small"),
+                "FX P&L": st.column_config.TextColumn("FX P&L", width="small"),
+                "Maturity": st.column_config.TextColumn("Matures", width="small"),
             },
         )
         st.markdown(caption(
-            "Booked = Current Value (INR). Return % is (booked − invested) / invested "
-            "from the single purchase record — not annualized, not XIRR. "
-            "ROI % p.a. in the dossier is the contractual rate."),
+            "NRI view: USD rows are FCNR (interest + FX vs deposit-date rate). INR rows are "
+            "domestic FDs. Native currency and INR sit side by side — a FCNR is never shown "
+            "as an INR deposit. Sorted by days to maturity. Return % on other sleeves is "
+            "(current − invested) / invested from the single purchase record — not annualized, "
+            "not XIRR. ROI % p.a. here is the contractual rate."),
+            unsafe_allow_html=True)
+        return
+    if kind == "MF":
+        y1, y3, y5, n1, n3, n5, cats = [], [], [], [], [], [], []
+        for _, r in df.iterrows():
+            recs = _raw_records_for(books, "MF", str(r["Key"]))
+            rec = recs[0] if recs else {}
+            y1.append(_fmt_pct_cell(rec.get("1Y %")))
+            y3.append(_fmt_pct_cell(rec.get("3Y %")))
+            y5.append(_fmt_pct_cell(rec.get("5Y %")))
+            n1.append(_fmt_pct_cell(rec.get("vs Nifty50 1Y")))
+            n3.append(_fmt_pct_cell(rec.get("vs Nifty50 3Y")))
+            n5.append(_fmt_pct_cell(rec.get("vs Nifty50 5Y")))
+            cats.append(str(rec.get("Category") or r.get("Class") or "—"))
+        df["Category"] = cats
+        df["1Y"] = y1
+        df["3Y"] = y3
+        df["5Y"] = y5
+        df["vs Nifty 1Y"] = n1
+        df["vs Nifty 3Y"] = n3
+        df["vs Nifty 5Y"] = n5
+        view = _money_view(df).sort_values("Current Value", ascending=False)
+        st.dataframe(
+            view[["Name", "Member", "Category", "Booked", "P&L ₹", "Return",
+                  "1Y", "3Y", "5Y", "vs Nifty 1Y", "vs Nifty 3Y", "vs Nifty 5Y"]],
+            hide_index=True, use_container_width=True,
+            column_config={
+                "Name": st.column_config.TextColumn("Fund", width="medium"),
+                "Member": st.column_config.TextColumn("Member", width="small"),
+                "Category": st.column_config.TextColumn("Category", width="small"),
+                "Booked": st.column_config.TextColumn("Current (INR)", width="small"),
+                "P&L ₹": st.column_config.TextColumn("P&L", width="small"),
+                "Return": st.column_config.TextColumn("Return %", width="small"),
+                "1Y": st.column_config.TextColumn("1Y", width="small"),
+                "3Y": st.column_config.TextColumn("3Y", width="small"),
+                "5Y": st.column_config.TextColumn("5Y", width="small"),
+                "vs Nifty 1Y": st.column_config.TextColumn("vs Nifty50 1Y", width="small"),
+                "vs Nifty 3Y": st.column_config.TextColumn("vs Nifty50 3Y", width="small"),
+                "vs Nifty 5Y": st.column_config.TextColumn("vs Nifty50 5Y", width="small"),
+            },
+        )
+        st.markdown(caption(
+            "1Y / 3Y / 5Y and vs Nifty50 are trailing CAGR from the latest NAV "
+            "(years × 365.25) — a broad equity bar, not each fund's official benchmark. "
+            "Mid/small/flexi/contra can look better or worse vs Nifty50 for the wrong reason. "
+            "'—' means insufficient history or a debt-like category. Roster Return % is "
+            "(current − invested) / invested from the single purchase record — not annualized, "
+            "not XIRR."),
             unsafe_allow_html=True)
         return
     view = _money_view(df).sort_values("Current Value", ascending=False)
