@@ -7,8 +7,25 @@ from datetime import datetime
 import json
 from lib.mf_health import analyze_fund, get_holdings_for_funds
 from lib.mf_holdings import HOLDINGS_META_CACHE
-from lib.theme import inject_css
+from lib.theme import inject_css, PLOTLY_LAYOUT
 from lib.formatters import format_inr_compact
+from lib.overlap import (
+    CONCENTRATION_THRESHOLD_PCT,
+    DIRECT_REGULAR_NOTE,
+    LOOKTHROUGH_METHOD,
+    OVERLAP_METHOD,
+    concentration_flags,
+    direct_regular_pairs,
+    family_look_through,
+    pairwise_matrix,
+    pairwise_overlap_pct,
+)
+from lib.returns import (
+    LUMP_SUM_ANN_LABEL,
+    MULTI_CASHFLOW_XIRR_GAP,
+    SIMPLE_ROI_LABEL,
+    TRAILING_CAGR_LABEL,
+)
 from lib.ui import (
     page_header_html,
     section_header_html,
@@ -204,6 +221,24 @@ for r in ok_results:
             r["fund_name"], float(weight), float(r["current_value"]),
             str(h.get("name") or "—")
         ))
+
+fund_weights = {}
+for r in ok_results:
+    wmap = {}
+    for h in holdings_by_code.get(r["scheme_code"], []):
+        if not _is_equity_holding(h):
+            continue
+        key = _holding_key(h)
+        weight = h.get("weight")
+        if key and isinstance(weight, (int, float)) and weight > 0:
+            wmap[key] = float(weight)
+    if wmap:
+        fund_weights[r["fund_name"]] = wmap
+
+look_through_rows = family_look_through(stock_exposure, total_value)
+concentrated = concentration_flags(look_through_rows)
+share_class_pairs = direct_regular_pairs([r["fund_name"] for r in ok_results])
+pairwise_rows = pairwise_matrix(fund_weights)
 
 overlap_available = any(len({x[0] for x in apps}) > 1 for apps in stock_exposure.values())
 n_disclosed = sum(1 for r in ok_results if holdings_by_code.get(r["scheme_code"]))
@@ -446,6 +481,203 @@ with c3:
     if force:
         get_holdings_for_funds(codes, force_refresh=True)
         st.rerun()
+
+# ==================================================
+# BOOKS AT A GLANCE — category / AMC / look-through / pairwise
+# All figures are disclosed or observed. Empty when the cache has no data.
+# ==================================================
+def _plot(fig, height=280, legend=False):
+    layout = dict(PLOTLY_LAYOUT)
+    layout.update(height=height, showlegend=legend, margin=dict(t=24, b=24, l=16, r=16))
+    fig.update_layout(**layout)
+    return fig
+
+
+st.markdown(section_header_html("Books at a glance", "category · AMC · look-through"),
+            unsafe_allow_html=True)
+st.markdown(caption(LOOKTHROUGH_METHOD), unsafe_allow_html=True)
+
+g1, g2 = st.columns(2)
+with g1:
+    cat_sum = df.groupby("Category", as_index=False)["Value"].sum().sort_values("Value", ascending=False)
+    if not cat_sum.empty:
+        fig_cat = go.Figure(go.Pie(
+            labels=cat_sum["Category"], values=cat_sum["Value"], hole=0.58,
+            textinfo="label+percent", textposition="inside",
+        ))
+        fig_cat.update_layout(title=dict(text="Category mix · by current value", font=dict(size=13)))
+        st.plotly_chart(_plot(fig_cat, legend=True), width="stretch", config={"displayModeBar": False})
+        st.markdown(caption("Category is inferred from the fund name / AMFI title — a proxy, not SEBI official."),
+                    unsafe_allow_html=True)
+    else:
+        st.markdown(caption("No category mix to draw."), unsafe_allow_html=True)
+with g2:
+    amc_sum = df.groupby("AMC", as_index=False)["Value"].sum().sort_values("Value", ascending=False)
+    if not amc_sum.empty:
+        fig_amc = go.Figure(go.Pie(
+            labels=amc_sum["AMC"], values=amc_sum["Value"], hole=0.58,
+            textinfo="label+percent", textposition="inside",
+        ))
+        fig_amc.update_layout(title=dict(text="AMC mix · by current value", font=dict(size=13)))
+        st.plotly_chart(_plot(fig_amc, legend=True), width="stretch", config={"displayModeBar": False})
+    else:
+        st.markdown(caption("No AMC mix to draw."), unsafe_allow_html=True)
+
+g3, g4 = st.columns(2)
+with g3:
+    st.markdown(section_header_html("3Y trailing CAGR vs Nifty50", "scheme path, not your XIRR"),
+                unsafe_allow_html=True)
+    perf = df.dropna(subset=["3Y"]).copy()
+    nifty_3y_pct = next(
+        (row.get("vs Nifty50 3Y") for row in mf_list if row.get("vs Nifty50 3Y") is not None),
+        None,
+    )
+    if not perf.empty:
+        perf = perf.sort_values("3Y", ascending=True)
+        fig_bar = go.Figure(go.Bar(
+            x=perf["3Y"] * 100.0, y=perf["Fund"], orientation="h",
+            marker_color="#8fa4c4", name="Fund 3Y",
+        ))
+        if nifty_3y_pct is not None:
+            fig_bar.add_vline(
+                x=float(nifty_3y_pct), line_dash="dot", line_color="#d4a054",
+                annotation_text=f"Nifty50 3Y {float(nifty_3y_pct):.1f}%",
+                annotation_position="top",
+            )
+        fig_bar.update_layout(xaxis_title="Trailing 3Y CAGR %")
+        st.plotly_chart(_plot(fig_bar, height=max(280, 22 * len(perf))), width="stretch",
+                        config={"displayModeBar": False})
+        st.markdown(caption(
+            TRAILING_CAGR_LABEL + " Nifty50 is a broad equity bar, not each fund's official benchmark. "
+            "'—' funds have too little NAV history or are debt-like."),
+            unsafe_allow_html=True)
+    else:
+        st.markdown(caption("No 3Y trailing CAGR in this run — open Command Center so scheme history is computed."),
+                    unsafe_allow_html=True)
+with g4:
+    st.markdown(section_header_html("Look-through · top companies", "family rupees through funds"),
+                unsafe_allow_html=True)
+    if look_through_rows:
+        top_lt = look_through_rows[:8]
+        fig_lt = go.Figure(go.Bar(
+            x=[r["exposure_inr"] for r in top_lt],
+            y=[r["name"][:28] for r in top_lt],
+            orientation="h", marker_color="#5b9eaa",
+            customdata=[[r["n_funds"], r["pct_of_mf"]] for r in top_lt],
+            hovertemplate="%{y}<br>₹%{x:,.0f}<br>%{customdata[0]} funds · %{customdata[1]:.1f}% of MF book<extra></extra>",
+        ))
+        fig_lt.update_layout(yaxis=dict(autorange="reversed"), xaxis_title="Family exposure (INR)")
+        st.plotly_chart(_plot(fig_lt, height=max(280, 24 * len(top_lt))), width="stretch",
+                        config={"displayModeBar": False})
+        st.markdown(caption(
+            f"Top {len(top_lt)} of {len(look_through_rows)} disclosed names. "
+            "A stock in several funds is one family exposure, not several."),
+            unsafe_allow_html=True)
+    else:
+        st.markdown(caption("No look-through yet — holdings cache empty for these scheme codes."),
+                    unsafe_allow_html=True)
+
+st.markdown(section_header_html("Pairwise fund overlap", "min-weight, disclosed equity"),
+            unsafe_allow_html=True)
+st.markdown(caption(OVERLAP_METHOD), unsafe_allow_html=True)
+if len(fund_weights) >= 2:
+    labels = sorted(fund_weights)
+    short = [(n if len(n) <= 22 else n[:21] + "…") for n in labels]
+    z = []
+    for a in labels:
+        row = []
+        for b in labels:
+            if a == b:
+                row.append(100.0)
+            else:
+                pct = pairwise_overlap_pct(fund_weights[a], fund_weights[b])
+                row.append(pct if pct is not None else 0.0)
+        z.append(row)
+    fig_hm = go.Figure(go.Heatmap(
+        z=z, x=short, y=short, colorscale="Tealgrn", zmin=0, zmax=60,
+        hovertemplate="%{y} × %{x}<br>%{z:.1f}% overlap<extra></extra>",
+        colorbar=dict(title="%"),
+    ))
+    st.plotly_chart(_plot(fig_hm, height=max(320, 18 * len(labels)), legend=False),
+                    width="stretch", config={"displayModeBar": False})
+    if pairwise_rows:
+        hottest = sorted(pairwise_rows, key=lambda t: -t[2])[:5]
+        for a, b, pct in hottest:
+            st.markdown(
+                f"<div class='t-list-row'><span class='t-list-name'>{a[:32]} × {b[:32]}</span>"
+                f"<span class='t-list-meta'>{pct:.1f}% common disclosed weight</span></div>",
+                unsafe_allow_html=True)
+    st.markdown(caption(
+        "Read as exposure, not an order. Two funds sharing ~N% of holdings may still "
+        "earn their keep if style or AMC differs."),
+        unsafe_allow_html=True)
+else:
+    st.markdown(caption("Need at least two disclosed equity funds to draw pairwise overlap."),
+                unsafe_allow_html=True)
+
+st.markdown(section_header_html("Single-stock concentration",
+                                f"flag ≥ {CONCENTRATION_THRESHOLD_PCT:.0f}% of the MF book"),
+            unsafe_allow_html=True)
+if concentrated:
+    for r in concentrated[:8]:
+        st.markdown(
+            f"<div class='t-list-row'><span class='t-list-name'>{r['name']}</span>"
+            f"<span class='t-list-meta'>{r['n_funds']} funds · {format_inr_compact(r['exposure_inr'])} · "
+            f"{r['pct_of_mf']:.1f}% of MF book</span></div>",
+            unsafe_allow_html=True)
+    st.markdown(caption(
+        "Threshold is a fact flag on this family's MF book, not a sell rule. "
+        "Direct stock holdings in the Stocks sleeve are a separate line — they are not added here."),
+        unsafe_allow_html=True)
+else:
+    st.markdown(caption(
+        f"No disclosed name is ≥ {CONCENTRATION_THRESHOLD_PCT:.0f}% of the MF book this run, "
+        "or look-through coverage is empty."),
+        unsafe_allow_html=True)
+
+if share_class_pairs:
+    st.markdown(section_header_html("Direct and Regular of the same scheme", "cost fact"),
+                unsafe_allow_html=True)
+    for stem, direct, regular in share_class_pairs:
+        st.markdown(
+            f"<div class='t-list-row'><span class='t-list-name'>{stem}</span>"
+            f"<span class='t-list-meta'>Direct {len(direct)} · Regular {len(regular)}</span></div>",
+            unsafe_allow_html=True)
+    st.markdown(caption(DIRECT_REGULAR_NOTE), unsafe_allow_html=True)
+
+sector_inr = defaultdict(float)
+for r in ok_results:
+    for h in holdings_by_code.get(r["scheme_code"], []):
+        sec = str(h.get("sector") or "").strip()
+        w = h.get("weight")
+        if not sec or not isinstance(w, (int, float)) or w <= 0:
+            continue
+        sector_inr[sec] += float(r["current_value"]) * float(w) / 100.0
+if sector_inr:
+    st.markdown(section_header_html("Look-through sector mix", "only where the disclosure carries a sector tag"),
+                unsafe_allow_html=True)
+    items = sorted(sector_inr.items(), key=lambda kv: -kv[1])
+    fig_sec = go.Figure(go.Pie(
+        labels=[k for k, _ in items], values=[v for _, v in items], hole=0.58,
+        textinfo="label+percent",
+    ))
+    st.plotly_chart(_plot(fig_sec, legend=True), width="stretch", config={"displayModeBar": False})
+else:
+    st.markdown(caption(
+        "This holdings cache does not carry sector tags on the disclosed names — "
+        "sector mix is no data, not zero."),
+        unsafe_allow_html=True)
+
+with st.expander("What these return numbers mean"):
+    st.markdown(caption(SIMPLE_ROI_LABEL), unsafe_allow_html=True)
+    st.markdown(caption(LUMP_SUM_ANN_LABEL), unsafe_allow_html=True)
+    st.markdown(caption(TRAILING_CAGR_LABEL), unsafe_allow_html=True)
+    st.markdown(caption(MULTI_CASHFLOW_XIRR_GAP), unsafe_allow_html=True)
+    st.markdown(caption(
+        "Rolling N-year CAGR is the scheme NAV measured on many end-dates. "
+        "It is not computed here because this page does not keep a NAV series in session. "
+        "Trailing 1Y / 3Y / 5Y above is the latest window of that path."),
+        unsafe_allow_html=True)
 
 # ==================================================
 # SEARCHABLE / FILTERABLE FUND TABLE

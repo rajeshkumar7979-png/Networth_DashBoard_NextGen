@@ -904,6 +904,10 @@ hr, [data-testid="stMarkdownHorizontalBlock"] { border: none !important; height:
 
 .js-plotly-plot, .plotly { max-width: 100% !important; }
 
+.t-chart-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 8px 0 16px; }
+@media (max-width: 767px) { .t-chart-grid { grid-template-columns: 1fr; } }
+.t-ov-note { font-size: 0.78rem; color: var(--c-text-muted) !important; margin: 4px 0 10px; }
+
 @media (min-width: 992px) {
     .t-title { font-size: 2.15rem; }
 }

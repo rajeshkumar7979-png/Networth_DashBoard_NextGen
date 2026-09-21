@@ -13,6 +13,18 @@ from lib.theme import inject_css
 from lib.register import canonical_instrument_key
 from lib.roster import build_roster, instrument_summary, member_filter_options
 from lib.formatters import format_inr, format_identity_value
+from lib.returns import (
+    LUMP_SUM_ANN_LABEL,
+    MULTI_CASHFLOW_XIRR_GAP,
+    SIMPLE_ROI_LABEL,
+    TRAILING_CAGR_LABEL,
+    holding_period_days,
+    lump_sum_annualized_pct,
+    simple_roi_pct,
+)
+from lib.intelligence.exposure import load_holdings_cache, _normalize_holdings
+from lib.intelligence import ai as intel_ai
+from lib.intelligence.ai.config import load_ai_config, provider_is_configured
 from lib.ui import (
     caption,
     data_sheet,
@@ -78,6 +90,33 @@ def _raw_records_for(books, kind, key):
         if canonical_instrument_key(kind, rec) == key:
             out.append(rec)
     return out
+
+
+def _scheme_code_for(rec):
+    isin = str((rec or {}).get("ISIN") or "").strip()
+    name = str((rec or {}).get("Fund Name") or "").strip()
+    for row in st.session_state.get("mf_holdings_for_health") or []:
+        row_isin = str(row.get("ISIN") or "").strip()
+        row_name = str(row.get("Fund Name") or "").strip()
+        code = row.get("Scheme Code")
+        if not code:
+            continue
+        if isin and row_isin == isin:
+            return code
+        if name and row_name == name:
+            return code
+    return None
+
+
+def _as_of_date():
+    assets = st.session_state.get("cc_assets") or {}
+    stamp = assets.get("as_of")
+    if stamp:
+        ts = pd.to_datetime(stamp, errors="coerce")
+        if pd.notna(ts):
+            return ts
+    return None
+
 
 
 books = st.session_state.get("cc_books")
@@ -252,7 +291,7 @@ def _render_sleeve(kind):
             unsafe_allow_html=True)
         return
     if kind == "MF":
-        y1, y3, y5, n1, n3, n5, cats = [], [], [], [], [], [], []
+        y1, y3, y5, n1, n3, n5, cats, ann = [], [], [], [], [], [], [], []
         for _, r in df.iterrows():
             recs = _raw_records_for(books, "MF", str(r["Key"]))
             rec = recs[0] if recs else {}
@@ -263,6 +302,7 @@ def _render_sleeve(kind):
             n3.append(_fmt_pct_cell(rec.get("vs Nifty50 3Y")))
             n5.append(_fmt_pct_cell(rec.get("vs Nifty50 5Y")))
             cats.append(str(rec.get("Category") or r.get("Class") or "—"))
+            ann.append(_fmt_pct_cell(rec.get("Ann. Return %")))
         df["Category"] = cats
         df["1Y"] = y1
         df["3Y"] = y3
@@ -270,9 +310,10 @@ def _render_sleeve(kind):
         df["vs Nifty 1Y"] = n1
         df["vs Nifty 3Y"] = n3
         df["vs Nifty 5Y"] = n5
+        df["Ann. %"] = ann
         view = _money_view(df).sort_values("Current Value", ascending=False)
         st.dataframe(
-            view[["Name", "Member", "Category", "Booked", "P&L ₹", "Return",
+            view[["Name", "Member", "Category", "Booked", "P&L ₹", "Return", "Ann. %",
                   "1Y", "3Y", "5Y", "vs Nifty 1Y", "vs Nifty 3Y", "vs Nifty 5Y"]],
             hide_index=True, use_container_width=True,
             column_config={
@@ -282,6 +323,7 @@ def _render_sleeve(kind):
                 "Booked": st.column_config.TextColumn("Current (INR)", width="small"),
                 "P&L ₹": st.column_config.TextColumn("P&L", width="small"),
                 "Return": st.column_config.TextColumn("Return %", width="small"),
+                "Ann. %": st.column_config.TextColumn("Lump-sum ann. %", width="small"),
                 "1Y": st.column_config.TextColumn("1Y", width="small"),
                 "3Y": st.column_config.TextColumn("3Y", width="small"),
                 "5Y": st.column_config.TextColumn("5Y", width="small"),
@@ -296,7 +338,48 @@ def _render_sleeve(kind):
             "Mid/small/flexi/contra can look better or worse vs Nifty50 for the wrong reason. "
             "'—' means insufficient history or a debt-like category. Roster Return % is "
             "(current − invested) / invested from the single purchase record — not annualized, "
-            "not XIRR."),
+            "not a multi-cashflow XIRR. Lump-sum ann. % annualizes that one buy; it equals XIRR "
+            "only if there was no SIP/sell/dividend."),
+            unsafe_allow_html=True)
+        return
+    if kind == "Stocks":
+        qty, avg, px, bought = [], [], [], []
+        for _, r in df.iterrows():
+            recs = _raw_records_for(books, "Stocks", str(r["Key"]))
+            rec = recs[0] if recs else {}
+            q = _num(rec.get("Quantity"))
+            qty.append(f"{q:.0f}" if q is not None else "—")
+            a = _num(rec.get("Avg Buy Price"))
+            avg.append(f"{a:.2f}" if a is not None else "—")
+            p = _num(rec.get("Current Price"))
+            px.append(f"{p:.2f}" if p is not None else "—")
+            pdt = rec.get("Purchase Date")
+            bought.append(str(pdt)[:10] if pdt is not None and str(pdt) not in {"", "NaT", "nan", "None"} else "—")
+        df["Qty"] = qty
+        df["Avg buy"] = avg
+        df["Price"] = px
+        df["Bought"] = bought
+        view = _money_view(df).sort_values("Current Value", ascending=False)
+        st.dataframe(
+            view[["Name", "Member", "Qty", "Avg buy", "Price", "Booked", "Invested ₹", "P&L ₹", "Return", "Bought"]],
+            hide_index=True, use_container_width=True,
+            column_config={
+                "Name": st.column_config.TextColumn("Instrument", width="medium"),
+                "Member": st.column_config.TextColumn("Member", width="small"),
+                "Qty": st.column_config.TextColumn("Qty", width="small"),
+                "Avg buy": st.column_config.TextColumn("Avg buy", width="small"),
+                "Price": st.column_config.TextColumn("Price", width="small"),
+                "Booked": st.column_config.TextColumn("Booked (INR)", width="small"),
+                "Invested ₹": st.column_config.TextColumn("Invested (INR)", width="small"),
+                "P&L ₹": st.column_config.TextColumn("P&L", width="small"),
+                "Return": st.column_config.TextColumn("Return %", width="small"),
+                "Bought": st.column_config.TextColumn("Purchase", width="small"),
+            },
+        )
+        st.markdown(caption(
+            "Return % = (current − invested) / invested from the single purchase record. "
+            "Not annualized, not a multi-cashflow XIRR. Open the dossier for lump-sum "
+            "annualized when Purchase Date is on the book."),
             unsafe_allow_html=True)
         return
     view = _money_view(df).sort_values("Current Value", ascending=False)
@@ -430,18 +513,71 @@ for _idx, (__, row) in enumerate(_positions.iterrows()):
             "Figures are the Command Center book columns, not a second valuation."),
             unsafe_allow_html=True)
 
+    # Returns — three different numbers, three different questions. Never mixed.
+    _as_of = _as_of_date()
+    _pdate = rec.get("Purchase Date") or rec.get("Deposit Date")
+    _days = holding_period_days(_pdate, _as_of)
+    _roi = simple_roi_pct(cur, inv)
+    _ann = _num(rec.get("Ann. Return %"))
+    if _ann is None:
+        _ann = lump_sum_annualized_pct(cur, inv, _days)
+    _ret_cards = [
+        {"label": "Simple ROI",
+         "value": f"{_roi:.2f}%" if _roi is not None else "n/a",
+         "sub": "current vs book cost",
+         "tone": tone_for(_roi) if _roi is not None else "neutral"},
+        {"label": "Lump-sum annualized",
+         "value": f"{_ann:.2f}%" if _ann is not None else "n/a",
+         "sub": (f"{_days} days held" if _days is not None else "needs purchase date + ≥30 days"),
+         "tone": tone_for(_ann) if _ann is not None else "neutral"},
+    ]
+    if str(row["Kind"]) == "MF":
+        _y1, _y3, _y5 = _num(rec.get("1Y %")), _num(rec.get("3Y %")), _num(rec.get("5Y %"))
+        _ret_cards.append({
+            "label": "Scheme 1Y / 3Y / 5Y",
+            "value": " · ".join(
+                f"{v:.1f}%" if v is not None else "—" for v in (_y1, _y3, _y5)
+            ),
+            "sub": "trailing CAGR of the NAV, not your cash-flow return",
+        })
+    st.markdown(section_header_html("How this line is doing", "three different returns"),
+                unsafe_allow_html=True)
+    st.markdown(kpi_cards(_ret_cards, cols=3), unsafe_allow_html=True)
+    st.markdown(caption(SIMPLE_ROI_LABEL), unsafe_allow_html=True)
+    st.markdown(caption(LUMP_SUM_ANN_LABEL), unsafe_allow_html=True)
+    if str(row["Kind"]) == "MF":
+        st.markdown(caption(TRAILING_CAGR_LABEL), unsafe_allow_html=True)
+        _n1, _n3, _n5 = _num(rec.get("vs Nifty50 1Y")), _num(rec.get("vs Nifty50 3Y")), _num(rec.get("vs Nifty50 5Y"))
+        if any(v is not None for v in (_n1, _n3, _n5)):
+            st.markdown(caption(
+                "Nifty50 trailing CAGR this run: "
+                + " · ".join(
+                    f"{lbl} {v:.1f}%" if v is not None else f"{lbl} —"
+                    for lbl, v in (("1Y", _n1), ("3Y", _n3), ("5Y", _n5))
+                )
+                + " — a broad equity bar, not this fund's official benchmark."
+            ), unsafe_allow_html=True)
+    st.markdown(caption(MULTI_CASHFLOW_XIRR_GAP), unsafe_allow_html=True)
+
     identity = []
     if recs:
         rec = recs[0]
         kind = str(row["Kind"])
         if kind == "MF":
             fields = [("Fund Name", "Fund Name"), ("ISIN", "ISIN"),
-                      ("Category", "Category"), ("Owner", "Owner")]
+                      ("Category", "Category"), ("Owner", "Owner"),
+                      ("Units", "Units"), ("Current NAV", "Current NAV"),
+                      ("Purchase Date", "Purchase Date")]
         elif kind == "Stocks":
             fields = [("Company Name", "Company"), ("Symbol", "Symbol"),
-                      ("Exchange", "Exchange"), ("Owner", "Owner")]
+                      ("Exchange", "Exchange"), ("Owner", "Owner"),
+                      ("Quantity", "Quantity"), ("Avg Buy Price", "Avg buy"),
+                      ("Current Price", "Last price"),
+                      ("Purchase Date", "Purchase Date")]
         elif kind == "Gold":
-            fields = [("Symbol", "Symbol"), ("Owner", "Owner")]
+            fields = [("Symbol", "Symbol"), ("Owner", "Owner"),
+                      ("Quantity", "Quantity"), ("Current Price", "Last price"),
+                      ("Purchase Date", "Purchase Date")]
         else:
             fields = [("Account Number", "Account Number"), ("Holder Name", "Holder"),
                       ("Product", "Product"), ("Currency", "Currency"),
@@ -470,6 +606,83 @@ for _idx, (__, row) in enumerate(_positions.iterrows()):
             [{"label": r["Field"], "value": r["Value"]} for r in identity]),
             unsafe_allow_html=True)
 
+    if str(row["Kind"]) == "MF":
+        st.markdown(section_header_html("Look-through · this fund", "statutory disclosure cache"),
+                    unsafe_allow_html=True)
+        _code = _scheme_code_for(rec)
+        _cache = load_holdings_cache()
+        _raw = []
+        if _code is not None:
+            try:
+                _raw = _cache.get(str(int(_code))) or _cache.get(str(_code)) or []
+            except (TypeError, ValueError):
+                _raw = _cache.get(str(_code)) or []
+        _cleaned, _derived = _normalize_holdings(_raw if isinstance(_raw, list) else [])
+        _top = sorted(_cleaned, key=lambda c: -(c.get("weight") or 0))[:10]
+        if _top:
+            _family_codes = []
+            for _h in st.session_state.get("mf_holdings_for_health") or []:
+                _sc = _h.get("Scheme Code")
+                if _sc is not None:
+                    _family_codes.append(_sc)
+            _rows = []
+            for _h in _top:
+                _isin = str(_h.get("isin") or "").strip().upper()
+                _also = 0
+                if _isin:
+                    for _oc in _family_codes:
+                        if _code is not None and str(_oc) == str(_code):
+                            continue
+                        try:
+                            _oraw = _cache.get(str(int(_oc))) or _cache.get(str(_oc)) or []
+                        except (TypeError, ValueError):
+                            _oraw = _cache.get(str(_oc)) or []
+                        _oclean, _ = _normalize_holdings(_oraw if isinstance(_oraw, list) else [])
+                        if any(str(x.get("isin") or "").strip().upper() == _isin for x in _oclean):
+                            _also += 1
+                _rows.append({
+                    "Name": _h.get("name") or "—",
+                    "Weight %": f"{_h['weight']:.2f}%" if _h.get("weight") is not None else "—",
+                    "Also in": f"{_also} other family fund(s)" if _also else "this fund only",
+                })
+            st.dataframe(pd.DataFrame(_rows), hide_index=True, use_container_width=True)
+            st.markdown(caption(
+                "Weights are the fund's disclosed portfolio, not your rupee mix. "
+                + ("Some weights derived from market value (disclosure had no weight_pct). "
+                   if _derived else "")
+                + "Also-in counts other schemes in this family's book that disclose the same ISIN."
+            ), unsafe_allow_html=True)
+        else:
+            st.markdown(caption(
+                "No disclosed holdings in the committed cache for this scheme. "
+                "Look-through is no data, not zero. Refresh holdings from Funds if the cache is stale."),
+                unsafe_allow_html=True)
+
+    st.markdown(section_header_html("Health · fundamentals · technicals", "what exists vs what does not"),
+                unsafe_allow_html=True)
+    if str(row["Kind"]) == "MF":
+        st.markdown(caption(
+            "Fund health score, overlap and concentration live on Funds — they are "
+            "portfolio-level, not re-scored here. This dossier does not fetch a new NAV series."
+        ), unsafe_allow_html=True)
+    elif str(row["Kind"]) == "Stocks":
+        st.markdown(empty_state(
+            "No fundamental tape for this name",
+            "PE, book value, earnings and shareholding are not in the workbook and there is "
+            "no free NSE/BSE fundamentals feed wired into this desk. SEC EDGAR covers US filers only. "
+            "Missing stays missing — never filled with a guessed PE.",
+        ), unsafe_allow_html=True)
+        st.markdown(empty_state(
+            "No technical overlay",
+            "RSI, moving averages and chart patterns are a trading terminal. This desk marks "
+            "the book; it does not generate buy/sell signals from candles.",
+        ), unsafe_allow_html=True)
+    else:
+        st.markdown(caption(
+            "No PE / RSI overlay is computed for gold or deposits. FCNR health is the two-part "
+            "return above; INR FD health is contractual ROI and days to maturity."
+        ), unsafe_allow_html=True)
+
     st.markdown(section_header_html("Not recorded for this position", "no-data"),
                 unsafe_allow_html=True)
     st.markdown(empty_state(
@@ -479,7 +692,8 @@ for _idx, (__, row) in enumerate(_positions.iterrows()):
     ), unsafe_allow_html=True)
     st.markdown(
         "<div class='t-card'><ul class='t-list'>"
-        "<li>XIRR / return history — transaction dates beyond the purchase record are not stored</li>"
+        "<li>True multi-cashflow XIRR — SIPs, sells and dividends are not stored; lump-sum annualized is the one-buy number above</li>"
+        "<li>Rolling CAGR series — NAV path is not kept on this page</li>"
         "<li>Dividends / corporate actions — no payout or tax ledger exists</li>"
         "<li>Tax treatment — not modelled for any asset</li>"
         "<li>Cash flows — the workbook records positions, not deposits/withdrawals</li>"
@@ -513,6 +727,70 @@ for _idx, (__, row) in enumerate(_positions.iterrows()):
             "No external developments mapped to this exact identifier "
             "(refresh research evidence in the Command Center to build the cohort)."),
             unsafe_allow_html=True)
+
+    st.markdown(section_header_html("AI interpretation", "opt-in · never on load"),
+                unsafe_allow_html=True)
+    st.markdown(caption(
+        "AI restates verified facts from the Command Center research brief. "
+        "It never computes a rupee, never invents XIRR, PE or a trade, and never runs when this page opens."
+    ), unsafe_allow_html=True)
+    _ai_key = f"holdings_ai_{row['Key']}_{_idx}"
+    try:
+        _ai_cfg = load_ai_config()
+        _ai_ready = provider_is_configured(_ai_cfg)
+    except Exception:
+        _ai_ready = False
+    if not _ai_ready:
+        st.markdown(caption(
+            "No AI provider is configured (local Ollama or an API key in secrets). "
+            "The numbers above stay the source of truth."
+        ), unsafe_allow_html=True)
+    _run_ai = st.button(
+        "Interpret this instrument (opt-in AI)",
+        key=_ai_key,
+        help="Calls the existing research provider with the Command Center brief. Never on page load.",
+    )
+    if _run_ai:
+        _brief = st.session_state.get("cc_research_brief")
+        _briefing = st.session_state.get("cc_intel_briefing")
+        if _brief is None:
+            st.warning("Open Command Center once so the research brief exists. AI will not invent one.")
+        else:
+            _q = (
+                f"Given only the verified family research brief, what does the evidence say "
+                f"about the instrument classified as {row['Kind']} / {row['Class']} named "
+                f"{str(row['Name'])[:80]}? Restate verified numbers. Do not invent PE, RSI, "
+                f"XIRR, tax or a buy/sell. Say where evidence is thin."
+            )
+            with st.spinner("AI is reading the verified brief…"):
+                _out = intel_ai.run_ai_research(
+                    brief=_brief,
+                    facts=getattr(_briefing, "facts", ()) or (),
+                    evidence=getattr(_briefing, "evidence", ()) or (),
+                    question=_q,
+                )
+            st.session_state[_ai_key + "_out"] = _out
+    _stored = st.session_state.get(_ai_key + "_out")
+    if _stored is not None:
+        _status = getattr(_stored, "status", "")
+        if _status == "ok" and getattr(_stored, "assessment", None) is not None:
+            _ass = _stored.assessment
+            st.markdown(caption(str(getattr(_ass, "overall_assessment", "") or "")),
+                        unsafe_allow_html=True)
+            if getattr(_ass, "uncertainty", None):
+                st.markdown(caption("Uncertainty: " + str(_ass.uncertainty)),
+                            unsafe_allow_html=True)
+            for _f in (getattr(_ass, "findings", None) or [])[:5]:
+                st.markdown(caption("· " + str(getattr(_f, "text", _f))),
+                            unsafe_allow_html=True)
+            st.markdown(caption(
+                "Decision-support only. Not an order. Numbers on this page were not rewritten."
+            ), unsafe_allow_html=True)
+        else:
+            st.markdown(caption(
+                f"AI did not produce a grounded reading ({_status or 'unavailable'}). "
+                "The deterministic dossier above is unchanged."
+            ), unsafe_allow_html=True)
 
 st.markdown("---")
 st.markdown(

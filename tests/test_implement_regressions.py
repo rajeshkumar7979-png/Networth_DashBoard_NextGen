@@ -121,6 +121,24 @@ def test_phase_c_holdings_performance_columns():
     assert "Interest Return (INR)" in src
     assert "Days left" in src
     assert "1Y / 3Y / 5Y" in src
+    assert "Lump-sum annualized" in src
+    assert "Look-through · this fund" in src
+    assert "Interpret this instrument (opt-in AI)" in src
+    assert "never on load" in src
+    assert "run_ai_research" in src
+
+
+def test_mf_health_lookthrough_charts_and_pairwise():
+    src = (ROOT / "pages" / "5_MF_Health.py").read_text(encoding="utf-8")
+    assert "Pairwise fund overlap" in src
+    assert "Look-through · top companies" in src
+    assert "Single-stock concentration" in src
+    assert "LUMP_SUM_ANN_LABEL" in src
+    assert "datetime.now()" not in src
+    assert "trailing CAGR" in src
+    assert "pairwise_overlap_pct" in src
+    assert "family_look_through" in src
+
 
 
 def test_phase_b_intelligence_mapped_only_no_unmapped_fallback():

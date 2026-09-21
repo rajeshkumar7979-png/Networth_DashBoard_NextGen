@@ -613,7 +613,12 @@ for _, row in stocks_raw.iterrows():
             integrity_issues.append(("MEDIUM", f"{symbol}: P&L is {pnl/invested*100:.0f}% of invested amount — unusually large; confirm quantity/price if this was a recent buy."))
         row_dict = {"Owner": str(row.get("Owner", "") or ""), "Symbol": symbol, "Quantity": qty,
                     "Invested": invested, "Current Price": price, "Current Value": current_value,
-                    "P&L": pnl, "Return %": ret, "Source": "Stocks"}
+                    "P&L": pnl, "Return %": ret, "Source": "Stocks",
+                    "Company Name": str(row.get("Company Name", "") or "").strip(),
+                    "Exchange": str(row.get("Exchange", "") or "").strip(),
+                    "Purchase Date": to_naive_ts(row.get("Purchase Date")),
+                    "Avg Buy Price": safe_float(row.get("Avg Buy Price")),
+                    }
         if is_gold:
             gold_rows.append(row_dict)
         else:
@@ -2214,6 +2219,21 @@ try:
                 "Weight %": weight,
                 "Scheme Code": scheme_code,
                 "Owner": str(row["Owner"]) if "Owner" in mf_valid.columns else "",
+                "ISIN": str(row["ISIN"]).strip() if "ISIN" in mf_valid.columns and pd.notna(row.get("ISIN")) else "",
+                "Category": str(row["Category"]) if "Category" in mf_valid.columns else "",
+                "Invested": float(row["Invested"]) if "Invested" in mf_valid.columns and pd.notna(row.get("Invested")) else None,
+                "P&L": float(row["P&L"]) if "P&L" in mf_valid.columns and pd.notna(row.get("P&L")) else None,
+                "Return %": float(row["Return %"]) if "Return %" in mf_valid.columns and pd.notna(row.get("Return %")) else None,
+                "Ann. Return %": float(row["Ann. Return %"]) if "Ann. Return %" in mf_valid.columns and pd.notna(row.get("Ann. Return %")) else None,
+                "1Y %": float(row["1Y %"]) if "1Y %" in mf_valid.columns and pd.notna(row.get("1Y %")) else None,
+                "3Y %": float(row["3Y %"]) if "3Y %" in mf_valid.columns and pd.notna(row.get("3Y %")) else None,
+                "5Y %": float(row["5Y %"]) if "5Y %" in mf_valid.columns and pd.notna(row.get("5Y %")) else None,
+                "vs Nifty50 1Y": float(row["vs Nifty50 1Y"]) if "vs Nifty50 1Y" in mf_valid.columns and pd.notna(row.get("vs Nifty50 1Y")) else None,
+                "vs Nifty50 3Y": float(row["vs Nifty50 3Y"]) if "vs Nifty50 3Y" in mf_valid.columns and pd.notna(row.get("vs Nifty50 3Y")) else None,
+                "vs Nifty50 5Y": float(row["vs Nifty50 5Y"]) if "vs Nifty50 5Y" in mf_valid.columns and pd.notna(row.get("vs Nifty50 5Y")) else None,
+                "Current NAV": float(row["Current NAV"]) if "Current NAV" in mf_valid.columns and pd.notna(row.get("Current NAV")) else None,
+                "Purchase Date": row["Purchase Date"] if "Purchase Date" in mf_valid.columns else None,
+                "Units": float(row["Units"]) if "Units" in mf_valid.columns and pd.notna(row.get("Units")) else None,
             })
         st.session_state["mf_holdings_for_health"] = records
 except Exception:
@@ -2242,6 +2262,7 @@ try:
         "liquid_mf_pct": float(liquid_mf_pct),
         "gold_pct": float(gold_pct),
         "health_score": float(health_score),
+        "as_of": str(TODAY_NAIVE.date()),
     }
     st.session_state["cc_recon_tests"] = [
         {"name": n, "ok": bool(ok), "detail": str(d)} for n, ok, d in recon_tests
