@@ -66,7 +66,7 @@ def test_command_center_renders_without_exception():
     # expander labels and st.caption are not surfaced, hence the session-state gate below
     # for the research brief (whose full readout lives inside the Level-5 expander).
     assert any("What deserves attention" in r for r in rendered), "attention section missing"
-    assert any("What changed this run" in r for r in rendered), "changed section missing"
+    assert any("Where today's P&L comes from" in r for r in rendered), "P&L split section missing"
     assert any("Research brief · synthesis" in r for r in rendered), "research brief section missing"
     # Navigation contract (audit fix): CC must render the rail in the sidebar and
     # emit no in-app ../ anchors (its drill row is now st.page_link, so its five

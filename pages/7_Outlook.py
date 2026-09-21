@@ -8,13 +8,12 @@
 # flat-rate assumptions the reader sets; it is never a forecast, and never advice.
 # ==================================================
 import streamlit as st
-from datetime import datetime
 import pandas as pd
-import pytz
 
 from lib import theme
 from lib.formatters import format_inr, format_inr_compact, safe_float
 import html as _html
+from lib.run_context import as_of_timestamp, header_valued_at, page_opened_ist, page_opened_label
 from lib.ui import (
     caption as ui_caption,
     empty_state as ui_empty,
@@ -28,9 +27,9 @@ from lib.ui import (
 
 theme.inject_css()
 
-IST = pytz.timezone("Asia/Kolkata")
-NOW_IST = datetime.now(IST)
-TODAY = pd.Timestamp(NOW_IST.date())
+NOW_IST = page_opened_ist()
+_valued_day = as_of_timestamp(st.session_state)
+TODAY = _valued_day if _valued_day is not None else pd.Timestamp(NOW_IST.date())
 
 ui_nav("outlook")
 st.markdown(ui_page_header(
@@ -39,7 +38,7 @@ st.markdown(ui_page_header(
     "Cash that is maturing, a five-year illustration of today’s mix versus a 40% equity book, "
     "and a quiet place to test a move. Not investment advice.",
     meta=[
-        f"AS OF {NOW_IST.strftime('%d %b %Y, %H:%M IST')}",
+        header_valued_at(st.session_state),
         "WORKBOOK DATES ONLY",
         "NO GUESSED FX",
     ],
@@ -95,7 +94,8 @@ def _bucket_rows(days):
 
 buckets = [
     ("Due now", _mat[_mat["_days"] < 0]),
-    ("Next 30 days", _mat[_mat["_days"].between(0, 30)]),
+    ("Matures today", _mat[_mat["_days"] == 0]),
+    ("Next 30 days", _mat[_mat["_days"].between(1, 30)]),
     ("31–60 days", _mat[_mat["_days"].between(31, 60)]),
     ("61–90 days", _mat[_mat["_days"].between(61, 90)]),
 ]
@@ -234,5 +234,5 @@ st.markdown("---")
 st.markdown("**Money that frees up has a decision to make.**")
 with st.container(key="nb_drill_links"):
     safe_page_link("pages/2_Deep_Health.py", label="Open Decision Desk →")
-st.caption(f"Outlook as-of {NOW_IST:%d %b %Y, %H:%M IST} · weeks and months from the workbook's own "
+st.caption(f"{header_valued_at(st.session_state)} · {page_opened_label(NOW_IST)} · weeks and months from the workbook's own "
            "maturity dates; nothing else is projected.")

@@ -41,11 +41,17 @@ from lib.register import (
 from lib.ledger import net_worth as compute_net_worth
 from lib.drivers import (
     DRIVER_KEYS,
+    DRIVER_SUBS,
+    LIFETIME_PNL_CAPTION,
     NOT_A_CASHFLOW_LABEL,
+    PERIOD_DELTA_CAPTION,
     class_pnl_from_register,
     decompose_current,
+    driver_sub_for,
     snapshot_delta,
+    split_change_rows,
 )
+from lib.instrument_names import equity_display_name, extract_isin, isin_name_index
 from lib import snapshot as snapshot_io
 from lib.intelligence import exposure as intel_exposure
 from lib.intelligence import evidence as intel_evidence
@@ -579,6 +585,7 @@ mf = pd.DataFrame(mf_rows)
 # Gold book: SGB + gold ETFs (from Stocks sheet) + gold FoFs (from MF sheet above).
 # All gold exposure lives in exactly one place.
 stock_rows, gold_rows = [], []
+_equity_names = isin_name_index()
 for _, row in stocks_raw.iterrows():
     try:
         symbol = str(row.get("Symbol", row.get("Ticker / Symbol", "")) or "").strip().upper()
@@ -611,10 +618,16 @@ for _, row in stocks_raw.iterrows():
         # multiple). Long-held winners at low cost basis are normal and noisy here.
         if invested > 0 and pnl is not None and abs(pnl) > invested * 10:
             integrity_issues.append(("MEDIUM", f"{symbol}: P&L is {pnl/invested*100:.0f}% of invested amount — unusually large; confirm quantity/price if this was a recent buy."))
+        raw_company = str(row.get("Company Name", "") or "").strip()
+        stock_isin = extract_isin(raw_company, row.get("ISIN"))
+        display_name = equity_display_name(
+            raw_company, symbol, stock_isin, names=_equity_names,
+        ) or symbol
         row_dict = {"Owner": str(row.get("Owner", "") or ""), "Symbol": symbol, "Quantity": qty,
                     "Invested": invested, "Current Price": price, "Current Value": current_value,
                     "P&L": pnl, "Return %": ret, "Source": "Stocks",
-                    "Company Name": str(row.get("Company Name", "") or "").strip(),
+                    "Company Name": display_name,
+                    "ISIN": stock_isin,
                     "Exchange": str(row.get("Exchange", "") or "").strip(),
                     "Purchase Date": to_naive_ts(row.get("Purchase Date")),
                     "Avg Buy Price": safe_float(row.get("Avg Buy Price")),
@@ -2076,24 +2089,23 @@ with st.expander("Books · recon & laboratory", expanded=False):
             unsafe_allow_html=True,
         )
 
-    st.markdown(ui_section("What changed this run"), unsafe_allow_html=True)
+    st.markdown(ui_section("Where today's P&L comes from"), unsafe_allow_html=True)
     _pnl_cs = []
     _ibc_cs = []
+    _period_cs = []
     if _research_brief is not None and _research_brief.changes:
-        _pnl_cs = [c for c in _research_brief.changes
-                   if getattr(c, "kind", "") != "invested_basis_change"]
-        _ibc_cs = [c for c in _research_brief.changes
+        _pnl_cs, _period_cs, _other_cs = split_change_rows(_research_brief.changes)
+        _ibc_cs = [c for c in _period_cs
                    if getattr(c, "kind", "") == "invested_basis_change"]
+        _period_cs = [c for c in _period_cs
+                      if getattr(c, "kind", "") != "invested_basis_change"]
     if _pnl_cs:
-        st.markdown(ui_caption(
-            "This run's P&L attribution — valuation drivers (market / NAV / gold / "
-            "FCNR interest / FCNR FX / INR FD interest). Not cash moved."
-        ), unsafe_allow_html=True)
+        st.markdown(ui_caption(LIFETIME_PNL_CAPTION), unsafe_allow_html=True)
         _chg_cards = [
             {
                 "label": c.label,
                 "value": format_inr_compact(c.amount) if c.amount is not None else "—",
-                "sub": "valuation attribution",
+                "sub": driver_sub_for(c),
                 "tone": "up" if (c.amount is not None and c.amount >= 0)
                         else ("down" if (c.amount is not None and c.amount < 0) else ""),
             }
@@ -2101,36 +2113,36 @@ with st.expander("Books · recon & laboratory", expanded=False):
         ]
         st.markdown(ui_kpi_cards(_chg_cards, cols=3), unsafe_allow_html=True)
     elif cc_drivers is not None and cc_drivers["drivers"]:
-        st.markdown(ui_caption(
-            "This run's P&L attribution — valuation drivers. Not cash moved."
-        ), unsafe_allow_html=True)
+        st.markdown(ui_caption(LIFETIME_PNL_CAPTION), unsafe_allow_html=True)
         _chg_cards = []
         for _k, _v in cc_drivers["drivers"].items():
             _chg_cards.append({
                 "label": cc_drivers["driver_labels"].get(_k, _k),
                 "value": format_inr_compact(_v),
-                "sub": "valuation attribution",
+                "sub": DRIVER_SUBS.get(_k, "current − invested"),
                 "tone": "up" if _v >= 0 else "down",
             })
         st.markdown(ui_kpi_cards(_chg_cards[:6], cols=3), unsafe_allow_html=True)
     else:
-        st.markdown(ui_empty("Change breakdown unavailable",
+        st.markdown(ui_empty("P&L split unavailable",
                              "The register or research layer did not build this run."),
                     unsafe_allow_html=True)
 
-    if _ibc_cs:
-        st.markdown(ui_caption(
-            "Invested-Basis Change vs prior snapshot — " + NOT_A_CASHFLOW_LABEL
-        ), unsafe_allow_html=True)
-        _ibc_cards = [
-            {
+    if _ibc_cs or _period_cs:
+        st.markdown(ui_section("What changed since last snapshot"), unsafe_allow_html=True)
+        st.markdown(ui_caption(PERIOD_DELTA_CAPTION), unsafe_allow_html=True)
+        _delta_cards = []
+        for c in list(_period_cs)[:4] + list(_ibc_cs)[:2]:
+            _delta_cards.append({
                 "label": c.label,
                 "value": format_inr_compact(c.amount) if c.amount is not None else "—",
-                "sub": NOT_A_CASHFLOW_LABEL,
-            }
-            for c in _ibc_cs[:4]
-        ]
-        st.markdown(ui_kpi_cards(_ibc_cards, cols=3), unsafe_allow_html=True)
+                "sub": PERIOD_DELTA_CAPTION if getattr(c, "kind", "") == "invested_basis_change"
+                       else "change in current − invested",
+                "tone": "up" if (c.amount is not None and c.amount >= 0)
+                        else ("down" if (c.amount is not None and c.amount < 0) else ""),
+            })
+        if _delta_cards:
+            st.markdown(ui_kpi_cards(_delta_cards, cols=3), unsafe_allow_html=True)
 
     if _delta_rows:
         st.markdown(ui_caption(
@@ -2263,6 +2275,7 @@ try:
         "gold_pct": float(gold_pct),
         "health_score": float(health_score),
         "as_of": str(TODAY_NAIVE.date()),
+        "valued_at": now_ist.isoformat(),
     }
     st.session_state["cc_recon_tests"] = [
         {"name": n, "ok": bool(ok), "detail": str(d)} for n, ok, d in recon_tests

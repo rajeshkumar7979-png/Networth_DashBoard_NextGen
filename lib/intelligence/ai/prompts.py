@@ -253,7 +253,7 @@ def build_context(*, brief, question=None, max_evidence=None) -> dict:
         f"  Total invested (INR): {total_invested}",
         f"  Total P&L (INR): {total_pnl}",
         "",
-        "What changed this run (label — amount INR. note):",
+        "Lifetime P&L by source at this mark (label — amount INR. note):",
         _changes_block(brief),
         "",
         _conclusions_block("Deterministic risks", brief.risks or ()),

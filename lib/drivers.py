@@ -30,13 +30,64 @@ DRIVER_KEYS = [
 ]
 
 DRIVER_LABELS = {
-    "equity_market": "Equity (stocks + non-liquid MF) market value",
-    "liquid_nav": "Liquid funds / NAV change",
-    "gold_price": "Gold (SGB + ETF + FoF) price change",
+    "equity_market": "Equity (stocks + non-liquid MF) P&L",
+    "liquid_nav": "Liquid funds P&L",
+    "gold_price": "Gold (SGB + ETF + FoF) P&L",
     "fcnr_interest": "FCNR interest (at current FX)",
     "fcnr_fx_principal": "FCNR FX on principal",
     "inr_fd_interest": "INR FD interest",
 }
+
+DRIVER_SUBS = {
+    "equity_market": "current − invested",
+    "liquid_nav": "current − invested",
+    "gold_price": "current − invested",
+    "fcnr_interest": "accrued USD × today's FX",
+    "fcnr_fx_principal": "principal × FX move",
+    "inr_fd_interest": "accrued contractual interest",
+}
+
+LIFETIME_PNL_CAPTION = (
+    "These rupees are this mark's P&L (current − invested) split by source. "
+    "They are not cash received and not the move since the last snapshot."
+)
+PERIOD_DELTA_CAPTION = (
+    "Difference versus the previous history snapshot. "
+    + NOT_A_CASHFLOW_LABEL
+)
+
+LIFETIME_CHANGE_KINDS = frozenset({"pnl_driver"})
+PERIOD_CHANGE_KINDS = frozenset({
+    "invested_basis_change", "market_valuation_change", "class_delta",
+})
+
+
+def split_change_rows(changes):
+    """Separate lifetime P&L drivers from snapshot-to-snapshot deltas.
+
+    build_change_summary emits both in one tuple. Mixing them under
+    'what changed this run' is the labelling bug — the numbers are right,
+    the heading is not.
+    """
+    lifetime, period, other = [], [], []
+    for row in changes or ():
+        kind = getattr(row, "kind", "")
+        if kind in LIFETIME_CHANGE_KINDS:
+            lifetime.append(row)
+        elif kind in PERIOD_CHANGE_KINDS:
+            period.append(row)
+        else:
+            other.append(row)
+    return lifetime, period, other
+
+
+def driver_sub_for(change) -> str:
+    label = getattr(change, "label", "") or ""
+    for key, text in DRIVER_LABELS.items():
+        if label == text:
+            return DRIVER_SUBS.get(key, "current − invested")
+    return "current − invested"
+
 
 
 def class_slug(cls):

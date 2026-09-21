@@ -263,7 +263,7 @@ def test_delta_from_history_enriched_and_edge_cases():
 def test_build_change_summary_drivers_only():
     changes = build_change_summary(drivers=_drivers(), delta=None)
     labels = [c.label for c in changes]
-    assert "Equity (stocks + non-liquid MF) market value" in labels
+    assert "Equity (stocks + non-liquid MF) P&L" in labels
     assert any(c.kind == "total" and c.amount == 2700.0 for c in changes)
     assert all(not c.cashflow_measurement for c in changes)
 

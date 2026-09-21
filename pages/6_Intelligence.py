@@ -11,13 +11,12 @@
 # Nothing here is an order. AI never runs on page load.
 # ==================================================
 import streamlit as st
-from datetime import datetime
 import html as _html
-import pytz
 import pandas as pd
 
 from lib import theme
-from lib.drivers import NOT_A_CASHFLOW_LABEL
+from lib.drivers import LIFETIME_PNL_CAPTION, PERIOD_DELTA_CAPTION, driver_sub_for, split_change_rows
+from lib.run_context import header_valued_at, page_opened_ist, page_opened_label
 from lib.formatters import format_inr_compact
 from lib.intelligence import exposure as intel_exposure
 from lib.intelligence import live as intel_live
@@ -39,8 +38,7 @@ from lib.register import build_asset_register
 
 theme.inject_css()
 
-IST = pytz.timezone("Asia/Kolkata")
-NOW_IST = datetime.now(IST)
+NOW_IST = page_opened_ist()
 
 ui_nav("intelligence")
 st.markdown(ui_page_header(
@@ -48,7 +46,7 @@ st.markdown(ui_page_header(
     "Intelligence",
     "What the evidence says — fixed, evidence-backed signals from this run. Read-only. Nothing here is an order.",
     meta=[
-        f"AS OF {NOW_IST.strftime('%d %b %Y, %H:%M IST')}",
+        header_valued_at(st.session_state),
         "READ-ONLY SYNTHESIS",
         "NO NETWORK THIS RUN",
     ],
@@ -224,17 +222,14 @@ if _questions:
 
 
 # ==================================================
-# C — WHAT CHANGED THIS RUN (P&L attribution vs Invested-Basis Change)
+# C — WHERE TODAY'S P&L COMES FROM (lifetime) vs SNAPSHOT DELTA
 # ==================================================
 if _research is not None and _research.changes:
-    st.markdown(ui_section("What changed this run", "deterministic delta vs prior snapshot"),
-                unsafe_allow_html=True)
-    _pnl_cs = [c for c in _research.changes
-               if getattr(c, "kind", "") != "invested_basis_change"]
-    _ibc_cs = [c for c in _research.changes
-               if getattr(c, "kind", "") == "invested_basis_change"]
+    _pnl_cs, _period_cs, _ = split_change_rows(_research.changes)
     if _pnl_cs:
-        st.caption("This run's P&L attribution — valuation drivers. Not cash moved.")
+        st.markdown(ui_section("Where today's P&L comes from", "lifetime, this mark"),
+                    unsafe_allow_html=True)
+        st.caption(LIFETIME_PNL_CAPTION)
         _chg_cards = []
         for _c in _pnl_cs[:6]:
             _amt = _c.amount
@@ -242,7 +237,7 @@ if _research is not None and _research.changes:
             _chg_cards.append({
                 "label": _c.label,
                 "value": _val,
-                "sub": "valuation attribution",
+                "sub": driver_sub_for(_c),
                 "tone": "up" if (_amt or 0) > 0 else ("down" if (_amt or 0) < 0 else "neutral"),
             })
         _changes_grid = "".join(
@@ -252,16 +247,18 @@ if _research is not None and _research.changes:
             f'<div class="t-kpi-sub">{_c.get("sub", "")}</div></div>' for _c in _chg_cards)
         st.markdown(f'<div class="t-kpi-grid">{_changes_grid}</div>',
                     unsafe_allow_html=True)
-    if _ibc_cs:
-        st.caption("Invested-Basis Change vs prior snapshot — " + NOT_A_CASHFLOW_LABEL)
+    if _period_cs:
+        st.markdown(ui_section("What changed since last snapshot", "history delta"),
+                    unsafe_allow_html=True)
+        st.caption(PERIOD_DELTA_CAPTION)
         _ibc_cards = []
-        for _c in _ibc_cs[:4]:
+        for _c in _period_cs[:6]:
             _amt = _c.amount
             _ibc_cards.append({
                 "label": _c.label,
                 "value": format_inr_compact(_amt) if _amt is not None else "—",
-                "sub": NOT_A_CASHFLOW_LABEL,
-                "tone": "neutral",
+                "sub": PERIOD_DELTA_CAPTION,
+                "tone": "up" if (_amt or 0) > 0 else ("down" if (_amt or 0) < 0 else "neutral"),
             })
         _ibc_grid = "".join(
             f'<div class="t-kpi t-kpi-tall t-kpi-tone-{_c.get("tone", "neutral")}">'
@@ -272,7 +269,7 @@ if _research is not None and _research.changes:
                     unsafe_allow_html=True)
     st.caption("The invested difference between snapshots is the Invested-Basis Change — "
                "there is no transaction history, so nothing on this page is a flow. "
-               + NOT_A_CASHFLOW_LABEL)
+               + PERIOD_DELTA_CAPTION)
 
 
 # ==================================================
@@ -455,6 +452,6 @@ _meta_bits = [
 ]
 st.markdown(f'<div class="t-footnote" style="margin-top:14px;">{" · ".join(_meta_bits)}</div>',
             unsafe_allow_html=True)
-st.caption(f"Intelligence as-of {NOW_IST:%d %b %Y, %H:%M IST} · "
+st.caption(f"{header_valued_at(st.session_state)} · {page_opened_label(NOW_IST)} · "
            "sources: AMFI NAV / holdings disclosures, Groww, Yahoo, goldprice.dev, Frankfurter, "
            "Google News RSS, FRED, SEC — via the read-only gateway cache.")

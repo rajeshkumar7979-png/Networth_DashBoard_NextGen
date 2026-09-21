@@ -148,7 +148,7 @@ def consistency_score(m):
     vals = [m.get("cagr_1Y"), m.get("cagr_3Y"), m.get("cagr_5Y")]
     vals = [v for v in vals if v is not None]
     if len(vals) < 2:
-        return 10.0  # neutral — not enough history to judge either way
+        return None  # missing history is excluded from the denominator, not a free 10
     spread = (max(vals) - min(vals))
     return float(np.clip(20 - spread * 40, 0, 20))
 
@@ -375,7 +375,8 @@ k_cards = [
      "sub": "sum of positions; unique schemes after merge"},
     {"label": "Positions / schemes", "value": f"{n_positions} / {n_schemes}",
      "sub": f"{n_families} fund families (AMCs)"},
-    {"label": "MF Health Score", "value": f"{overall_health}/100", "sub": b_label + " · cost excluded",
+    {"label": "Illustrative health index", "value": f"{overall_health}/100",
+     "sub": "rescaled over scored pillars · cost excluded · missing ≠ 0",
      "tone": "up" if b_label == "Excellent" else ("warn" if b_label == "Good" else "down")},
     {"label": "Portfolio Overlap", "value": ov_txt, "sub": ov_lbl, "tone": _ov_tone},
     {"label": "Concentration Risk", "value": conc_label, "sub": f"Top 5 schemes: {top5_weight:.1f}% of MF book",
@@ -571,6 +572,7 @@ with g4:
                         config={"displayModeBar": False})
         st.markdown(caption(
             f"Top {len(top_lt)} of {len(look_through_rows)} disclosed names. "
+            "Bar = family rupees through funds; hover % is of the MF book, not total assets. "
             "A stock in several funds is one family exposure, not several."),
             unsafe_allow_html=True)
     else:
@@ -595,7 +597,7 @@ if len(fund_weights) >= 2:
         z.append(row)
     fig_hm = go.Figure(go.Heatmap(
         z=z, x=short, y=short, colorscale="Tealgrn", zmin=0, zmax=60,
-        hovertemplate="%{y} × %{x}<br>%{z:.1f}% overlap<extra></extra>",
+        hovertemplate="%{y} × %{x}<br>%{z:.1f}% of disclosed fund weights<extra></extra>",
         colorbar=dict(title="%"),
     ))
     st.plotly_chart(_plot(fig_hm, height=max(320, 18 * len(labels)), legend=False),
@@ -750,7 +752,7 @@ else:
 
 st.markdown("---")
 lc1, lc2, lc3 = st.columns(3)
-lc1.markdown("**How we calculate MF Health Score**")
+lc1.markdown("**How we calculate the illustrative health index**")
 lc1.markdown(caption(
     "Each scheme: Performance 25 + Consistency 20 + Concentration 15 + Risk Adjusted 10 "
     "+ Overlap 20 when disclosures exist. The sum is rescaled to /100 over that scheme’s "

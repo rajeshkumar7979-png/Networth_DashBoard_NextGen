@@ -15,6 +15,7 @@ import pandas as pd
 
 from lib.register import canonical_instrument_key, assign_asset_class
 from lib.formatters import safe_float
+from lib.instrument_names import equity_display_name, extract_isin, looks_like_isin
 
 
 def _s(row, column):
@@ -32,7 +33,11 @@ def _name_of(row, kind):
     if kind == "MF":
         return _s(row, "Fund Name") or _s(row, "ISIN")
     if kind == "Stocks":
-        return _s(row, "Company Name") or _s(row, "Symbol")
+        return equity_display_name(
+            _s(row, "Company Name"),
+            _s(row, "Symbol"),
+            extract_isin(_s(row, "ISIN"), _s(row, "Company Name")),
+        ) or _s(row, "Symbol")
     if kind == "Gold":
         return _s(row, "Symbol") or _s(row, "Company Name")
     # FD / FCNR: the workbook has no Symbol column. Build a readable name
@@ -99,6 +104,12 @@ def _match_terms(row, kind, key, name):
     terms = {_s(row, "Symbol").upper(), key.upper(), name.upper()}
     if kind == "MF":
         terms.add(_s(row, "ISIN").upper())
+    elif kind == "Stocks":
+        isin = extract_isin(_s(row, "ISIN"), _s(row, "Company Name"))
+        if isin:
+            terms.add(isin)
+        if looks_like_isin(_s(row, "Company Name")):
+            terms.add(_s(row, "Company Name").upper())
     elif kind == "FD":
         terms.add(_s(row, "Account Number").upper())
     for word in name.upper().replace("-", " ").split():

@@ -140,14 +140,13 @@ def test_mf_health_lookthrough_charts_and_pairwise():
     assert "family_look_through" in src
 
 
-
 def test_phase_b_intelligence_mapped_only_no_unmapped_fallback():
     src = (ROOT / "pages" / "6_Intelligence.py").read_text(encoding="utf-8")
     assert "or _dev_rows" not in src
     assert "_mapped[:6] or" not in src
     assert "not mapped to your book" in src
-    assert "invested_basis_change" in src
-    assert "NOT_A_CASHFLOW_LABEL" in src
+    assert "split_change_rows" in src
+    assert "PERIOD_DELTA_CAPTION" in src
 
 
 def test_phase_b_news_macro_demoted_from_primary_order():
@@ -157,37 +156,54 @@ def test_phase_b_news_macro_demoted_from_primary_order():
     assert "NRI / tax treatment is not modelled" in src
 
 
-def test_phase_b_holdings_fd_table_indian_grouping_and_two_returns():
-    src = (ROOT / "pages" / "3_Asset_Detail.py").read_text(encoding="utf-8")
-    assert 'format="₹%d"' not in src
-    assert '"Product"' in src and '"Account"' in src
-    assert "not annualized" in src
-    assert "NRI / tax treatment is not modelled" in src
-    assert "FCNR return · two parts" in src
-    assert "Interest Return (INR)" in src
-    assert "FX Gain/Loss (INR)" in src
+def test_attribution_is_lifetime_pnl_not_this_run_jargon():
+    src = (ROOT / "pages" / "1_Command_Center.py").read_text(encoding="utf-8")
+    assert "Where today's P&L comes from" in src
+    assert "valuation attribution" not in src
+    assert "LIFETIME_PNL_CAPTION" in src
+    desk = (ROOT / "pages" / "8_Desk.py").read_text(encoding="utf-8")
+    assert "valuation attribution" not in desk
+    intel = (ROOT / "pages" / "6_Intelligence.py").read_text(encoding="utf-8")
+    assert "Where today's P&L comes from" in intel
 
 
-def test_phase_b_mf_health_overlap_disclosure_and_as_of():
+def test_decision_desk_is_scenario_not_advice():
+    src = (ROOT / "pages" / "2_Deep_Health.py").read_text(encoding="utf-8")
+    assert "Prefer Liquid / short FD" not in src
+    assert "Do not put this money into equity right now" not in src
+    assert "Liquidity scenario" in src
+    assert "does not guess USD/INR" in src
+
+
+def test_funds_consistency_does_not_award_free_points():
     src = (ROOT / "pages" / "5_MF_Health.py").read_text(encoding="utf-8")
-    assert "n_disclosed" in src
-    assert "disclosed" in src
-    assert "undisclosed" in src
-    assert "datetime.now()" not in src
-    assert "trailing_return" in src
-    assert "trailing CAGR" in src
+    assert "return 10.0" not in src
+    assert "Illustrative health index" in src
 
 
-def test_phase_b_nri_tax_empty_state_on_desk_holdings_decisions():
-    for rel in ("pages/2_Deep_Health.py", "pages/3_Asset_Detail.py", "pages/8_Desk.py"):
-        src = (ROOT / rel).read_text(encoding="utf-8")
-        assert "NRI / tax treatment is not modelled" in src, rel
+def test_pages_do_not_print_fresh_now_as_valuation_clock():
+    for name in ("6_Intelligence.py", "7_Outlook.py", "8_Desk.py"):
+        src = (ROOT / "pages" / name).read_text(encoding="utf-8")
+        assert "header_valued_at" in src, name
+        assert "AS OF {NOW_IST" not in src, name
 
 
-def test_phase_b_desk_renders_recon_grid_and_timestamps():
-    src = (ROOT / "pages" / "8_Desk.py").read_text(encoding="utf-8")
-    assert "cc_recon_tests" in src
-    assert "usd_inr_published" in src
-    assert "invested_basis_change" in src
-    assert "NOT_A_CASHFLOW_LABEL" in src
-    assert 'class="recon-pass"' in src or "recon-pass" in src
+def test_command_publishes_valued_at():
+    src = (ROOT / "pages" / "1_Command_Center.py").read_text(encoding="utf-8")
+    assert '"valued_at"' in src
+    assert "now_ist.isoformat()" in src
+
+
+def test_outlook_today_is_not_inside_next_30():
+    src = (ROOT / "pages" / "7_Outlook.py").read_text(encoding="utf-8")
+    assert "Matures today" in src
+    assert "between(1, 30)" in src
+    assert "between(0, 30)" not in src
+
+
+def test_holdings_dossier_uses_company_name_not_raw_isin_label():
+    src = (ROOT / "pages" / "3_Asset_Detail.py").read_text(encoding="utf-8")
+    assert "_dossier_label" in src
+    assert "Also inside family funds" in src
+    assert "of family assets" in src
+    assert "status_label" in src

@@ -56,35 +56,35 @@ st.markdown(section_header_html("Time horizon", "02"), unsafe_allow_html=True)
 
 _sugg = {
     "0–3 months": (
-        "Prefer Liquid / short FD",
-        "warn",
+        "Liquidity scenario",
+        "info",
         [
-            "Keep in Liquid Mutual Fund or short-term FD",
-            "Do not put this money into equity right now",
+            "Sandbox routing: Liquid MF or a short-term FD",
+            "Equity is not a matching bucket for a 0–3 month need — that is a horizon fact, not an order",
         ],
     ),
     "3–12 months": (
-        "Prefer short FD + some Liquid",
-        "warn",
+        "Short-duration preservation",
+        "info",
         [
-            "Majority in FD maturing near your need date",
-            "Small portion can stay in Liquid fund",
+            "Sandbox routing: FD maturing near the need date, remainder in Liquid",
+            "The table below shows the allocation after each route — it does not rank them",
         ],
     ),
     "1–3 years": (
-        "Can consider a mix",
+        "Mix / horizon 1–3y",
         "info",
         [
-            "Part in FD / debt",
-            "Part can go to equity or hybrid only if you can tolerate ups and downs",
+            "Sandbox routing: part FD / debt, part equity or hybrid",
+            "Tolerance for drawdowns is an input you set, not a recommendation this page makes",
         ],
     ),
     "3+ years / not sure": (
-        "Longer horizon — equity can be considered",
+        "Growth-exposure scenario",
         "info",
         [
-            "Only if this money is truly not needed for 3+ years",
-            "Match with your overall equity target",
+            "Sandbox routing: equity is available only if this money is not needed for 3+ years",
+            "Match any route against the equity weight already in the books",
         ],
     ),
 }
@@ -310,7 +310,9 @@ if decision_amount > 0 and total_nw > 0:
     out = pd.DataFrame([baseline] + scenarios)
 
     st.caption("Each row is the same decision, routed differently. Weights after the move. "
-               "The rupee column is total assets (the sandbox base), not net worth.")
+               "The rupee column is total assets (the sandbox base), not net worth. "
+               "All → FCNR is an INR-weight shift marked at the next settlement rate; "
+               "this table does not guess USD/INR.")
     _disp = out.copy()
     _disp["New total assets (₹)"] = _disp["New total assets (₹)"].map(lambda n: format_inr(n))
     st.dataframe(

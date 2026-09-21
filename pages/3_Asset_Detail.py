@@ -11,7 +11,7 @@ import pandas as pd
 
 from lib.theme import inject_css
 from lib.register import canonical_instrument_key
-from lib.roster import build_roster, instrument_summary, member_filter_options
+from lib.roster import build_roster, member_filter_options
 from lib.formatters import format_inr, format_identity_value
 from lib.returns import (
     LUMP_SUM_ANN_LABEL,
@@ -36,6 +36,7 @@ from lib.ui import (
     section_header_html,
     tone_for,
 )
+from lib.instrument_names import extract_isin, looks_like_isin
 from lib.intelligence.live import development_rows
 
 inject_css()
@@ -116,6 +117,42 @@ def _as_of_date():
         if pd.notna(ts):
             return ts
     return None
+
+
+def _family_funds_holding(isin):
+    """Schemes in this family's MF book that disclose this equity ISIN."""
+    code = str(isin or "").strip().upper()
+    if not code:
+        return []
+    cache = load_holdings_cache()
+    out = []
+    seen = set()
+    for holding in st.session_state.get("mf_holdings_for_health") or []:
+        scheme = holding.get("Scheme Code")
+        if scheme is None:
+            continue
+        try:
+            raw = cache.get(str(int(scheme))) or cache.get(str(scheme)) or []
+        except (TypeError, ValueError):
+            raw = cache.get(str(scheme)) or []
+        cleaned, _ = _normalize_holdings(raw if isinstance(raw, list) else [])
+        hit = next(
+            (x for x in cleaned if str(x.get("isin") or "").strip().upper() == code),
+            None,
+        )
+        if not hit:
+            continue
+        fund = str(holding.get("Fund Name") or scheme)
+        key = (fund, str(holding.get("Owner") or ""))
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append({
+            "Fund": fund,
+            "Owner": holding.get("Owner") or "",
+            "Weight %": hit.get("weight"),
+        })
+    return out
 
 
 
@@ -423,17 +460,29 @@ if _q_symbol:
                          | roster["Name"].astype(str).eq(_q_symbol)].tolist()
     if _hits:
         _default = _hits[0]
+def _dossier_label(k):
+    hit = roster[roster["Key"] == k]
+    if hit.empty:
+        return str(k)
+    r = hit.iloc[0]
+    name = str(r["Name"] or "").strip()
+    member = str(r["Member"] or "").strip()
+    kind = str(r["Kind"] or "")
+    bits = [b for b in (name, member, kind) if b]
+    if kind == "FD":
+        mat = str(r.get("Maturity") or "").strip()
+        if mat and mat.lower() not in {"nan", "nat", "none", "—"}:
+            ts = pd.to_datetime(mat, errors="coerce")
+            bits.append(ts.strftime("%d %b %Y") if pd.notna(ts) else mat[:10])
+    return " · ".join(bits) if bits else str(k)
+
+
 choice = st.selectbox(
     "Instrument",
     _options,
     index=_default,
     key="holdings_dossier_instrument",
-    format_func=lambda k: (
-        (lambda n, kind: f"{n} · {kind}" if n else f"{kind} · {k}")(
-            str(roster[roster["Key"] == k].iloc[0]["Name"] or "").strip(),
-            str(roster[roster["Key"] == k].iloc[0]["Kind"]),
-        )
-    ),
+    format_func=_dossier_label,
 )
 
 _positions = roster[roster["Key"] == choice]
@@ -460,10 +509,15 @@ for _idx, (__, row) in enumerate(_positions.iterrows()):
         + pill(str(row["Kind"]), "info")
         + pill(str(row["Class"]), "neutral")
         + pill(str(row["Member"]) if len(str(row["Member"])) > 0 else "member n/a", "neutral")
-        + (pill(f"{contrib:.1f}% of assets", "positive") if contrib is not None else "")
+        + (pill(f"{contrib:.1f}% of family assets", "positive") if contrib is not None else "")
         + '</div>',
         unsafe_allow_html=True,
     )
+    if contrib is not None:
+        st.markdown(caption(
+            "Contribution % is this line ÷ family total assets (all members, all sleeves), "
+            "not this member's book."),
+            unsafe_allow_html=True)
 
     st.markdown(kpi_cards([
         {"label": "Current Value (INR)", "value": format_inr(cur) if cur is not None else "n/a",
@@ -570,6 +624,7 @@ for _idx, (__, row) in enumerate(_positions.iterrows()):
                       ("Purchase Date", "Purchase Date")]
         elif kind == "Stocks":
             fields = [("Company Name", "Company"), ("Symbol", "Symbol"),
+                      ("ISIN", "ISIN"),
                       ("Exchange", "Exchange"), ("Owner", "Owner"),
                       ("Quantity", "Quantity"), ("Avg Buy Price", "Avg buy"),
                       ("Current Price", "Last price"),
@@ -593,6 +648,14 @@ for _idx, (__, row) in enumerate(_positions.iterrows()):
                 continue
             value = rec.get(col)
             if value is None or (isinstance(value, float) and value != value):
+                continue
+            if label == "Company" and looks_like_isin(value):
+                recovered = extract_isin(value)
+                if "ISIN" not in seen_labels and recovered:
+                    seen_labels.add("ISIN")
+                    identity.append({"Field": "ISIN", "Value": recovered})
+                continue
+            if not str(value).strip() or str(value).strip().lower() in {"nan", "none"}:
                 continue
             seen_labels.add(label)
             native = label.lower().endswith("(native)")
@@ -658,30 +721,91 @@ for _idx, (__, row) in enumerate(_positions.iterrows()):
                 "Look-through is no data, not zero. Refresh holdings from Funds if the cache is stale."),
                 unsafe_allow_html=True)
 
-    st.markdown(section_header_html("Health · fundamentals · technicals", "what exists vs what does not"),
+    st.markdown(section_header_html("Health · this line in the book", "what the register actually knows"),
                 unsafe_allow_html=True)
-    if str(row["Kind"]) == "MF":
+    _kind = str(row["Kind"])
+    _last = _num(rec.get("Current Price"))
+    _avg = _num(rec.get("Avg Buy Price"))
+    _mark_vs_buy = None
+    if _last is not None and _avg and _avg > 0:
+        _mark_vs_buy = (_last / _avg - 1.0) * 100.0
+    _health_cards = [
+        {"label": "Simple ROI",
+         "value": f"{_roi:.2f}%" if _roi is not None else "n/a",
+         "sub": "current vs book cost",
+         "tone": tone_for(_roi) if _roi is not None else "neutral"},
+        {"label": "Lump-sum annualized",
+         "value": f"{_ann:.2f}%" if _ann is not None else "n/a",
+         "sub": f"{_days} days held" if _days is not None else "needs purchase date",
+         "tone": tone_for(_ann) if _ann is not None else "neutral"},
+        {"label": "Of family assets",
+         "value": f"{contrib:.2f}%" if contrib is not None else "n/a",
+         "sub": "this line ÷ total assets"},
+    ]
+    if _mark_vs_buy is not None:
+        _health_cards.append({
+            "label": "Mark vs avg buy",
+            "value": f"{_mark_vs_buy:+.1f}%",
+            "sub": "last price vs workbook avg buy — not a signal",
+            "tone": tone_for(_mark_vs_buy),
+        })
+    if _kind == "MF":
+        _y3 = _num(rec.get("3Y %"))
+        _n3 = _num(rec.get("vs Nifty50 3Y"))
+        _health_cards.append({
+            "label": "Scheme 3Y vs Nifty50",
+            "value": (
+                f"{_y3:.1f}% vs {_n3:.1f}%" if _y3 is not None and _n3 is not None
+                else (f"{_y3:.1f}%" if _y3 is not None else "n/a")
+            ),
+            "sub": "trailing NAV CAGR, not your XIRR",
+        })
+    st.markdown(kpi_cards(_health_cards, cols=4), unsafe_allow_html=True)
+
+    if _kind == "Stocks":
+        _isin = extract_isin(rec.get("ISIN"), rec.get("Company Name"), row.get("Key"))
+        _also = _family_funds_holding(_isin) if _isin else []
+        st.markdown(section_header_html("Also inside family funds", "look-through, same ISIN"),
+                    unsafe_allow_html=True)
+        if _also:
+            _also_rows = []
+            for item in _also:
+                w = item.get("Weight %")
+                _also_rows.append({
+                    "Fund": item["Fund"],
+                    "Member": item.get("Owner") or "",
+                    "Weight in that fund": f"{w:.2f}%" if isinstance(w, (int, float)) else "—",
+                })
+            st.dataframe(pd.DataFrame(_also_rows), hide_index=True, use_container_width=True)
+            st.markdown(caption(
+                f"{len(_also)} scheme(s) in this family's MF book disclose {_isin or 'this ISIN'}. "
+                "Weight is the fund's statutory portfolio, not your rupee mix. Direct holding above is extra."),
+                unsafe_allow_html=True)
+        else:
+            st.markdown(caption(
+                "No family fund in the committed holdings cache discloses this ISIN. "
+                "That is 'not in the look-through', not 'zero overlap'."),
+                unsafe_allow_html=True)
+
+        st.markdown(section_header_html("Fundamentals · technicals", "what this desk does not have"),
+                    unsafe_allow_html=True)
         st.markdown(caption(
-            "Fund health score, overlap and concentration live on Funds — they are "
-            "portfolio-level, not re-scored here. This dossier does not fetch a new NAV series."
-        ), unsafe_allow_html=True)
-    elif str(row["Kind"]) == "Stocks":
-        st.markdown(empty_state(
-            "No fundamental tape for this name",
-            "PE, book value, earnings and shareholding are not in the workbook and there is "
-            "no free NSE/BSE fundamentals feed wired into this desk. SEC EDGAR covers US filers only. "
-            "Missing stays missing — never filled with a guessed PE.",
-        ), unsafe_allow_html=True)
-        st.markdown(empty_state(
-            "No technical overlay",
-            "RSI, moving averages and chart patterns are a trading terminal. This desk marks "
-            "the book; it does not generate buy/sell signals from candles.",
-        ), unsafe_allow_html=True)
+            "PE, book value, earnings, shareholding, RSI, moving averages and candle patterns "
+            "are not in the workbook and there is no NSE/BSE fundamentals or charting feed on this desk. "
+            "SEC EDGAR covers US filers only. Missing stays missing — never a guessed PE or a buy/sell from candles. "
+            "Health above is this line in YOUR book (cost, mark, days held, family weight, fund overlap)."),
+            unsafe_allow_html=True)
+    elif _kind == "MF":
+        st.markdown(caption(
+            "Scheme 1Y/3Y/5Y and Nifty bars come from the Command Center NAV path. "
+            "Portfolio overlap, pairwise heatmap and the illustrative health index live on Funds — "
+            "they are book-level, not re-scored here. This dossier does not fetch a new NAV series."),
+            unsafe_allow_html=True)
     else:
         st.markdown(caption(
             "No PE / RSI overlay is computed for gold or deposits. FCNR health is the two-part "
-            "return above; INR FD health is contractual ROI and days to maturity."
-        ), unsafe_allow_html=True)
+            "return above; INR FD health is contractual ROI and days to maturity."),
+            unsafe_allow_html=True)
 
     st.markdown(section_header_html("Not recorded for this position", "no-data"),
                 unsafe_allow_html=True)
@@ -759,7 +883,10 @@ for _idx, (__, row) in enumerate(_positions.iterrows()):
             _q = (
                 f"Given only the verified family research brief, what does the evidence say "
                 f"about the instrument classified as {row['Kind']} / {row['Class']} named "
-                f"{str(row['Name'])[:80]}? Restate verified numbers. Do not invent PE, RSI, "
+                f"{str(row['Name'])[:80]}"
+                f" (symbol {str(rec.get('Symbol') or row.get('Key') or '')[:24]}, "
+                f"ISIN {extract_isin(rec.get('ISIN'), rec.get('Company Name')) or 'n/a'})"
+                f"? Restate verified numbers. Do not invent PE, RSI, "
                 f"XIRR, tax or a buy/sell. Say where evidence is thin."
             )
             with st.spinner("AI is reading the verified brief…"):
@@ -787,10 +914,18 @@ for _idx, (__, row) in enumerate(_positions.iterrows()):
                 "Decision-support only. Not an order. Numbers on this page were not rewritten."
             ), unsafe_allow_html=True)
         else:
-            st.markdown(caption(
-                f"AI did not produce a grounded reading ({_status or 'unavailable'}). "
-                "The deterministic dossier above is unchanged."
-            ), unsafe_allow_html=True)
+            _label = getattr(_stored, "status_label", None) or _status or "unavailable"
+            _reason = str(getattr(_stored, "reason", "") or "").strip()
+            _line = f"AI did not produce a grounded reading — {_label}."
+            if _reason:
+                _line += f" {_reason}"
+            if _status == "not_configured":
+                _line += " Configure a local Ollama endpoint or an API key in secrets. The numbers above stay the source of truth."
+            elif _status == "insufficient_evidence":
+                _line += " Open Command Center so the research brief has evidence; AI will not invent it."
+            else:
+                _line += " The deterministic dossier above is unchanged."
+            st.markdown(caption(_line), unsafe_allow_html=True)
 
 st.markdown("---")
 st.markdown(

@@ -8,17 +8,16 @@
 # from the Command Center's own session data.
 # ==================================================
 import streamlit as st
-from datetime import datetime
 import json
 import os
 import pandas as pd
-import pytz
 
 from lib import theme
 from lib.formatters import format_inr_compact, format_inr_indian, format_inr
 from lib.intelligence.sources import gateway_status
 from lib.intelligence import live as intel_live
-from lib.drivers import NOT_A_CASHFLOW_LABEL
+from lib.drivers import LIFETIME_PNL_CAPTION, NOT_A_CASHFLOW_LABEL, PERIOD_DELTA_CAPTION, driver_sub_for, split_change_rows
+from lib.run_context import header_valued_at, page_opened_ist, page_opened_label
 from lib.register import aggregate_by_class, build_asset_register, family_level_sum
 from lib.ui import (
     caption as ui_caption,
@@ -32,8 +31,7 @@ from lib.ui import (
 
 theme.inject_css()
 
-IST = pytz.timezone("Asia/Kolkata")
-NOW_IST = datetime.now(IST)
+NOW_IST = page_opened_ist()
 
 ui_nav("desk")
 st.markdown(ui_page_header(
@@ -41,7 +39,7 @@ st.markdown(ui_page_header(
     "Sources, exports, how to read this",
     "Tape status, downloads, reconciliation, and the method behind every number. Nothing here re-values the book.",
     meta=[
-        f"AS OF {NOW_IST.strftime('%d %b %Y, %H:%M IST')}",
+        header_valued_at(st.session_state),
         "CACHE-READ-ONLY",
         "NO VALUATION HERE",
     ],
@@ -230,6 +228,9 @@ try:
             if "Invested" in _cls.columns:
                 _cls["Invested"] = _cls["Invested"].map(
                     lambda v: format_inr(v) if pd.notna(v) else "—")
+            if "Data Backed" in _cls.columns:
+                _cls["Data Backed"] = _cls["Data Backed"].map(
+                    lambda v: "PASS" if bool(v) else "")
             st.dataframe(
                 _cls,
                 hide_index=True,
@@ -238,7 +239,7 @@ try:
                     "Asset Class": st.column_config.TextColumn("Asset class"),
                     "Current Value": st.column_config.TextColumn("Current (INR)"),
                     "Invested": st.column_config.TextColumn("Invested (INR)"),
-                    "Data Backed": st.column_config.CheckboxColumn("Data backed"),
+                    "Data Backed": st.column_config.TextColumn("Data backed"),
                 },
             )
 except Exception as _recon_err:
@@ -324,43 +325,35 @@ if os.path.exists(history_path):
 # --------------------------------------------------
 # 04b — P&L ATTRIBUTION vs INVESTED-BASIS CHANGE
 # --------------------------------------------------
-st.markdown(ui_section("P&L attribution vs Invested-Basis Change", "two different numbers"),
+st.markdown(ui_section("Where today's P&L comes from", "lifetime vs snapshot delta"),
             unsafe_allow_html=True)
 _research = st.session_state.get("cc_research_brief")
-_pnl_cs, _ibc_cs = [], []
+_pnl_cs, _period_cs = [], []
 if _research is not None and getattr(_research, "changes", None):
-    _pnl_cs = [c for c in _research.changes
-               if getattr(c, "kind", "") != "invested_basis_change"]
-    _ibc_cs = [c for c in _research.changes
-               if getattr(c, "kind", "") == "invested_basis_change"]
+    _pnl_cs, _period_cs, _ = split_change_rows(_research.changes)
 if _pnl_cs:
-    st.markdown(ui_caption(
-        "This run's P&L attribution — valuation drivers (market / NAV / gold / "
-        "FCNR interest / FCNR FX / INR FD interest). Not cash moved."
-    ), unsafe_allow_html=True)
+    st.markdown(ui_caption(LIFETIME_PNL_CAPTION), unsafe_allow_html=True)
     _chg_cards = []
     for c in _pnl_cs[:6]:
         _chg_cards.append(
             f'<div class="t-kpi"><div class="t-kpi-label">{c.label}</div>'
             f'<div class="t-kpi-value">{format_inr_compact(c.amount) if c.amount is not None else "—"}</div>'
-            f'<div class="t-kpi-sub">valuation attribution</div></div>'
+            f'<div class="t-kpi-sub">{driver_sub_for(c)}</div></div>'
         )
     st.markdown(f'<div class="t-kpi-grid">{"".join(_chg_cards)}</div>', unsafe_allow_html=True)
-if _ibc_cs:
-    st.markdown(ui_caption(
-        "Invested-Basis Change vs prior snapshot — " + NOT_A_CASHFLOW_LABEL
-    ), unsafe_allow_html=True)
+if _period_cs:
+    st.markdown(ui_caption(PERIOD_DELTA_CAPTION), unsafe_allow_html=True)
     _ibc_cards = []
-    for c in _ibc_cs[:4]:
+    for c in _period_cs[:6]:
         _ibc_cards.append(
             f'<div class="t-kpi"><div class="t-kpi-label">{c.label}</div>'
             f'<div class="t-kpi-value">{format_inr_compact(c.amount) if c.amount is not None else "—"}</div>'
-            f'<div class="t-kpi-sub">{NOT_A_CASHFLOW_LABEL}</div></div>'
+            f'<div class="t-kpi-sub">{PERIOD_DELTA_CAPTION}</div></div>'
         )
     st.markdown(f'<div class="t-kpi-grid">{"".join(_ibc_cards)}</div>', unsafe_allow_html=True)
-if not _pnl_cs and not _ibc_cs:
+if not _pnl_cs and not _period_cs:
     st.markdown(ui_caption(
-        "Open Command Center to publish this run's P&L attribution and Invested-Basis Change. "
+        "Open Command Center to publish this run's P&L split and snapshot delta. "
         + NOT_A_CASHFLOW_LABEL),
         unsafe_allow_html=True)
 
@@ -403,6 +396,6 @@ for _s in _stmts:
                 f'<span class="t-list-meta" style="text-align:left;">{_s}</span></div>',
                 unsafe_allow_html=True)
 
-st.markdown(f'<div class="t-footnote" style="margin-top:16px;">Desk as-of '
-            f'{NOW_IST:%d %b %Y, %H:%M IST} · read-only render; no network happened on this page.</div>',
+st.markdown(f'<div class="t-footnote" style="margin-top:16px;">{header_valued_at(st.session_state)} · '
+            f'{page_opened_label(NOW_IST)} · read-only render; no network happened on this page.</div>',
             unsafe_allow_html=True)
