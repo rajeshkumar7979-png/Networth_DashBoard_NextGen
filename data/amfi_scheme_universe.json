@@ -1,5 +1,5 @@
 {
-  "fetched_at": "2026-09-21T14:33:55+00:00",
+  "fetched_at": "2026-09-22T09:26:27+00:00",
   "rows": [
     {
       "scheme_code": "135762",
@@ -33709,6 +33709,46 @@
       "nav": null,
       "nav_date": "IDCW",
       "amc": "Mirae Asset Mutual Fund",
+      "category": "Open Ended Schemes(Equity Schemes - Multi Cap Fund)"
+    },
+    {
+      "scheme_code": "154664",
+      "isin_primary": "INF2F0001685",
+      "isin_secondary": "",
+      "scheme_name": "The Wealth Company Multi Cap Fund",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "The Wealth Company Mutual Fund",
+      "category": "Open Ended Schemes(Equity Schemes - Multi Cap Fund)"
+    },
+    {
+      "scheme_code": "154663",
+      "isin_primary": "INF2F0001719",
+      "isin_secondary": "",
+      "scheme_name": "The Wealth Company Multi Cap Fund",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "The Wealth Company Mutual Fund",
+      "category": "Open Ended Schemes(Equity Schemes - Multi Cap Fund)"
+    },
+    {
+      "scheme_code": "154666",
+      "isin_primary": "INF2F0001727",
+      "isin_secondary": "INF2F0001735",
+      "scheme_name": "The Wealth Company Multi Cap Fund",
+      "nav": null,
+      "nav_date": "IDCW",
+      "amc": "The Wealth Company Mutual Fund",
+      "category": "Open Ended Schemes(Equity Schemes - Multi Cap Fund)"
+    },
+    {
+      "scheme_code": "154665",
+      "isin_primary": "INF2F0001693",
+      "isin_secondary": "INF2F0001701",
+      "scheme_name": "The Wealth Company Multi Cap Fund",
+      "nav": null,
+      "nav_date": "IDCW",
+      "amc": "The Wealth Company Mutual Fund",
       "category": "Open Ended Schemes(Equity Schemes - Multi Cap Fund)"
     },
     {
