@@ -1006,17 +1006,36 @@ for _idx, (__, row) in enumerate(_positions.iterrows()):
         if _brief is None:
             st.warning("Open Command Center once so the research brief exists. AI will not invent one.")
         else:
-            _q = (
-                f"Given only the verified family research brief, what does the evidence say "
-                f"about the instrument classified as {row['Kind']} / {row['Class']} named "
-                f"{str(row['Name'])[:80]}"
-                f" (symbol {str(rec.get('Symbol') or row.get('Key') or '')[:24]}, "
-                f"ISIN {extract_isin(rec.get('ISIN'), rec.get('Company Name')) or 'n/a'})"
-                f"? Restate verified numbers. Do not invent PE, RSI, "
-                f"XIRR, tax or a buy/sell. Say where evidence is thin."
-            )
+_q = (
+    "Interpret this selected instrument using ONLY the verified facts below "
+    "and the research evidence supplied to you. Do not guess missing values. "
+    "Do not calculate new financial metrics.\n\n"
+    f"Instrument type: {row.get('Kind') or 'n/a'}\n"
+    f"Class: {row.get('Class') or 'n/a'}\n"
+    f"Name: {str(row.get('Name') or 'n/a')[:120]}\n"
+    f"Symbol: {str(rec.get('Symbol') or row.get('Key') or 'n/a')[:30]}\n"
+    f"ISIN: {extract_isin(rec.get('ISIN'), rec.get('Company Name')) or 'n/a'}\n"
+    f"Current value INR: {rec.get('Current Value') or row.get('Current Value') or 'n/a'}\n"
+    f"Invested INR: {rec.get('Invested') or row.get('Invested') or 'n/a'}\n"
+    f"Simple ROI %: {rec.get('Return %') or row.get('Return %') or 'n/a'}\n"
+    f"Annualized return %: {rec.get('Ann. Return %') or 'n/a'}\n"
+    f"1Y %: {rec.get('1Y %') or 'n/a'}\n"
+    f"3Y %: {rec.get('3Y %') or 'n/a'}\n"
+    f"5Y %: {rec.get('5Y %') or 'n/a'}\n"
+    f"vs Nifty50 1Y: {rec.get('vs Nifty50 1Y') or 'n/a'}\n"
+    f"vs Nifty50 3Y: {rec.get('vs Nifty50 3Y') or 'n/a'}\n"
+    f"vs Nifty50 5Y: {rec.get('vs Nifty50 5Y') or 'n/a'}\n"
+    f"Quantity: {rec.get('Quantity') or 'n/a'}\n"
+    f"Average buy price: {rec.get('Avg Buy Price') or 'n/a'}\n"
+    f"Current price: {rec.get('Current Price') or 'n/a'}\n\n"
+    "Explain what these verified facts and supplied evidence indicate. "
+    "Clearly distinguish facts from interpretation. "
+    "Do not invent PE, RSI, XIRR, tax conclusions, or buy/sell instructions. "
+    "State missing evidence explicitly."
+)
             _cache_store = st.session_state.setdefault("holdings_ai_hour", {})
             _ck = "|".join((
+                "instrument-ai-v2",
                 str(row.get("Key") or ""),
                 str(getattr(_brief, "as_of", "") or ""),
                 str(getattr(_brief, "evidence_count", 0) or 0),
