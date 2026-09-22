@@ -54,7 +54,6 @@ from lib.intelligence.ai.schema import OUTPUT_SCHEMA
 from lib.intelligence.ai.validator import (
     ground_assessment,
     inherit_fact_ids,
-    known_evidence_ids,
     validate_assessment_claims,
 )
 
