@@ -332,7 +332,7 @@ def run_ai_research(
             fallback_used=True,
         )
 
-    allowed = known_evidence_ids(brief)
+    allowed = ctx["allowed_evidence_ids"]
     assessment = ground_assessment(assessment, allowed)
     assessment = inherit_fact_ids(assessment, getattr(brief, "conclusions", ()) or ())
     assessment = validate_assessment_claims(
