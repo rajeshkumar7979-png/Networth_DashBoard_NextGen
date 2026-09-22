@@ -22,6 +22,10 @@ pg = st.navigation(
         "INTELLIGENCE": [
             st.Page("pages/6_Intelligence.py", title="Intelligence", url_path="intelligence"),
             st.Page("pages/4_News.py", title="Pulse", url_path="pulse"),
+            st.Page("pages/9_Asset_Intelligence.py", 
+            title="Asset Intelligence",
+            url_path="asset-intelligence",
+)
         ],
         "PLANNING": [
             st.Page("pages/2_Deep_Health.py", title="Decision Desk", url_path="decisions"),
