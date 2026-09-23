@@ -1,5 +1,5 @@
 {
-  "fetched_at": "2026-09-22T09:26:27+00:00",
+  "fetched_at": "2026-09-23T09:28:19+00:00",
   "rows": [
     {
       "scheme_code": "135762",
@@ -36662,6 +36662,46 @@
       "category": "Open Ended Schemes(Equity Schemes - Thematic Fund)"
     },
     {
+      "scheme_code": "154668",
+      "isin_primary": "INF247L01HI3",
+      "isin_secondary": "",
+      "scheme_name": "Motilal Oswal Quality Fund",
+      "nav": null,
+      "nav_date": "GROWTH",
+      "amc": "Motilal Oswal Mutual Fund",
+      "category": "Open Ended Schemes(Equity Schemes - Thematic Fund)"
+    },
+    {
+      "scheme_code": "154670",
+      "isin_primary": "INF247L01HJ1",
+      "isin_secondary": "INF247L01HK9",
+      "scheme_name": "Motilal Oswal Quality Fund",
+      "nav": null,
+      "nav_date": "IDCW",
+      "amc": "Motilal Oswal Mutual Fund",
+      "category": "Open Ended Schemes(Equity Schemes - Thematic Fund)"
+    },
+    {
+      "scheme_code": "154667",
+      "isin_primary": "INF247L01HL7",
+      "isin_secondary": "",
+      "scheme_name": "Motilal Oswal Quality Fund",
+      "nav": null,
+      "nav_date": "GROWTH",
+      "amc": "Motilal Oswal Mutual Fund",
+      "category": "Open Ended Schemes(Equity Schemes - Thematic Fund)"
+    },
+    {
+      "scheme_code": "154669",
+      "isin_primary": "INF247L01HM5",
+      "isin_secondary": "INF247L01HN3",
+      "scheme_name": "Motilal Oswal Quality Fund",
+      "nav": null,
+      "nav_date": "IDCW",
+      "amc": "Motilal Oswal Mutual Fund",
+      "category": "Open Ended Schemes(Equity Schemes - Thematic Fund)"
+    },
+    {
       "scheme_code": "153276",
       "isin_primary": "INF204KC1EH1",
       "isin_secondary": "",
@@ -37299,6 +37339,46 @@
       "nav": null,
       "nav_date": "IDCW Option",
       "amc": "Axis Mutual Fund",
+      "category": "Open Ended Schemes(Equity Schemes - Value Fund)"
+    },
+    {
+      "scheme_code": "154693",
+      "isin_primary": "INF761K01HK1",
+      "isin_secondary": "",
+      "scheme_name": "BANK OF INDIA VALUE FUND",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Bank of India Mutual Fund",
+      "category": "Open Ended Schemes(Equity Schemes - Value Fund)"
+    },
+    {
+      "scheme_code": "154694",
+      "isin_primary": "INF761K01HL9",
+      "isin_secondary": "INF761K01HM7",
+      "scheme_name": "BANK OF INDIA VALUE FUND",
+      "nav": null,
+      "nav_date": "IDCW",
+      "amc": "Bank of India Mutual Fund",
+      "category": "Open Ended Schemes(Equity Schemes - Value Fund)"
+    },
+    {
+      "scheme_code": "154695",
+      "isin_primary": "INF761K01HN5",
+      "isin_secondary": "",
+      "scheme_name": "BANK OF INDIA VALUE FUND",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Bank of India Mutual Fund",
+      "category": "Open Ended Schemes(Equity Schemes - Value Fund)"
+    },
+    {
+      "scheme_code": "154696",
+      "isin_primary": "INF761K01HO3",
+      "isin_secondary": "INF761K01HP0",
+      "scheme_name": "BANK OF INDIA VALUE FUND",
+      "nav": null,
+      "nav_date": "IDCW",
+      "amc": "Bank of India Mutual Fund",
       "category": "Open Ended Schemes(Equity Schemes - Value Fund)"
     },
     {
@@ -62057,7 +62137,7 @@
       "isin_secondary": "INF846K011M7",
       "scheme_name": "Axis Long Term Fund",
       "nav": null,
-      "nav_date": "Monthly IDCW\t Option",
+      "nav_date": "Monthly IDCW Option",
       "amc": "Axis Mutual Fund",
       "category": "Open Ended Schemes(Income/Debt Oriented Schemes - Long Term Fund)"
     },
@@ -62837,7 +62917,7 @@
       "isin_secondary": "INF846K01BS6",
       "scheme_name": "Axis Medium Term Fund",
       "nav": null,
-      "nav_date": "Quarterly IDCW\tOption",
+      "nav_date": "Quarterly IDCW Option",
       "amc": "Axis Mutual Fund",
       "category": "Open Ended Schemes(Income/Debt Oriented Schemes - Medium Term Fund)"
     },
@@ -65017,7 +65097,7 @@
       "isin_secondary": "INF846K01S03",
       "scheme_name": "Axis Money Market Fund",
       "nav": null,
-      "nav_date": "Quarterly IDCW\tOption",
+      "nav_date": "Quarterly IDCW Option",
       "amc": "Axis Mutual Fund",
       "category": "Open Ended Schemes(Income/Debt Oriented Schemes - Money Market Fund)"
     },
@@ -74987,7 +75067,7 @@
       "isin_secondary": "",
       "scheme_name": "Axis Nifty India Defence Index Fund",
       "nav": null,
-      "nav_date": "Growth\t Option",
+      "nav_date": "Growth Option",
       "amc": "Axis Mutual Fund",
       "category": "Open Ended Schemes(Index Funds - Equity Funds)"
     },
@@ -75672,6 +75752,46 @@
       "category": "Open Ended Schemes(Index Funds - Equity Funds)"
     },
     {
+      "scheme_code": "154750",
+      "isin_primary": "INF179KC1KV0",
+      "isin_secondary": "",
+      "scheme_name": "HDFC BSE REITS and Commercial Real Estate Index Fund",
+      "nav": null,
+      "nav_date": "IDCW Option",
+      "amc": "HDFC Mutual Fund",
+      "category": "Open Ended Schemes(Index Funds - Equity Funds)"
+    },
+    {
+      "scheme_code": "154751",
+      "isin_primary": "INF179KC1KY4",
+      "isin_secondary": "",
+      "scheme_name": "HDFC BSE REITS and Commercial Real Estate Index Fund",
+      "nav": null,
+      "nav_date": "IDCW Option",
+      "amc": "HDFC Mutual Fund",
+      "category": "Open Ended Schemes(Index Funds - Equity Funds)"
+    },
+    {
+      "scheme_code": "154753",
+      "isin_primary": "INF179KC1KX6",
+      "isin_secondary": "",
+      "scheme_name": "HDFC BSE REITS and Commercial Real Estate Index Fund",
+      "nav": null,
+      "nav_date": "Growth Option",
+      "amc": "HDFC Mutual Fund",
+      "category": "Open Ended Schemes(Index Funds - Equity Funds)"
+    },
+    {
+      "scheme_code": "154752",
+      "isin_primary": "INF179KC1KU2",
+      "isin_secondary": "",
+      "scheme_name": "HDFC BSE REITS and Commercial Real Estate Index Fund",
+      "nav": null,
+      "nav_date": "Growth Option",
+      "amc": "HDFC Mutual Fund",
+      "category": "Open Ended Schemes(Index Funds - Equity Funds)"
+    },
+    {
       "scheme_code": "154427",
       "isin_primary": "INF179KC1KQ0",
       "isin_secondary": "",
@@ -76106,6 +76226,26 @@
       "isin_primary": "INF789F1AYS9",
       "isin_secondary": "",
       "scheme_name": "UTI BSE Housing Index Fund",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "UTI Mutual Fund",
+      "category": "Open Ended Schemes(Index Funds - Equity Funds)"
+    },
+    {
+      "scheme_code": "154699",
+      "isin_primary": "INF789F1AH67",
+      "isin_secondary": "",
+      "scheme_name": "UTI BSE India Sector Leaders Index Fund",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "UTI Mutual Fund",
+      "category": "Open Ended Schemes(Index Funds - Equity Funds)"
+    },
+    {
+      "scheme_code": "154700",
+      "isin_primary": "INF789F1AH59",
+      "isin_secondary": "",
+      "scheme_name": "UTI BSE India Sector Leaders Index Fund",
       "nav": null,
       "nav_date": "Growth",
       "amc": "UTI Mutual Fund",
