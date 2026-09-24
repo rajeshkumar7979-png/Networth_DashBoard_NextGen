@@ -1,5 +1,5 @@
 {
-  "fetched_at": "2026-09-23T09:28:19+00:00",
+  "fetched_at": "2026-09-24T09:27:41+00:00",
   "rows": [
     {
       "scheme_code": "135762",
@@ -65259,6 +65259,16 @@
       "nav": null,
       "nav_date": "Weekly IDCW Option",
       "amc": "Baroda BNP Paribas Mutual Fund",
+      "category": "Open Ended Schemes(Income/Debt Oriented Schemes - Money Market Fund)"
+    },
+    {
+      "scheme_code": "154425",
+      "isin_primary": "INF740KA1ZB2",
+      "isin_secondary": "INF740KA1ZC0",
+      "scheme_name": "DSP Money Market Fund",
+      "nav": null,
+      "nav_date": "Weekly IDCW",
+      "amc": "DSP Mutual Fund",
       "category": "Open Ended Schemes(Income/Debt Oriented Schemes - Money Market Fund)"
     },
     {
