@@ -1,5 +1,5 @@
 {
-  "fetched_at": "2026-09-24T09:27:41+00:00",
+  "fetched_at": "2026-09-25T09:45:17+00:00",
   "rows": [
     {
       "scheme_code": "135762",
@@ -20422,86 +20422,6 @@
       "category": "Open Ended Schemes(Equity Scheme - Multi Cap Fund)"
     },
     {
-      "scheme_code": "118652",
-      "isin_primary": "INF204K01XD4",
-      "isin_secondary": "INF204K01XE2",
-      "scheme_name": "Nippon India Multi Cap Fund",
-      "nav": null,
-      "nav_date": "IDCW Option",
-      "amc": "Nippon India Mutual Fund",
-      "category": "Open Ended Schemes(Equity Scheme - Multi Cap Fund)"
-    },
-    {
-      "scheme_code": "118651",
-      "isin_primary": "INF204K01D55",
-      "isin_secondary": "",
-      "scheme_name": "Nippon India Multi Cap Fund",
-      "nav": null,
-      "nav_date": "Bonus Option",
-      "amc": "Nippon India Mutual Fund",
-      "category": "Open Ended Schemes(Equity Scheme - Multi Cap Fund)"
-    },
-    {
-      "scheme_code": "118650",
-      "isin_primary": "INF204K01XF9",
-      "isin_secondary": "",
-      "scheme_name": "Nippon India Multi Cap Fund",
-      "nav": null,
-      "nav_date": "Growth Option",
-      "amc": "Nippon India Mutual Fund",
-      "category": "Open Ended Schemes(Equity Scheme - Multi Cap Fund)"
-    },
-    {
-      "scheme_code": "101163",
-      "isin_primary": "INF204K01455",
-      "isin_secondary": "INF204K01463",
-      "scheme_name": "Nippon India Multi Cap Fund",
-      "nav": null,
-      "nav_date": "IDCW Option",
-      "amc": "Nippon India Mutual Fund",
-      "category": "Open Ended Schemes(Equity Scheme - Multi Cap Fund)"
-    },
-    {
-      "scheme_code": "106252",
-      "isin_primary": "INF204K01414",
-      "isin_secondary": "INF204K01422",
-      "scheme_name": "Nippon India Multi Cap Fund",
-      "nav": null,
-      "nav_date": "Institutional Dividend Plan",
-      "amc": "Nippon India Mutual Fund",
-      "category": "Open Ended Schemes(Equity Scheme - Multi Cap Fund)"
-    },
-    {
-      "scheme_code": "106253",
-      "isin_primary": "INF204K01448",
-      "isin_secondary": "",
-      "scheme_name": "Nippon India Multi Cap Fund",
-      "nav": null,
-      "nav_date": "Institutional Plan Growth Plan",
-      "amc": "Nippon India Mutual Fund",
-      "category": "Open Ended Schemes(Equity Scheme - Multi Cap Fund)"
-    },
-    {
-      "scheme_code": "101162",
-      "isin_primary": "INF204K01471",
-      "isin_secondary": "",
-      "scheme_name": "Nippon India Multi Cap Fund",
-      "nav": null,
-      "nav_date": "Bonus Option",
-      "amc": "Nippon India Mutual Fund",
-      "category": "Open Ended Schemes(Equity Scheme - Multi Cap Fund)"
-    },
-    {
-      "scheme_code": "101161",
-      "isin_primary": "INF204K01489",
-      "isin_secondary": "",
-      "scheme_name": "Nippon India Multi Cap Fund",
-      "nav": null,
-      "nav_date": "Growth Option",
-      "amc": "Nippon India Mutual Fund",
-      "category": "Open Ended Schemes(Equity Scheme - Multi Cap Fund)"
-    },
-    {
       "scheme_code": "152815",
       "isin_primary": "INF663L01Z03",
       "isin_secondary": "",
@@ -33709,6 +33629,86 @@
       "nav": null,
       "nav_date": "IDCW",
       "amc": "Mirae Asset Mutual Fund",
+      "category": "Open Ended Schemes(Equity Schemes - Multi Cap Fund)"
+    },
+    {
+      "scheme_code": "118652",
+      "isin_primary": "INF204K01XD4",
+      "isin_secondary": "INF204K01XE2",
+      "scheme_name": "Nippon India Multi Cap Fund",
+      "nav": null,
+      "nav_date": "IDCW Option",
+      "amc": "Nippon India Mutual Fund",
+      "category": "Open Ended Schemes(Equity Schemes - Multi Cap Fund)"
+    },
+    {
+      "scheme_code": "118651",
+      "isin_primary": "INF204K01D55",
+      "isin_secondary": "",
+      "scheme_name": "Nippon India Multi Cap Fund",
+      "nav": null,
+      "nav_date": "Bonus Option",
+      "amc": "Nippon India Mutual Fund",
+      "category": "Open Ended Schemes(Equity Schemes - Multi Cap Fund)"
+    },
+    {
+      "scheme_code": "118650",
+      "isin_primary": "INF204K01XF9",
+      "isin_secondary": "",
+      "scheme_name": "Nippon India Multi Cap Fund",
+      "nav": null,
+      "nav_date": "Growth Option",
+      "amc": "Nippon India Mutual Fund",
+      "category": "Open Ended Schemes(Equity Schemes - Multi Cap Fund)"
+    },
+    {
+      "scheme_code": "101163",
+      "isin_primary": "INF204K01455",
+      "isin_secondary": "INF204K01463",
+      "scheme_name": "Nippon India Multi Cap Fund",
+      "nav": null,
+      "nav_date": "IDCW Option",
+      "amc": "Nippon India Mutual Fund",
+      "category": "Open Ended Schemes(Equity Schemes - Multi Cap Fund)"
+    },
+    {
+      "scheme_code": "106252",
+      "isin_primary": "INF204K01414",
+      "isin_secondary": "INF204K01422",
+      "scheme_name": "Nippon India Multi Cap Fund",
+      "nav": null,
+      "nav_date": "Institutional Dividend Plan",
+      "amc": "Nippon India Mutual Fund",
+      "category": "Open Ended Schemes(Equity Schemes - Multi Cap Fund)"
+    },
+    {
+      "scheme_code": "106253",
+      "isin_primary": "INF204K01448",
+      "isin_secondary": "",
+      "scheme_name": "Nippon India Multi Cap Fund",
+      "nav": null,
+      "nav_date": "Institutional Plan Growth Plan",
+      "amc": "Nippon India Mutual Fund",
+      "category": "Open Ended Schemes(Equity Schemes - Multi Cap Fund)"
+    },
+    {
+      "scheme_code": "101162",
+      "isin_primary": "INF204K01471",
+      "isin_secondary": "",
+      "scheme_name": "Nippon India Multi Cap Fund",
+      "nav": null,
+      "nav_date": "Bonus Option",
+      "amc": "Nippon India Mutual Fund",
+      "category": "Open Ended Schemes(Equity Schemes - Multi Cap Fund)"
+    },
+    {
+      "scheme_code": "101161",
+      "isin_primary": "INF204K01489",
+      "isin_secondary": "",
+      "scheme_name": "Nippon India Multi Cap Fund",
+      "nav": null,
+      "nav_date": "Growth Option",
+      "amc": "Nippon India Mutual Fund",
       "category": "Open Ended Schemes(Equity Schemes - Multi Cap Fund)"
     },
     {
@@ -66669,6 +66669,26 @@
       "nav": null,
       "nav_date": "Unclaimed Redemption I.E.F - Growth Plan",
       "amc": "JM Financial Mutual Fund",
+      "category": "Open Ended Schemes(Income/Debt Oriented Schemes - Overnight Fund)"
+    },
+    {
+      "scheme_code": "154736",
+      "isin_primary": "INF2ZPR01014",
+      "isin_secondary": "",
+      "scheme_name": "LAKSHYA OVERNIGHT FUND",
+      "nav": null,
+      "nav_date": "GROWTH",
+      "amc": "Lakshya Mutual Fund",
+      "category": "Open Ended Schemes(Income/Debt Oriented Schemes - Overnight Fund)"
+    },
+    {
+      "scheme_code": "154737",
+      "isin_primary": "INF2ZPR01022",
+      "isin_secondary": "",
+      "scheme_name": "LAKSHYA OVERNIGHT FUND",
+      "nav": null,
+      "nav_date": "GROWTH",
+      "amc": "Lakshya Mutual Fund",
       "category": "Open Ended Schemes(Income/Debt Oriented Schemes - Overnight Fund)"
     },
     {
