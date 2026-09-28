@@ -1,5 +1,5 @@
 {
-  "fetched_at": "2026-09-27T10:09:48+00:00",
+  "fetched_at": "2026-09-28T11:10:07+00:00",
   "rows": [
     {
       "scheme_code": "135762",
@@ -11352,36 +11352,6 @@
       "category": "Open Ended Schemes(Debt Scheme - Overnight Fund)"
     },
     {
-      "scheme_code": "150631",
-      "isin_primary": "INF0K1H01040",
-      "isin_secondary": "",
-      "scheme_name": "Samco Overnight Fund",
-      "nav": null,
-      "nav_date": "Growth",
-      "amc": "Samco Mutual Fund",
-      "category": "Open Ended Schemes(Debt Scheme - Overnight Fund)"
-    },
-    {
-      "scheme_code": "150632",
-      "isin_primary": "INF0K1H01032",
-      "isin_secondary": "",
-      "scheme_name": "Samco Overnight Fund",
-      "nav": null,
-      "nav_date": "Growth",
-      "amc": "Samco Mutual Fund",
-      "category": "Open Ended Schemes(Debt Scheme - Overnight Fund)"
-    },
-    {
-      "scheme_code": "153021",
-      "isin_primary": "",
-      "isin_secondary": "",
-      "scheme_name": "Samco Overnight Fund",
-      "nav": null,
-      "nav_date": "",
-      "amc": "Samco Mutual Fund",
-      "category": "Open Ended Schemes(Debt Scheme - Overnight Fund)"
-    },
-    {
       "scheme_code": "119831",
       "isin_primary": "",
       "isin_secondary": "INF200K01TJ7",
@@ -14702,26 +14672,6 @@
       "category": "Open Ended Schemes(Equity Scheme - ELSS)"
     },
     {
-      "scheme_code": "150838",
-      "isin_primary": "INF0K1H01065",
-      "isin_secondary": "",
-      "scheme_name": "Samco ELSS Tax Saver Fund",
-      "nav": null,
-      "nav_date": "Growth",
-      "amc": "Samco Mutual Fund",
-      "category": "Open Ended Schemes(Equity Scheme - ELSS)"
-    },
-    {
-      "scheme_code": "150839",
-      "isin_primary": "INF0K1H01057",
-      "isin_secondary": "",
-      "scheme_name": "Samco ELSS Tax Saver Fund",
-      "nav": null,
-      "nav_date": "Growth",
-      "amc": "Samco Mutual Fund",
-      "category": "Open Ended Schemes(Equity Scheme - ELSS)"
-    },
-    {
       "scheme_code": "119722",
       "isin_primary": "INF200K01UK3",
       "isin_secondary": "",
@@ -15819,26 +15769,6 @@
       "nav": null,
       "nav_date": "IDCW Option",
       "amc": "quant Mutual Fund",
-      "category": "Open Ended Schemes(Equity Scheme - Flexi Cap Fund)"
-    },
-    {
-      "scheme_code": "149450",
-      "isin_primary": "INF0K1H01024",
-      "isin_secondary": "",
-      "scheme_name": "Samco Flexi Cap Fund",
-      "nav": null,
-      "nav_date": "Growth",
-      "amc": "Samco Mutual Fund",
-      "category": "Open Ended Schemes(Equity Scheme - Flexi Cap Fund)"
-    },
-    {
-      "scheme_code": "149449",
-      "isin_primary": "INF0K1H01016",
-      "isin_secondary": "",
-      "scheme_name": "Samco Flexi Cap Fund",
-      "nav": null,
-      "nav_date": "Growth",
-      "amc": "Samco Mutual Fund",
       "category": "Open Ended Schemes(Equity Scheme - Flexi Cap Fund)"
     },
     {
@@ -17772,26 +17702,6 @@
       "category": "Open Ended Schemes(Equity Scheme - Large & Mid Cap Fund)"
     },
     {
-      "scheme_code": "153534",
-      "isin_primary": "INF0K1H01271",
-      "isin_secondary": "",
-      "scheme_name": "Samco Large & Mid Cap Fund",
-      "nav": null,
-      "nav_date": "Growth",
-      "amc": "Samco Mutual Fund",
-      "category": "Open Ended Schemes(Equity Scheme - Large & Mid Cap Fund)"
-    },
-    {
-      "scheme_code": "153533",
-      "isin_primary": "INF0K1H01289",
-      "isin_secondary": "",
-      "scheme_name": "Samco Large & Mid Cap Fund",
-      "nav": null,
-      "nav_date": "Growth",
-      "amc": "Samco Mutual Fund",
-      "category": "Open Ended Schemes(Equity Scheme - Large & Mid Cap Fund)"
-    },
-    {
       "scheme_code": "119720",
       "isin_primary": "INF200K01UH9",
       "isin_secondary": "INF200K01UI7",
@@ -18872,26 +18782,6 @@
       "category": "Open Ended Schemes(Equity Scheme - Large Cap Fund)"
     },
     {
-      "scheme_code": "153239",
-      "isin_primary": "INF0K1H01255",
-      "isin_secondary": "",
-      "scheme_name": "Samco Large Cap Fund",
-      "nav": null,
-      "nav_date": "Growth",
-      "amc": "Samco Mutual Fund",
-      "category": "Open Ended Schemes(Equity Scheme - Large Cap Fund)"
-    },
-    {
-      "scheme_code": "153238",
-      "isin_primary": "INF0K1H01263",
-      "isin_secondary": "",
-      "scheme_name": "Samco Large Cap Fund",
-      "nav": null,
-      "nav_date": "Growth",
-      "amc": "Samco Mutual Fund",
-      "category": "Open Ended Schemes(Equity Scheme - Large Cap Fund)"
-    },
-    {
       "scheme_code": "119585",
       "isin_primary": "INF200K01QV8",
       "isin_secondary": "INF200K01QW6",
@@ -19702,26 +19592,6 @@
       "category": "Open Ended Schemes(Equity Scheme - Mid Cap Fund)"
     },
     {
-      "scheme_code": "154114",
-      "isin_primary": "INF0K1H01313",
-      "isin_secondary": "",
-      "scheme_name": "Samco Mid Cap Fund",
-      "nav": null,
-      "nav_date": "Growth",
-      "amc": "Samco Mutual Fund",
-      "category": "Open Ended Schemes(Equity Scheme - Mid Cap Fund)"
-    },
-    {
-      "scheme_code": "154115",
-      "isin_primary": "INF0K1H01321",
-      "isin_secondary": "",
-      "scheme_name": "Samco Mid Cap Fund",
-      "nav": null,
-      "nav_date": "Growth",
-      "amc": "Samco Mutual Fund",
-      "category": "Open Ended Schemes(Equity Scheme - Mid Cap Fund)"
-    },
-    {
       "scheme_code": "119716",
       "isin_primary": "INF200K01TP4",
       "isin_secondary": "",
@@ -20499,26 +20369,6 @@
       "nav": null,
       "nav_date": "IDCW Option",
       "amc": "quant Mutual Fund",
-      "category": "Open Ended Schemes(Equity Scheme - Multi Cap Fund)"
-    },
-    {
-      "scheme_code": "152847",
-      "isin_primary": "INF0K1H01198",
-      "isin_secondary": "",
-      "scheme_name": "Samco Multi Cap Fund",
-      "nav": null,
-      "nav_date": "Growth",
-      "amc": "Samco Mutual Fund",
-      "category": "Open Ended Schemes(Equity Scheme - Multi Cap Fund)"
-    },
-    {
-      "scheme_code": "152848",
-      "isin_primary": "INF0K1H01206",
-      "isin_secondary": "",
-      "scheme_name": "Samco Multi Cap Fund",
-      "nav": null,
-      "nav_date": "Growth",
-      "amc": "Samco Mutual Fund",
       "category": "Open Ended Schemes(Equity Scheme - Multi Cap Fund)"
     },
     {
@@ -25982,26 +25832,6 @@
       "category": "Open Ended Schemes(Equity Scheme - Sectoral/ Thematic)"
     },
     {
-      "scheme_code": "152586",
-      "isin_primary": "INF0K1H01180",
-      "isin_secondary": "",
-      "scheme_name": "Samco Special Opportunities Fund",
-      "nav": null,
-      "nav_date": "Growth",
-      "amc": "Samco Mutual Fund",
-      "category": "Open Ended Schemes(Equity Scheme - Sectoral/ Thematic)"
-    },
-    {
-      "scheme_code": "152587",
-      "isin_primary": "INF0K1H01172",
-      "isin_secondary": "",
-      "scheme_name": "Samco Special Opportunities Fund",
-      "nav": null,
-      "nav_date": "Growth",
-      "amc": "Samco Mutual Fund",
-      "category": "Open Ended Schemes(Equity Scheme - Sectoral/ Thematic)"
-    },
-    {
       "scheme_code": "152657",
       "isin_primary": "INF200KB1183",
       "isin_secondary": "",
@@ -28772,26 +28602,6 @@
       "category": "Open Ended Schemes(Equity Scheme - Small Cap Fund)"
     },
     {
-      "scheme_code": "153868",
-      "isin_primary": "INF0K1H01297",
-      "isin_secondary": "",
-      "scheme_name": "Samco Small Cap Fund",
-      "nav": null,
-      "nav_date": "Growth",
-      "amc": "Samco Mutual Fund",
-      "category": "Open Ended Schemes(Equity Scheme - Small Cap Fund)"
-    },
-    {
-      "scheme_code": "153869",
-      "isin_primary": "INF0K1H01305",
-      "isin_secondary": "",
-      "scheme_name": "Samco Small Cap Fund",
-      "nav": null,
-      "nav_date": "Growth",
-      "amc": "Samco Mutual Fund",
-      "category": "Open Ended Schemes(Equity Scheme - Small Cap Fund)"
-    },
-    {
       "scheme_code": "125497",
       "isin_primary": "INF200K01T51",
       "isin_secondary": "",
@@ -30632,6 +30442,26 @@
       "category": "Open Ended Schemes(Equity Schemes - ELSS- Tax Saver Fund)"
     },
     {
+      "scheme_code": "150838",
+      "isin_primary": "INF0K1H01065",
+      "isin_secondary": "",
+      "scheme_name": "Samco ELSS Tax Saver Fund",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Samco Mutual Fund",
+      "category": "Open Ended Schemes(Equity Schemes - ELSS- Tax Saver Fund)"
+    },
+    {
+      "scheme_code": "150839",
+      "isin_primary": "INF0K1H01057",
+      "isin_secondary": "",
+      "scheme_name": "Samco ELSS Tax Saver Fund",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Samco Mutual Fund",
+      "category": "Open Ended Schemes(Equity Schemes - ELSS- Tax Saver Fund)"
+    },
+    {
       "scheme_code": "119281",
       "isin_primary": "INF277K01I94",
       "isin_secondary": "",
@@ -32152,6 +31982,26 @@
       "category": "Open Ended Schemes(Equity Schemes - Large & Mid Cap Fund)"
     },
     {
+      "scheme_code": "153534",
+      "isin_primary": "INF0K1H01271",
+      "isin_secondary": "",
+      "scheme_name": "Samco Large & Mid Cap Fund",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Samco Mutual Fund",
+      "category": "Open Ended Schemes(Equity Schemes - Large & Mid Cap Fund)"
+    },
+    {
+      "scheme_code": "153533",
+      "isin_primary": "INF0K1H01289",
+      "isin_secondary": "",
+      "scheme_name": "Samco Large & Mid Cap Fund",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Samco Mutual Fund",
+      "category": "Open Ended Schemes(Equity Schemes - Large & Mid Cap Fund)"
+    },
+    {
       "scheme_code": "154433",
       "isin_primary": "INF0GCD01891",
       "isin_secondary": "",
@@ -32672,6 +32522,26 @@
       "category": "Open Ended Schemes(Equity Schemes - Large Cap Fund)"
     },
     {
+      "scheme_code": "153239",
+      "isin_primary": "INF0K1H01255",
+      "isin_secondary": "",
+      "scheme_name": "Samco Large Cap Fund",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Samco Mutual Fund",
+      "category": "Open Ended Schemes(Equity Schemes - Large Cap Fund)"
+    },
+    {
+      "scheme_code": "153238",
+      "isin_primary": "INF0K1H01263",
+      "isin_secondary": "",
+      "scheme_name": "Samco Large Cap Fund",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Samco Mutual Fund",
+      "category": "Open Ended Schemes(Equity Schemes - Large Cap Fund)"
+    },
+    {
       "scheme_code": "150797",
       "isin_primary": "INF03VN01696",
       "isin_secondary": "",
@@ -33149,6 +33019,26 @@
       "nav": null,
       "nav_date": "IDCW",
       "amc": "Mirae Asset Mutual Fund",
+      "category": "Open Ended Schemes(Equity Schemes - Mid Cap Fund)"
+    },
+    {
+      "scheme_code": "154114",
+      "isin_primary": "INF0K1H01313",
+      "isin_secondary": "",
+      "scheme_name": "Samco Mid Cap Fund",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Samco Mutual Fund",
+      "category": "Open Ended Schemes(Equity Schemes - Mid Cap Fund)"
+    },
+    {
+      "scheme_code": "154115",
+      "isin_primary": "INF0K1H01321",
+      "isin_secondary": "",
+      "scheme_name": "Samco Mid Cap Fund",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Samco Mutual Fund",
       "category": "Open Ended Schemes(Equity Schemes - Mid Cap Fund)"
     },
     {
@@ -33709,6 +33599,26 @@
       "nav": null,
       "nav_date": "Growth Option",
       "amc": "Nippon India Mutual Fund",
+      "category": "Open Ended Schemes(Equity Schemes - Multi Cap Fund)"
+    },
+    {
+      "scheme_code": "152847",
+      "isin_primary": "INF0K1H01198",
+      "isin_secondary": "",
+      "scheme_name": "Samco Multi Cap Fund",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Samco Mutual Fund",
+      "category": "Open Ended Schemes(Equity Schemes - Multi Cap Fund)"
+    },
+    {
+      "scheme_code": "152848",
+      "isin_primary": "INF0K1H01206",
+      "isin_secondary": "",
+      "scheme_name": "Samco Multi Cap Fund",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Samco Mutual Fund",
       "category": "Open Ended Schemes(Equity Schemes - Multi Cap Fund)"
     },
     {
@@ -34999,6 +34909,26 @@
       "nav": null,
       "nav_date": "IDCW",
       "amc": "Mirae Asset Mutual Fund",
+      "category": "Open Ended Schemes(Equity Schemes - Small Cap Fund)"
+    },
+    {
+      "scheme_code": "153868",
+      "isin_primary": "INF0K1H01297",
+      "isin_secondary": "",
+      "scheme_name": "Samco Small Cap Fund",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Samco Mutual Fund",
+      "category": "Open Ended Schemes(Equity Schemes - Small Cap Fund)"
+    },
+    {
+      "scheme_code": "153869",
+      "isin_primary": "INF0K1H01305",
+      "isin_secondary": "",
+      "scheme_name": "Samco Small Cap Fund",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Samco Mutual Fund",
       "category": "Open Ended Schemes(Equity Schemes - Small Cap Fund)"
     },
     {
@@ -37076,6 +37006,46 @@
       "isin_primary": "INF0K1H01073",
       "isin_secondary": "",
       "scheme_name": "Samco Active Momentum Fund",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Samco Mutual Fund",
+      "category": "Open Ended Schemes(Equity Schemes - Thematic Fund)"
+    },
+    {
+      "scheme_code": "149450",
+      "isin_primary": "INF0K1H01024",
+      "isin_secondary": "",
+      "scheme_name": "Samco Flexi Cap Fund",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Samco Mutual Fund",
+      "category": "Open Ended Schemes(Equity Schemes - Thematic Fund)"
+    },
+    {
+      "scheme_code": "149449",
+      "isin_primary": "INF0K1H01016",
+      "isin_secondary": "",
+      "scheme_name": "Samco Flexi Cap Fund",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Samco Mutual Fund",
+      "category": "Open Ended Schemes(Equity Schemes - Thematic Fund)"
+    },
+    {
+      "scheme_code": "152586",
+      "isin_primary": "INF0K1H01180",
+      "isin_secondary": "",
+      "scheme_name": "Samco Special Opportunities Fund",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Samco Mutual Fund",
+      "category": "Open Ended Schemes(Equity Schemes - Thematic Fund)"
+    },
+    {
+      "scheme_code": "152587",
+      "isin_primary": "INF0K1H01172",
+      "isin_secondary": "",
+      "scheme_name": "Samco Special Opportunities Fund",
       "nav": null,
       "nav_date": "Growth",
       "amc": "Samco Mutual Fund",
@@ -43272,26 +43242,6 @@
       "category": "Open Ended Schemes(Hybrid Scheme - Arbitrage Fund)"
     },
     {
-      "scheme_code": "153090",
-      "isin_primary": "INF0K1H01214",
-      "isin_secondary": "",
-      "scheme_name": "Samco Arbitrage Fund",
-      "nav": null,
-      "nav_date": "Growth",
-      "amc": "Samco Mutual Fund",
-      "category": "Open Ended Schemes(Hybrid Scheme - Arbitrage Fund)"
-    },
-    {
-      "scheme_code": "153091",
-      "isin_primary": "INF0K1H01222",
-      "isin_secondary": "",
-      "scheme_name": "Samco Arbitrage Fund",
-      "nav": null,
-      "nav_date": "Growth",
-      "amc": "Samco Mutual Fund",
-      "category": "Open Ended Schemes(Hybrid Scheme - Arbitrage Fund)"
-    },
-    {
       "scheme_code": "149552",
       "isin_primary": "INF173K01NB6",
       "isin_secondary": "",
@@ -44969,46 +44919,6 @@
       "nav": null,
       "nav_date": "IDCW Option",
       "amc": "quant Mutual Fund",
-      "category": "Open Ended Schemes(Hybrid Scheme - Dynamic Asset Allocation or Balanced Advantage)"
-    },
-    {
-      "scheme_code": "152188",
-      "isin_primary": "INF0K1H01131",
-      "isin_secondary": "",
-      "scheme_name": "Samco Dynamic Asset Allocation Fund",
-      "nav": null,
-      "nav_date": "Growth",
-      "amc": "Samco Mutual Fund",
-      "category": "Open Ended Schemes(Hybrid Scheme - Dynamic Asset Allocation or Balanced Advantage)"
-    },
-    {
-      "scheme_code": "152186",
-      "isin_primary": "INF0K1H01149",
-      "isin_secondary": "INF0K1H01156",
-      "scheme_name": "Samco Dynamic Asset Allocation Fund",
-      "nav": null,
-      "nav_date": "IDCW Option",
-      "amc": "Samco Mutual Fund",
-      "category": "Open Ended Schemes(Hybrid Scheme - Dynamic Asset Allocation or Balanced Advantage)"
-    },
-    {
-      "scheme_code": "152187",
-      "isin_primary": "INF0K1H01099",
-      "isin_secondary": "",
-      "scheme_name": "Samco Dynamic Asset Allocation Fund",
-      "nav": null,
-      "nav_date": "Growth",
-      "amc": "Samco Mutual Fund",
-      "category": "Open Ended Schemes(Hybrid Scheme - Dynamic Asset Allocation or Balanced Advantage)"
-    },
-    {
-      "scheme_code": "152185",
-      "isin_primary": "INF0K1H01107",
-      "isin_secondary": "INF0K1H01115",
-      "scheme_name": "Samco Dynamic Asset Allocation Fund",
-      "nav": null,
-      "nav_date": "IDCW Option",
-      "amc": "Samco Mutual Fund",
       "category": "Open Ended Schemes(Hybrid Scheme - Dynamic Asset Allocation or Balanced Advantage)"
     },
     {
@@ -47079,26 +46989,6 @@
       "nav": null,
       "nav_date": "Growth Option",
       "amc": "Quantum Mutual Fund",
-      "category": "Open Ended Schemes(Hybrid Scheme - Multi Asset Allocation)"
-    },
-    {
-      "scheme_code": "153092",
-      "isin_primary": "INF0K1H01230",
-      "isin_secondary": "",
-      "scheme_name": "Samco Multi Asset Allocation Fund",
-      "nav": null,
-      "nav_date": "Growth",
-      "amc": "Samco Mutual Fund",
-      "category": "Open Ended Schemes(Hybrid Scheme - Multi Asset Allocation)"
-    },
-    {
-      "scheme_code": "153093",
-      "isin_primary": "INF0K1H01248",
-      "isin_secondary": "",
-      "scheme_name": "Samco Multi Asset Allocation Fund",
-      "nav": null,
-      "nav_date": "Growth",
-      "amc": "Samco Mutual Fund",
       "category": "Open Ended Schemes(Hybrid Scheme - Multi Asset Allocation)"
     },
     {
@@ -49182,6 +49072,26 @@
       "category": "Open Ended Schemes(Hybrid Schemes - Arbitrage Fund)"
     },
     {
+      "scheme_code": "153090",
+      "isin_primary": "INF0K1H01214",
+      "isin_secondary": "",
+      "scheme_name": "Samco Arbitrage Fund",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Samco Mutual Fund",
+      "category": "Open Ended Schemes(Hybrid Schemes - Arbitrage Fund)"
+    },
+    {
+      "scheme_code": "153091",
+      "isin_primary": "INF0K1H01222",
+      "isin_secondary": "",
+      "scheme_name": "Samco Arbitrage Fund",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Samco Mutual Fund",
+      "category": "Open Ended Schemes(Hybrid Schemes - Arbitrage Fund)"
+    },
+    {
       "scheme_code": "119574",
       "isin_primary": "INF200K01QU0",
       "isin_secondary": "",
@@ -49719,6 +49629,46 @@
       "nav": null,
       "nav_date": "IDCW Payout Option",
       "amc": "NJ Mutual Fund",
+      "category": "Open Ended Schemes(Hybrid Schemes - Balanced Advantage Fund/ Dynamic Asset Allocation)"
+    },
+    {
+      "scheme_code": "152188",
+      "isin_primary": "INF0K1H01131",
+      "isin_secondary": "",
+      "scheme_name": "Samco Dynamic Asset Allocation Fund",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Samco Mutual Fund",
+      "category": "Open Ended Schemes(Hybrid Schemes - Balanced Advantage Fund/ Dynamic Asset Allocation)"
+    },
+    {
+      "scheme_code": "152186",
+      "isin_primary": "INF0K1H01149",
+      "isin_secondary": "INF0K1H01156",
+      "scheme_name": "Samco Dynamic Asset Allocation Fund",
+      "nav": null,
+      "nav_date": "IDCW Option",
+      "amc": "Samco Mutual Fund",
+      "category": "Open Ended Schemes(Hybrid Schemes - Balanced Advantage Fund/ Dynamic Asset Allocation)"
+    },
+    {
+      "scheme_code": "152187",
+      "isin_primary": "INF0K1H01099",
+      "isin_secondary": "",
+      "scheme_name": "Samco Dynamic Asset Allocation Fund",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Samco Mutual Fund",
+      "category": "Open Ended Schemes(Hybrid Schemes - Balanced Advantage Fund/ Dynamic Asset Allocation)"
+    },
+    {
+      "scheme_code": "152185",
+      "isin_primary": "INF0K1H01107",
+      "isin_secondary": "INF0K1H01115",
+      "scheme_name": "Samco Dynamic Asset Allocation Fund",
+      "nav": null,
+      "nav_date": "IDCW Option",
+      "amc": "Samco Mutual Fund",
       "category": "Open Ended Schemes(Hybrid Schemes - Balanced Advantage Fund/ Dynamic Asset Allocation)"
     },
     {
@@ -51619,6 +51569,26 @@
       "nav": null,
       "nav_date": "IDCW",
       "amc": "Mirae Asset Mutual Fund",
+      "category": "Open Ended Schemes(Hybrid Schemes - Multi Asset Allocation Fund)"
+    },
+    {
+      "scheme_code": "153092",
+      "isin_primary": "INF0K1H01230",
+      "isin_secondary": "",
+      "scheme_name": "Samco Multi Asset Allocation Fund",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Samco Mutual Fund",
+      "category": "Open Ended Schemes(Hybrid Schemes - Multi Asset Allocation Fund)"
+    },
+    {
+      "scheme_code": "153093",
+      "isin_primary": "INF0K1H01248",
+      "isin_secondary": "",
+      "scheme_name": "Samco Multi Asset Allocation Fund",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Samco Mutual Fund",
       "category": "Open Ended Schemes(Hybrid Schemes - Multi Asset Allocation Fund)"
     },
     {
@@ -66842,6 +66812,36 @@
       "category": "Open Ended Schemes(Income/Debt Oriented Schemes - Overnight Fund)"
     },
     {
+      "scheme_code": "150631",
+      "isin_primary": "INF0K1H01040",
+      "isin_secondary": "",
+      "scheme_name": "Samco Overnight Fund",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Samco Mutual Fund",
+      "category": "Open Ended Schemes(Income/Debt Oriented Schemes - Overnight Fund)"
+    },
+    {
+      "scheme_code": "150632",
+      "isin_primary": "INF0K1H01032",
+      "isin_secondary": "",
+      "scheme_name": "Samco Overnight Fund",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Samco Mutual Fund",
+      "category": "Open Ended Schemes(Income/Debt Oriented Schemes - Overnight Fund)"
+    },
+    {
+      "scheme_code": "153021",
+      "isin_primary": "",
+      "isin_secondary": "",
+      "scheme_name": "Samco Overnight Fund",
+      "nav": null,
+      "nav_date": "",
+      "amc": "Samco Mutual Fund",
+      "category": "Open Ended Schemes(Income/Debt Oriented Schemes - Overnight Fund)"
+    },
+    {
       "scheme_code": "154395",
       "isin_primary": "",
       "isin_secondary": "INF680P01513",
@@ -74459,6 +74459,66 @@
       "nav": null,
       "nav_date": "IDCW",
       "amc": "SBI Mutual Fund",
+      "category": "Open Ended Schemes(Index Funds - Debt Funds)"
+    },
+    {
+      "scheme_code": "154747",
+      "isin_primary": "INF277KA1FB5",
+      "isin_secondary": "",
+      "scheme_name": "Tata CRISIL-IBX Financial Services 3-6 Months Debt Index Fund",
+      "nav": null,
+      "nav_date": "Growth Option",
+      "amc": "Tata Mutual Fund",
+      "category": "Open Ended Schemes(Index Funds - Debt Funds)"
+    },
+    {
+      "scheme_code": "154748",
+      "isin_primary": "INF277KA1FC3",
+      "isin_secondary": "",
+      "scheme_name": "Tata CRISIL-IBX Financial Services 3-6 Months Debt Index Fund",
+      "nav": null,
+      "nav_date": "IDCW Payout",
+      "amc": "Tata Mutual Fund",
+      "category": "Open Ended Schemes(Index Funds - Debt Funds)"
+    },
+    {
+      "scheme_code": "154749",
+      "isin_primary": "",
+      "isin_secondary": "INF277KA1FD1",
+      "scheme_name": "Tata CRISIL-IBX Financial Services 3-6 Months Debt Index Fund",
+      "nav": null,
+      "nav_date": "IDCW Reinvestment",
+      "amc": "Tata Mutual Fund",
+      "category": "Open Ended Schemes(Index Funds - Debt Funds)"
+    },
+    {
+      "scheme_code": "154744",
+      "isin_primary": "INF277KA1EY0",
+      "isin_secondary": "",
+      "scheme_name": "Tata CRISIL-IBX Financial Services 3-6 Months Debt Index Fund",
+      "nav": null,
+      "nav_date": "Growth Option",
+      "amc": "Tata Mutual Fund",
+      "category": "Open Ended Schemes(Index Funds - Debt Funds)"
+    },
+    {
+      "scheme_code": "154745",
+      "isin_primary": "INF277KA1EZ7",
+      "isin_secondary": "",
+      "scheme_name": "Tata CRISIL-IBX Financial Services 3-6 Months Debt Index Fund",
+      "nav": null,
+      "nav_date": "IDCW Payout",
+      "amc": "Tata Mutual Fund",
+      "category": "Open Ended Schemes(Index Funds - Debt Funds)"
+    },
+    {
+      "scheme_code": "154746",
+      "isin_primary": "",
+      "isin_secondary": "INF277KA1FA7",
+      "scheme_name": "Tata CRISIL-IBX Financial Services 3-6 Months Debt Index Fund",
+      "nav": null,
+      "nav_date": "IDCW Reinvestment",
+      "amc": "Tata Mutual Fund",
       "category": "Open Ended Schemes(Index Funds - Debt Funds)"
     },
     {
