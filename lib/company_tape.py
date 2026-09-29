@@ -77,7 +77,6 @@ def _pct_field(info: dict, key: str):
     n = _finite((info or {}).get(key))
     if n is None:
         return None
-    # Yahoo stores 0.012 for 1.2%. Values already > 1.5 are treated as percent.
     return n * 100.0 if abs(n) <= 1.5 else n
 
 
@@ -100,10 +99,17 @@ def fundamentals_from_info(info: dict) -> dict:
     add("Book value / share", _finite(info.get("bookValue")))
     add("Trailing EPS", _finite(info.get("trailingEps")))
     add("Profit margin", _pct_field(info, "profitMargins"), "%")
+    add("Operating margin", _pct_field(info, "operatingMargins"), "%")
     add("ROE", _pct_field(info, "returnOnEquity"), "%")
+    add("ROA", _pct_field(info, "returnOnAssets"), "%")
+    add("Revenue growth", _pct_field(info, "revenueGrowth"), "%")
+    add("Earnings growth", _pct_field(info, "earningsGrowth"), "%")
     add("Dividend yield", _pct_field(info, "dividendYield"), "%")
     add("Beta", _finite(info.get("beta")))
     add("Debt / Equity", _finite(info.get("debtToEquity")))
+    add("Current ratio", _finite(info.get("currentRatio")))
+    add("Quick ratio", _finite(info.get("quickRatio")))
+    add("EV / EBITDA", _finite(info.get("enterpriseToEbitda")), "Yahoo ratio")
     return {"rows": rows, "source": YAHOO_SOURCE, "note": FUNDAMENTAL_NOTE}
 
 
@@ -146,6 +152,8 @@ def technicals_from_history(hist: pd.DataFrame, info: dict | None = None) -> dic
     add("RSI-14", rsi, "Wilder, daily closes")
     if last is not None and sma50:
         add("vs SMA 50", (last / sma50 - 1.0) * 100.0, "%")
+    if last is not None and sma200:
+        add("vs SMA 200", (last / sma200 - 1.0) * 100.0, "%")
     add("52-week high", high_52)
     add("52-week low", low_52)
     if last is not None and high_52 and low_52 and high_52 > low_52:
@@ -159,8 +167,6 @@ def technicals_from_history(hist: pd.DataFrame, info: dict | None = None) -> dic
     }
 
 
-# Conservative tape flags only — never a buy/sell. Missing stays missing.
-# Tones: "ok" (green), "watch" (amber), "elevated" (red), "neutral" (no flag).
 _TONE_NEUTRAL = "neutral"
 _TONE_OK = "ok"
 _TONE_WATCH = "watch"
@@ -179,30 +185,31 @@ def metric_tone(label: str, value) -> str:
         if n <= 30:
             return _TONE_WATCH
         return _TONE_OK
-    if lab == "vs sma 50":
+    if lab in {"vs sma 50", "vs sma 200"}:
         if n >= 0:
             return _TONE_OK
         return _TONE_WATCH
-    if lab in {"profit margin", "roe"}:
+    if lab in {"profit margin", "operating margin", "roe", "roa"}:
         if n < 0:
             return _TONE_ELEVATED
         if n >= 10:
             return _TONE_OK
         return _TONE_NEUTRAL
+    if lab in {"revenue growth", "earnings growth"}:
+        if n < 0:
+            return _TONE_WATCH
+        return _TONE_NEUTRAL
     if lab == "debt / equity":
-        # Yahoo often publishes D/E as a percent-like number for Indian names.
         if n >= 200:
             return _TONE_ELEVATED
         if n >= 100:
             return _TONE_WATCH
         return _TONE_OK
-    if lab == "trailing p/e":
-        if n < 0:
+    if lab == "current ratio":
+        if n < 1:
             return _TONE_WATCH
-        if n >= 80:
-            return _TONE_ELEVATED
         return _TONE_NEUTRAL
-    if lab == "forward p/e":
+    if lab in {"trailing p/e", "forward p/e", "ev / ebitda"}:
         if n < 0:
             return _TONE_WATCH
         if n >= 80:
@@ -222,7 +229,6 @@ def metric_tone(label: str, value) -> str:
 
 
 def tape_table_rows(rows) -> list:
-    """Flatten fundamentals/technicals rows into table dicts with tone."""
     out = []
     for row in rows or []:
         if not isinstance(row, dict):
@@ -255,19 +261,26 @@ def format_tape_value(label: str, value, sub: str = "") -> str:
             return f"₹{n/1e7:,.2f} Cr"
         return f"₹{n:,.0f}"
     if sub == "%" or lab in {
-        "Profit margin", "ROE", "Dividend yield", "vs SMA 50", "In 52-week range",
+        "Profit margin", "Operating margin", "ROE", "ROA",
+        "Dividend yield", "Revenue growth", "Earnings growth",
+        "vs SMA 50", "vs SMA 200", "In 52-week range",
     }:
         return f"{n:.1f}%"
-    if lab in {"Trailing P/E", "Forward P/E", "Price / Book", "RSI-14", "Beta", "Debt / Equity"}:
+    if lab in {
+        "Trailing P/E", "Forward P/E", "Price / Book", "EV / EBITDA",
+        "RSI-14", "Beta", "Debt / Equity", "Current ratio", "Quick ratio",
+    }:
         return f"{n:.1f}"
-    if lab in {"Last close", "SMA 20", "SMA 50", "SMA 200", "52-week high", "52-week low",
-               "Book value / share", "Trailing EPS"}:
+    if lab in {
+        "Last close", "SMA 20", "SMA 50", "SMA 200",
+        "52-week high", "52-week low",
+        "Book value / share", "Trailing EPS",
+    }:
         return f"{n:,.2f}"
     return f"{n:,.2f}"
 
 
 def tape_prompt_lines(tape: dict | None) -> list[str]:
-    """Verified Yahoo tape lines for the AI question. Empty when no tape."""
     if not tape or not tape.get("ok"):
         return []
     lines = []
@@ -289,13 +302,17 @@ def tape_prompt_lines(tape: dict | None) -> list[str]:
             lines.append(f"{label}: {shown}{flag}")
     retrieved = str(tape.get("retrieved_at") or "").strip()
     if retrieved:
-        lines.append(f"Tape retrieved: {retrieved}. Source: Yahoo Finance (yfinance). Not a buy/sell.")
+        lines.append(
+            f"Tape retrieved: {retrieved}. Source: Yahoo Finance (yfinance). Not a buy/sell."
+        )
     return lines
 
 
 def build_equity_tape(info=None, hist=None, ticker="", retrieved_at=None) -> dict:
     funda = fundamentals_from_info(info or {})
-    tech = technicals_from_history(hist if hist is not None else pd.DataFrame(), info or {})
+    tech = technicals_from_history(
+        hist if hist is not None else pd.DataFrame(), info or {}
+    )
     return {
         "ticker": ticker,
         "name": str((info or {}).get("longName") or (info or {}).get("shortName") or "").strip(),
