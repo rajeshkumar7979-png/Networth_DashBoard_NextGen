@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 from lib.company_tape import metric_tone
 from lib.instrument_names import extract_isin
@@ -13,6 +13,18 @@ from lib.intelligence.sources.mapping import PortfolioIndex
 CONC_WATCH_PCT = 8.0
 CONC_ELEVATED_PCT = 15.0
 TOP_HOLDING_WATCH = 10.0
+
+_MF_PARAM_KEYS = (
+    ("Category", "Category"),
+    ("AMC", "AMC"),
+    ("Fund House", "Fund House"),
+    ("1Y %", "1Y %"),
+    ("3Y %", "3Y %"),
+    ("5Y %", "5Y %"),
+    ("vs Nifty50 1Y", "vs Nifty50 1Y"),
+    ("vs Nifty50 3Y", "vs Nifty50 3Y"),
+    ("vs Nifty50 5Y", "vs Nifty50 5Y"),
+)
 
 
 def _finite(value):
@@ -153,7 +165,10 @@ def _family_overlap(isin, session_holdings):
         except (TypeError, ValueError):
             raw = cache.get(str(scheme)) or []
         cleaned, _ = _normalize_holdings(raw if isinstance(raw, list) else [])
-        hit = next((x for x in cleaned if _text(x.get("isin")).upper() == code), None)
+        hit = next(
+            (x for x in cleaned if _text(x.get("isin")).upper() == code),
+            None,
+        )
         if not hit:
             continue
         fund = _text(holding.get("Fund Name") or scheme)
@@ -161,7 +176,11 @@ def _family_overlap(isin, session_holdings):
         if key in seen:
             continue
         seen.add(key)
-        out.append({"Fund": fund, "Owner": holding.get("Owner") or "", "Weight %": _finite(hit.get("weight"))})
+        out.append({
+            "Fund": fund,
+            "Owner": holding.get("Owner") or "",
+            "Weight %": _finite(hit.get("weight")),
+        })
     return out
 
 
@@ -170,7 +189,10 @@ def _mapped_developments(cohort, index):
         return []
     try:
         from lib.intelligence.live import development_rows
-        return [row for row in development_rows(cohort, index, None) if row.get("Relevance") == "mapped"]
+        return [
+            row for row in development_rows(cohort, index, None)
+            if row.get("Relevance") == "mapped"
+        ]
     except Exception:
         return []
 
@@ -185,50 +207,115 @@ def _flag_tape(rows, green, red, watch, gaps):
     ]
     for label in wanted:
         if label.lower() not in present:
-            _add(gaps, "gap", label, label + " is not on the observed tape this session.", "yahoo-tape")
+            _add(
+                gaps, "gap", label,
+                label + " is not on the observed tape this session.",
+                "yahoo-tape",
+            )
     for row in rows:
         label = _text(row.get("label"))
         tone = metric_tone(label, row.get("value"))
         if tone == "ok":
-            _add(green, "green", label, label + " is inside the conservative observed band.", "yahoo-tape")
+            _add(
+                green, "green", label,
+                label + " is inside the conservative observed band.",
+                "yahoo-tape",
+            )
         elif tone == "watch":
-            _add(watch, "watch", label, label + " is on the watch band of the observed tape.", "yahoo-tape")
+            _add(
+                watch, "watch", label,
+                label + " is on the watch band of the observed tape.",
+                "yahoo-tape",
+            )
         elif tone == "elevated":
-            _add(red, "red", label, label + " is on the elevated band of the observed tape.", "yahoo-tape")
+            _add(
+                red, "red", label,
+                label + " is on the elevated band of the observed tape.",
+                "yahoo-tape",
+            )
 
 
 def _flag_concentration(weight_pct, green, red, watch, gaps):
     if weight_pct is None:
-        _add(gaps, "gap", "Concentration", "Family asset total was not published this session.", "command-center")
+        _add(
+            gaps, "gap", "Concentration",
+            "Family asset total was not published this session.",
+            "command-center",
+        )
         return
     text = "This line is %.1f%% of published family assets." % weight_pct
     if weight_pct >= CONC_ELEVATED_PCT:
-        _add(red, "red", "Concentration", text + " Elevated single-name weight.", "register")
+        _add(
+            red, "red", "Concentration",
+            text + " Elevated single-name weight.",
+            "register",
+        )
     elif weight_pct >= CONC_WATCH_PCT:
-        _add(watch, "watch", "Concentration", text + " Watch single-name weight.", "register")
+        _add(
+            watch, "watch", "Concentration",
+            text + " Watch single-name weight.",
+            "register",
+        )
     else:
-        _add(green, "green", "Concentration", text + " Below the 8% watch band.", "register")
+        _add(
+            green, "green", "Concentration",
+            text + " Below the 8% watch band.",
+            "register",
+        )
 
 
 def _flag_mf_perf(rec, green, red, watch, gaps):
     y1 = _finite(rec.get("1Y %"))
     vs1 = _finite(rec.get("vs Nifty50 1Y"))
     if y1 is None:
-        _add(gaps, "gap", "1Y %", "Scheme 1Y is not on the Command Center row.", "command-center")
+        _add(
+            gaps, "gap", "1Y %",
+            "Scheme 1Y is not on the Command Center row.",
+            "command-center",
+        )
     elif y1 < 0:
-        _add(watch, "watch", "1Y %", "Scheme 1Y is %.1f%% (trailing, not XIRR)." % y1, "command-center")
+        _add(
+            watch, "watch", "1Y %",
+            "Scheme 1Y is %.1f%% (trailing, not XIRR)." % y1,
+            "command-center",
+        )
     else:
-        _add(green, "green", "1Y %", "Scheme 1Y is %.1f%% (trailing, not XIRR)." % y1, "command-center")
+        _add(
+            green, "green", "1Y %",
+            "Scheme 1Y is %.1f%% (trailing, not XIRR)." % y1,
+            "command-center",
+        )
     if vs1 is None:
-        _add(gaps, "gap", "vs Nifty 1Y", "Benchmark comparison is missing on this row.", "command-center")
+        _add(
+            gaps, "gap", "vs Nifty 1Y",
+            "Benchmark comparison is missing on this row.",
+            "command-center",
+        )
     elif vs1 < 0:
-        _add(watch, "watch", "vs Nifty 1Y", "Trailing 1Y vs Nifty50 is %.1f pp." % vs1, "command-center")
+        _add(
+            watch, "watch", "vs Nifty 1Y",
+            "Trailing 1Y vs Nifty50 is %.1f pp." % vs1,
+            "command-center",
+        )
     else:
-        _add(green, "green", "vs Nifty 1Y", "Trailing 1Y vs Nifty50 is %+.1f pp." % vs1, "command-center")
+        _add(
+            green, "green", "vs Nifty 1Y",
+            "Trailing 1Y vs Nifty50 is %+.1f pp." % vs1,
+            "command-center",
+        )
 
 
-def build_asset_pack(*, row, rec=None, books=None, assets=None, research_brief=None,
-                     live_cohort=None, tape=None, session_holdings=None):
+def build_asset_pack(
+    *,
+    row,
+    rec=None,
+    books=None,
+    assets=None,
+    research_brief=None,
+    live_cohort=None,
+    tape=None,
+    session_holdings=None,
+):
     rec = rec or {}
     kind = _text(row.get("Kind"))
     name = _text(row.get("Name") or rec.get("Fund Name") or rec.get("Company Name"))
@@ -236,8 +323,14 @@ def build_asset_pack(*, row, rec=None, books=None, assets=None, research_brief=N
     key = _text(row.get("Key"))
     isin = extract_isin(rec.get("ISIN"), rec.get("Company Name"), row.get("Key"), name)
     symbol = _text(rec.get("Symbol") or (row.get("Key") if kind == "Stocks" else ""))
-    current = rec.get("Current Value") if rec.get("Current Value") is not None else row.get("Current Value")
-    invested = rec.get("Invested") if rec.get("Invested") is not None else row.get("Invested")
+    if rec.get("Current Value") is not None:
+        current = rec.get("Current Value")
+    else:
+        current = row.get("Current Value")
+    if rec.get("Invested") is not None:
+        invested = rec.get("Invested")
+    else:
+        invested = row.get("Invested")
     total_assets = assets.get("total_assets") if isinstance(assets, dict) else None
     weight = _concentration(current, total_assets)
     green, red, watch, gaps = [], [], [], []
@@ -254,26 +347,58 @@ def build_asset_pack(*, row, rec=None, books=None, assets=None, research_brief=N
         if tape_ok:
             freshness.append("Yahoo tape %s" % (tape.get("retrieved_at") or "loaded"))
             for item in tape_rows:
-                parameters.append({"Parameter": item.get("label"), "Value": item.get("value"), "Unit": item.get("sub") or "", "Source": "Yahoo Finance (opt-in tape)"})
+                parameters.append({
+                    "Parameter": item.get("label"),
+                    "Value": item.get("value"),
+                    "Unit": item.get("sub") or "",
+                    "Source": "Yahoo Finance (opt-in tape)",
+                })
             _flag_tape(tape_rows, green, red, watch, gaps)
         else:
             tape_ok = False
-            _add(gaps, "gap", "Company tape", "Yahoo tape is not loaded this session.", "yahoo-tape")
+            _add(
+                gaps, "gap", "Company tape",
+                "Yahoo tape is not loaded this session.",
+                "yahoo-tape",
+            )
         family_overlap = _family_overlap(isin, session_holdings)
         if family_overlap:
-            _add(watch, "watch", "MF overlap", "%d family fund-row(s) also disclose this ISIN." % len(family_overlap), "mf-holdings-cache")
+            _add(
+                watch, "watch", "MF overlap",
+                "%d family fund-row(s) also disclose this ISIN." % len(family_overlap),
+                "mf-holdings-cache",
+            )
         else:
-            _add(gaps, "gap", "MF overlap", "No family fund in the committed holdings cache discloses this ISIN.", "mf-holdings-cache")
+            _add(
+                gaps, "gap", "MF overlap",
+                "No family fund in the holdings cache discloses this ISIN.",
+                "mf-holdings-cache",
+            )
     elif kind == "MF":
         tape_ok = False
-        for label, keyn in (("Category", "Category"), ("AMC", "AMC"), ("Fund House", "Fund House"), ("1Y %", "1Y %"), ("3Y %", "3Y %"), ("5Y %", "5Y %"), ("vs Nifty50 1Y", "vs Nifty50 1Y"), ("vs Nifty50 3Y", "vs Nifty50 3Y"), ("vs Nifty50 5Y", "vs Nifty50 5Y")):
+        for label, keyn in _MF_PARAM_KEYS:
             val = rec.get(keyn) or row.get(keyn)
             if val not in (None, "", "-"):
-                parameters.append({"Parameter": label, "Value": val, "Unit": "", "Source": "Command Center row"})
-        if rec.get("Category") or row.get("Class"):
-            parameters.append({"Parameter": "Class", "Value": rec.get("Category") or row.get("Class"), "Unit": "", "Source": "Command Center row"})
+                parameters.append({
+                    "Parameter": label,
+                    "Value": val,
+                    "Unit": "",
+                    "Source": "Command Center row",
+                })
+        class_val = rec.get("Category") or row.get("Class")
+        if class_val:
+            parameters.append({
+                "Parameter": "Class",
+                "Value": class_val,
+                "Unit": "",
+                "Source": "Command Center row",
+            })
         else:
-            _add(gaps, "gap", "Category", "Fund category is not on this row.", "command-center")
+            _add(
+                gaps, "gap", "Category",
+                "Fund category is not on this row.",
+                "command-center",
+            )
         _flag_mf_perf(rec, green, red, watch, gaps)
         lookthrough, holdings_as_of = _mf_lookthrough(scheme_code)
         if holdings_as_of:
@@ -281,43 +406,117 @@ def build_asset_pack(*, row, rec=None, books=None, assets=None, research_brief=N
         if lookthrough:
             top_w = _finite(lookthrough[0].get("Weight %"))
             if top_w is not None and top_w >= TOP_HOLDING_WATCH:
-                _add(watch, "watch", "Top holding", "Largest disclosed name is %s at %.1f%%." % (lookthrough[0].get("Name"), top_w), "mf-holdings-cache")
+                _add(
+                    watch, "watch", "Top holding",
+                    "Largest disclosed name is %s at %.1f%%." % (
+                        lookthrough[0].get("Name"), top_w,
+                    ),
+                    "mf-holdings-cache",
+                )
             else:
-                _add(green, "green", "Look-through", "%d disclosed names available in the holdings cache." % len(lookthrough), "mf-holdings-cache")
+                _add(
+                    green, "green", "Look-through",
+                    "%d disclosed names available in the holdings cache." % (
+                        len(lookthrough),
+                    ),
+                    "mf-holdings-cache",
+                )
             if not any(r.get("Sector") for r in lookthrough):
-                _add(gaps, "gap", "Sector exposure", "Holdings cache rows carry no sector field this run.", "mf-holdings-cache")
+                _add(
+                    gaps, "gap", "Sector exposure",
+                    "Holdings cache rows carry no sector field this run.",
+                    "mf-holdings-cache",
+                )
         else:
-            _add(gaps, "gap", "Look-through", "No disclosed holdings in the committed cache for this scheme.", "mf-holdings-cache")
+            _add(
+                gaps, "gap", "Look-through",
+                "No disclosed holdings in the committed cache for this scheme.",
+                "mf-holdings-cache",
+            )
         shared = 0
         for item in lookthrough[:5]:
-            shared += max(0, len(_family_overlap(item.get("ISIN"), session_holdings)) - 1)
+            others = _family_overlap(item.get("ISIN"), session_holdings)
+            shared += max(0, len(others) - 1)
         if shared:
-            _add(watch, "watch", "Family-fund overlap", "Top disclosed names also appear in %d other family fund-row(s)." % shared, "mf-holdings-cache")
+            _add(
+                watch, "watch", "Family-fund overlap",
+                "Top disclosed names also appear in %d other family fund-row(s)." % (
+                    shared,
+                ),
+                "mf-holdings-cache",
+            )
     else:
         tape_ok = False
-        _add(gaps, "gap", "Issuer tape", "%s has no company-tape overlay in Asset Intelligence." % (kind or "This sleeve"), "register")
+        sleeve = kind or "This sleeve"
+        _add(
+            gaps, "gap", "Issuer tape",
+            "%s has no company-tape overlay in Asset Intelligence." % sleeve,
+            "register",
+        )
     _flag_concentration(weight, green, red, watch, gaps)
     if weight is not None:
-        parameters.append({"Parameter": "Weight of family assets", "Value": round(weight, 2), "Unit": "%", "Source": "Command Center totals"})
-    developments = _mapped_developments(live_cohort, _instrument_index(kind, isin, symbol, name, scheme_code))
+        parameters.append({
+            "Parameter": "Weight of family assets",
+            "Value": round(weight, 2),
+            "Unit": "%",
+            "Source": "Command Center totals",
+        })
+    developments = _mapped_developments(
+        live_cohort,
+        _instrument_index(kind, isin, symbol, name, scheme_code),
+    )
     if developments:
         freshness.append("%d mapped external development(s)" % len(developments))
-        _add(watch, "watch", "Mapped evidence", "%d cohort item(s) exact-match this instrument." % len(developments), "live-cohort")
+        _add(
+            watch, "watch", "Mapped evidence",
+            "%d cohort item(s) exact-match this instrument." % len(developments),
+            "live-cohort",
+        )
     else:
-        _add(gaps, "gap", "Mapped evidence", "No portfolio-mapped external development exact-matches this instrument this session.", "live-cohort")
+        _add(
+            gaps, "gap", "Mapped evidence",
+            "No portfolio-mapped external development exact-matches this instrument.",
+            "live-cohort",
+        )
     brief = build_instrument_brief(
-        parent=research_brief, kind=kind, name=name, member=member, isin=isin, symbol=symbol,
-        current_value=current, invested=invested, pnl=rec.get("P&L") or row.get("P&L"),
-        simple_roi=rec.get("Return %") or row.get("Return %"), lump_sum_ann=rec.get("Ann. Return %"),
-        y1=rec.get("1Y %"), y3=rec.get("3Y %"), y5=rec.get("5Y %"),
-        vs_n1=rec.get("vs Nifty50 1Y"), vs_n3=rec.get("vs Nifty50 3Y"), vs_n5=rec.get("vs Nifty50 5Y"),
-        lookthrough=lookthrough or family_overlap, tape=tape if tape_ok else None,
+        parent=research_brief,
+        kind=kind,
+        name=name,
+        member=member,
+        isin=isin,
+        symbol=symbol,
+        current_value=current,
+        invested=invested,
+        pnl=rec.get("P&L") or row.get("P&L"),
+        simple_roi=rec.get("Return %") or row.get("Return %"),
+        lump_sum_ann=rec.get("Ann. Return %"),
+        y1=rec.get("1Y %"),
+        y3=rec.get("3Y %"),
+        y5=rec.get("5Y %"),
+        vs_n1=rec.get("vs Nifty50 1Y"),
+        vs_n3=rec.get("vs Nifty50 3Y"),
+        vs_n5=rec.get("vs Nifty50 5Y"),
+        lookthrough=lookthrough or family_overlap,
+        tape=tape if tape_ok else None,
     )
     return AssetIntelligencePack(
-        kind=kind, name=name, member=member, key=key, isin=isin, symbol=symbol,
-        parameters=parameters, green=green, red=red, watch=watch, gaps=gaps,
-        developments=developments, lookthrough=lookthrough, family_overlap=family_overlap,
-        freshness=freshness, brief=brief, tape_ok=tape_ok,
+        kind=kind,
+        name=name,
+        member=member,
+        key=key,
+        isin=isin,
+        symbol=symbol,
+        parameters=parameters,
+        green=green,
+        red=red,
+        watch=watch,
+        gaps=gaps,
+        developments=developments,
+        lookthrough=lookthrough,
+        family_overlap=family_overlap,
+        freshness=freshness,
+        brief=brief,
+        tape_ok=tape_ok,
     )
 
 
@@ -325,17 +524,27 @@ AI_QUESTION = (
     "You are interpreting an Asset Intelligence Pack, not a holdings summary. "
     "Use ONLY the catalog and deterministic flags already in this brief. "
     "Structure the reading as: overall investor view; green flags; red flags; "
-    "watch items; key evidence; what could change / invalidate this view; data gaps. "
-    "Do not restate quantity, average buy price, invested amount or current value "
-    "unless they are needed to explain concentration or trailing performance. "
-    "Do not invent PE, RSI, XIRR, SIP history, tax, or buy/sell instructions. "
-    "Decision-support only."
+    "watch items; key evidence; what could change / invalidate this view; "
+    "data gaps. Do not restate quantity, average buy price, invested amount "
+    "or current value unless they are needed to explain concentration or "
+    "trailing performance. Do not invent PE, RSI, XIRR, SIP history, tax, "
+    "or buy/sell instructions. Decision-support only."
 )
 
 
 def pack_prompt_extras(pack):
-    lines = [AI_QUESTION, "", "Deterministic flags already computed (do not invent new ones):"]
-    for group, title in ((pack.green, "GREEN"), (pack.red, "RED"), (pack.watch, "WATCH"), (pack.gaps, "GAPS")):
+    lines = [
+        AI_QUESTION,
+        "",
+        "Deterministic flags already computed (do not invent new ones):",
+    ]
+    groups = (
+        (pack.green, "GREEN"),
+        (pack.red, "RED"),
+        (pack.watch, "WATCH"),
+        (pack.gaps, "GAPS"),
+    )
+    for group, title in groups:
         if not group:
             continue
         lines.append(title + ":")
