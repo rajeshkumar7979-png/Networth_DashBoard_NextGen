@@ -1,5 +1,5 @@
 {
-  "fetched_at": "2026-09-28T11:10:07+00:00",
+  "fetched_at": "2026-09-29T10:51:50+00:00",
   "rows": [
     {
       "scheme_code": "135762",
@@ -76139,6 +76139,46 @@
       "nav": null,
       "nav_date": "IDCW",
       "amc": "Kotak Mahindra Mutual Fund",
+      "category": "Open Ended Schemes(Index Funds - Equity Funds)"
+    },
+    {
+      "scheme_code": "154720",
+      "isin_primary": "INF769K01RO5",
+      "isin_secondary": "",
+      "scheme_name": "Mirae Asset BSE Information Technology Index Fund",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Mirae Asset Mutual Fund",
+      "category": "Open Ended Schemes(Index Funds - Equity Funds)"
+    },
+    {
+      "scheme_code": "154721",
+      "isin_primary": "INF769K01RQ0",
+      "isin_secondary": "INF769K01RP2",
+      "scheme_name": "Mirae Asset BSE Information Technology Index Fund",
+      "nav": null,
+      "nav_date": "IDCW",
+      "amc": "Mirae Asset Mutual Fund",
+      "category": "Open Ended Schemes(Index Funds - Equity Funds)"
+    },
+    {
+      "scheme_code": "154722",
+      "isin_primary": "INF769K01RL1",
+      "isin_secondary": "",
+      "scheme_name": "Mirae Asset BSE Information Technology Index Fund",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Mirae Asset Mutual Fund",
+      "category": "Open Ended Schemes(Index Funds - Equity Funds)"
+    },
+    {
+      "scheme_code": "154723",
+      "isin_primary": "INF769K01RN7",
+      "isin_secondary": "INF769K01RM9",
+      "scheme_name": "Mirae Asset BSE Information Technology Index Fund",
+      "nav": null,
+      "nav_date": "IDCW",
+      "amc": "Mirae Asset Mutual Fund",
       "category": "Open Ended Schemes(Index Funds - Equity Funds)"
     },
     {
