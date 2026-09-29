@@ -42,6 +42,12 @@ def _raw_records_for(books, kind, key):
     return out
 
 
+def _flag_frame(items):
+    return pd.DataFrame([
+        {"Flag": f.label, "Reading": f.text, "Source": f.source} for f in items
+    ])
+
+
 books = st.session_state.get("cc_books")
 assets = st.session_state.get("cc_assets")
 cohort = st.session_state.get("cc_live_cohort")
@@ -51,8 +57,12 @@ briefing = st.session_state.get("cc_intel_briefing")
 roster = None
 if isinstance(books, dict):
     try:
-        roster = build_roster(mf_valid=books.get("mf"), stocks_valid=books.get("stocks"),
-                             gold_valid=books.get("gold"), fd_valid=books.get("fd"))
+        roster = build_roster(
+            mf_valid=books.get("mf"),
+            stocks_valid=books.get("stocks"),
+            gold_valid=books.get("gold"),
+            fd_valid=books.get("fd"),
+        )
     except Exception:
         roster = None
 
@@ -64,18 +74,24 @@ if roster is None or len(roster) == 0:
     st.stop()
 
 members = member_filter_options(roster)
-owners = st.multiselect("Member filter", members, default=members)
+left, right = st.columns((1, 2))
+with left:
+    owners = st.multiselect("Member filter", members, default=members)
 show = roster[roster["Member"].isin(owners)] if owners else roster
 show = show[show["Kind"].isin(["Stocks", "MF"])]
 if show.empty:
-    st.markdown(empty_state("No stock or fund line in this filter", "Gold and FD have no issuer tape on this page."), unsafe_allow_html=True)
+    st.markdown(empty_state(
+        "No stock or fund line in this filter",
+        "Gold and FD have no issuer tape on this page.",
+    ), unsafe_allow_html=True)
     st.stop()
 
 labels = [f"{r['Kind']} · {r['Name']} · {r['Member']}" for _, r in show.iterrows()]
 keys = list(show["Key"].astype(str))
 focus = st.session_state.get("ai_focus_key")
 default_idx = keys.index(str(focus)) if focus and str(focus) in keys else 0
-picked = st.selectbox("Instrument", labels, index=default_idx)
+with right:
+    picked = st.selectbox("Instrument", labels, index=default_idx)
 row = show.iloc[labels.index(picked)].to_dict()
 recs = _raw_records_for(books, str(row.get("Kind")), str(row.get("Key")))
 rec = recs[0] if recs else {}
@@ -112,32 +128,57 @@ if pack.parameters:
         view.append({"Parameter": label, "Value": shown, "Source": item.get("Source")})
     st.dataframe(pd.DataFrame(view), hide_index=True, use_container_width=True)
 
-for title, items, hint in (
-    ("Green flags", pack.green, "Conservative observed band — not a buy."),
-    ("Red flags", pack.red, "Elevated observed band — not a sell."),
-    ("Watch items", pack.watch, "Needs attention, still not an order."),
-    ("Data gaps", pack.gaps, "Missing stays missing."),
-):
-    st.markdown(section_header_html(title, hint), unsafe_allow_html=True)
-    if not items:
+row1_l, row1_r = st.columns(2)
+with row1_l:
+    st.markdown(section_header_html("Green flags", "Conservative observed band — not a buy."), unsafe_allow_html=True)
+    if pack.green:
+        st.dataframe(_flag_frame(pack.green), hide_index=True, use_container_width=True)
+    else:
         st.markdown(caption("None on verified inputs this session."), unsafe_allow_html=True)
-        continue
-    st.dataframe(pd.DataFrame([{"Flag": f.label, "Reading": f.text, "Source": f.source} for f in items]), hide_index=True, use_container_width=True)
+with row1_r:
+    st.markdown(section_header_html("Red flags", "Elevated observed band — not a sell."), unsafe_allow_html=True)
+    if pack.red:
+        st.dataframe(_flag_frame(pack.red), hide_index=True, use_container_width=True)
+    else:
+        st.markdown(caption("None on verified inputs this session."), unsafe_allow_html=True)
 
-if pack.lookthrough:
-    st.markdown(section_header_html("Look-through", "statutory cache"), unsafe_allow_html=True)
-    st.dataframe(pd.DataFrame(pack.lookthrough), hide_index=True, use_container_width=True)
-if pack.family_overlap:
-    st.markdown(section_header_html("Family-fund overlap", "same ISIN"), unsafe_allow_html=True)
-    st.dataframe(pd.DataFrame(pack.family_overlap), hide_index=True, use_container_width=True)
+row2_l, row2_r = st.columns(2)
+with row2_l:
+    st.markdown(section_header_html("Watch items", "Needs attention, still not an order."), unsafe_allow_html=True)
+    if pack.watch:
+        st.dataframe(_flag_frame(pack.watch), hide_index=True, use_container_width=True)
+    else:
+        st.markdown(caption("None on verified inputs this session."), unsafe_allow_html=True)
+with row2_r:
+    st.markdown(section_header_html("Data gaps", "Missing stays missing."), unsafe_allow_html=True)
+    if pack.gaps:
+        st.dataframe(_flag_frame(pack.gaps), hide_index=True, use_container_width=True)
+    else:
+        st.markdown(caption("None on verified inputs this session."), unsafe_allow_html=True)
+
+look_col, overlap_col = st.columns(2)
+with look_col:
+    if pack.lookthrough:
+        st.markdown(section_header_html("Look-through", "statutory cache"), unsafe_allow_html=True)
+        st.dataframe(pd.DataFrame(pack.lookthrough), hide_index=True, use_container_width=True)
+with overlap_col:
+    if pack.family_overlap:
+        st.markdown(section_header_html("Family-fund overlap", "same ISIN"), unsafe_allow_html=True)
+        st.dataframe(pd.DataFrame(pack.family_overlap), hide_index=True, use_container_width=True)
 
 st.markdown(section_header_html("Mapped external developments", "exact identifier"), unsafe_allow_html=True)
 if pack.developments:
     cols = [c for c in ("Development", "Source", "Published", "Category", "Relevance", "Link") if c in pack.developments[0]]
-    st.dataframe(pd.DataFrame(pack.developments)[cols], hide_index=True, use_container_width=True,
-                 column_config={"Link": st.column_config.LinkColumn("Link")})
+    st.dataframe(
+        pd.DataFrame(pack.developments)[cols],
+        hide_index=True,
+        use_container_width=True,
+        column_config={"Link": st.column_config.LinkColumn("Link")},
+    )
 else:
-    st.markdown(caption("No cohort item exact-matches this instrument. Refresh research evidence on Command Center."), unsafe_allow_html=True)
+    st.markdown(caption(
+        "No cohort item exact-matches this instrument. Refresh research evidence on Command Center."
+    ), unsafe_allow_html=True)
 
 st.markdown(section_header_html("AI reading of this pack", "opt-in · never on load"), unsafe_allow_html=True)
 try:
@@ -154,7 +195,12 @@ if run_ai:
         st.warning("No instrument brief could be built. Open Command Center first.")
     else:
         store = st.session_state.setdefault("asset_intel_ai_hour", {})
-        ck = "|".join(("asset-intel-v1", pack.key, str(getattr(pack.brief, "evidence_count", 0)), str(getattr(ai_cfg, "provider", "") or "")))
+        ck = "|".join((
+            "asset-intel-v1",
+            pack.key,
+            str(getattr(pack.brief, "evidence_count", 0)),
+            str(getattr(ai_cfg, "provider", "") or ""),
+        ))
         hit = store.get(ck) if isinstance(store, dict) else None
         reuse = isinstance(hit, dict) and (time.time() - float(hit.get("ts") or 0) < 3600)
         if reuse:
