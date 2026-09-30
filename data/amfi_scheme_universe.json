@@ -1,5 +1,5 @@
 {
-  "fetched_at": "2026-09-29T10:51:50+00:00",
+  "fetched_at": "2026-09-30T10:41:11+00:00",
   "rows": [
     {
       "scheme_code": "135762",
@@ -8080,116 +8080,6 @@
       "nav_date": "",
       "amc": "UTI Mutual Fund",
       "category": "Open Ended Schemes(Debt Scheme - Medium Duration Fund)"
-    },
-    {
-      "scheme_code": "119395",
-      "isin_primary": "INF761K01850",
-      "isin_secondary": "INF761K01843",
-      "scheme_name": "BANK OF INDIA CONSERVATIVE HYBRID FUND",
-      "nav": null,
-      "nav_date": "Quarterly IDCW",
-      "amc": "Bank of India Mutual Fund",
-      "category": "Open Ended Schemes(Debt Scheme - Medium to Long Duration Fund)"
-    },
-    {
-      "scheme_code": "111718",
-      "isin_primary": "INF761K01439",
-      "isin_secondary": "INF761K01421",
-      "scheme_name": "BANK OF INDIA CONSERVATIVE HYBRID FUND",
-      "nav": null,
-      "nav_date": "Quarterly IDCW",
-      "amc": "Bank of India Mutual Fund",
-      "category": "Open Ended Schemes(Debt Scheme - Medium to Long Duration Fund)"
-    },
-    {
-      "scheme_code": "119393",
-      "isin_primary": "INF761K01819",
-      "isin_secondary": "",
-      "scheme_name": "BANK OF INDIA CONSERVATIVE HYBRID FUND",
-      "nav": null,
-      "nav_date": "Growth",
-      "amc": "Bank of India Mutual Fund",
-      "category": "Open Ended Schemes(Debt Scheme - Medium to Long Duration Fund)"
-    },
-    {
-      "scheme_code": "119396",
-      "isin_primary": "INF761K01793",
-      "isin_secondary": "INF761K01801",
-      "scheme_name": "BANK OF INDIA CONSERVATIVE HYBRID FUND",
-      "nav": null,
-      "nav_date": "Annual IDCW",
-      "amc": "Bank of India Mutual Fund",
-      "category": "Open Ended Schemes(Debt Scheme - Medium to Long Duration Fund)"
-    },
-    {
-      "scheme_code": "119394",
-      "isin_primary": "INF761K01835",
-      "isin_secondary": "INF761K01827",
-      "scheme_name": "BANK OF INDIA CONSERVATIVE HYBRID FUND",
-      "nav": null,
-      "nav_date": "Monthly IDCW",
-      "amc": "Bank of India Mutual Fund",
-      "category": "Open Ended Schemes(Debt Scheme - Medium to Long Duration Fund)"
-    },
-    {
-      "scheme_code": "111715",
-      "isin_primary": "INF761K01397",
-      "isin_secondary": "",
-      "scheme_name": "BANK OF INDIA CONSERVATIVE HYBRID FUND",
-      "nav": null,
-      "nav_date": "Growth",
-      "amc": "Bank of India Mutual Fund",
-      "category": "Open Ended Schemes(Debt Scheme - Medium to Long Duration Fund)"
-    },
-    {
-      "scheme_code": "111717",
-      "isin_primary": "INF761K01413",
-      "isin_secondary": "INF761K01405",
-      "scheme_name": "BANK OF INDIA CONSERVATIVE HYBRID FUND",
-      "nav": null,
-      "nav_date": "Monthly IDCW",
-      "amc": "Bank of India Mutual Fund",
-      "category": "Open Ended Schemes(Debt Scheme - Medium to Long Duration Fund)"
-    },
-    {
-      "scheme_code": "111714",
-      "isin_primary": "INF761K01454",
-      "isin_secondary": "INF761K01447",
-      "scheme_name": "BANK OF INDIA CONSERVATIVE HYBRID FUND",
-      "nav": null,
-      "nav_date": "Annual IDCW",
-      "amc": "Bank of India Mutual Fund",
-      "category": "Open Ended Schemes(Debt Scheme - Medium to Long Duration Fund)"
-    },
-    {
-      "scheme_code": "111712",
-      "isin_primary": "INF761K01462",
-      "isin_secondary": "",
-      "scheme_name": "BANK OF INDIA CONSERVATIVE HYBRID FUND",
-      "nav": null,
-      "nav_date": "Growth",
-      "amc": "Bank of India Mutual Fund",
-      "category": "Open Ended Schemes(Debt Scheme - Medium to Long Duration Fund)"
-    },
-    {
-      "scheme_code": "111716",
-      "isin_primary": "INF761K01488",
-      "isin_secondary": "INF761K01470",
-      "scheme_name": "BANK OF INDIA CONSERVATIVE HYBRID FUND",
-      "nav": null,
-      "nav_date": "Monthly IDCW",
-      "amc": "Bank of India Mutual Fund",
-      "category": "Open Ended Schemes(Debt Scheme - Medium to Long Duration Fund)"
-    },
-    {
-      "scheme_code": "111713",
-      "isin_primary": "INF761K01504",
-      "isin_secondary": "INF761K01496",
-      "scheme_name": "BANK OF INDIA CONSERVATIVE HYBRID FUND",
-      "nav": null,
-      "nav_date": "Quarterly IDCW",
-      "amc": "Bank of India Mutual Fund",
-      "category": "Open Ended Schemes(Debt Scheme - Medium to Long Duration Fund)"
     },
     {
       "scheme_code": "119876",
@@ -50069,6 +49959,116 @@
       "nav": null,
       "nav_date": "Quarterly IDCW Option",
       "amc": "Axis Mutual Fund",
+      "category": "Open Ended Schemes(Hybrid Schemes - Conservative Hybrid Fund)"
+    },
+    {
+      "scheme_code": "119395",
+      "isin_primary": "INF761K01850",
+      "isin_secondary": "INF761K01843",
+      "scheme_name": "BANK OF INDIA CONSERVATIVE HYBRID FUND",
+      "nav": null,
+      "nav_date": "Quarterly IDCW",
+      "amc": "Bank of India Mutual Fund",
+      "category": "Open Ended Schemes(Hybrid Schemes - Conservative Hybrid Fund)"
+    },
+    {
+      "scheme_code": "111718",
+      "isin_primary": "INF761K01439",
+      "isin_secondary": "INF761K01421",
+      "scheme_name": "BANK OF INDIA CONSERVATIVE HYBRID FUND",
+      "nav": null,
+      "nav_date": "Quarterly IDCW",
+      "amc": "Bank of India Mutual Fund",
+      "category": "Open Ended Schemes(Hybrid Schemes - Conservative Hybrid Fund)"
+    },
+    {
+      "scheme_code": "119393",
+      "isin_primary": "INF761K01819",
+      "isin_secondary": "",
+      "scheme_name": "BANK OF INDIA CONSERVATIVE HYBRID FUND",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Bank of India Mutual Fund",
+      "category": "Open Ended Schemes(Hybrid Schemes - Conservative Hybrid Fund)"
+    },
+    {
+      "scheme_code": "119396",
+      "isin_primary": "INF761K01793",
+      "isin_secondary": "INF761K01801",
+      "scheme_name": "BANK OF INDIA CONSERVATIVE HYBRID FUND",
+      "nav": null,
+      "nav_date": "Annual IDCW",
+      "amc": "Bank of India Mutual Fund",
+      "category": "Open Ended Schemes(Hybrid Schemes - Conservative Hybrid Fund)"
+    },
+    {
+      "scheme_code": "119394",
+      "isin_primary": "INF761K01835",
+      "isin_secondary": "INF761K01827",
+      "scheme_name": "BANK OF INDIA CONSERVATIVE HYBRID FUND",
+      "nav": null,
+      "nav_date": "Monthly IDCW",
+      "amc": "Bank of India Mutual Fund",
+      "category": "Open Ended Schemes(Hybrid Schemes - Conservative Hybrid Fund)"
+    },
+    {
+      "scheme_code": "111715",
+      "isin_primary": "INF761K01397",
+      "isin_secondary": "",
+      "scheme_name": "BANK OF INDIA CONSERVATIVE HYBRID FUND",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Bank of India Mutual Fund",
+      "category": "Open Ended Schemes(Hybrid Schemes - Conservative Hybrid Fund)"
+    },
+    {
+      "scheme_code": "111717",
+      "isin_primary": "INF761K01413",
+      "isin_secondary": "INF761K01405",
+      "scheme_name": "BANK OF INDIA CONSERVATIVE HYBRID FUND",
+      "nav": null,
+      "nav_date": "Monthly IDCW",
+      "amc": "Bank of India Mutual Fund",
+      "category": "Open Ended Schemes(Hybrid Schemes - Conservative Hybrid Fund)"
+    },
+    {
+      "scheme_code": "111714",
+      "isin_primary": "INF761K01454",
+      "isin_secondary": "INF761K01447",
+      "scheme_name": "BANK OF INDIA CONSERVATIVE HYBRID FUND",
+      "nav": null,
+      "nav_date": "Annual IDCW",
+      "amc": "Bank of India Mutual Fund",
+      "category": "Open Ended Schemes(Hybrid Schemes - Conservative Hybrid Fund)"
+    },
+    {
+      "scheme_code": "111712",
+      "isin_primary": "INF761K01462",
+      "isin_secondary": "",
+      "scheme_name": "BANK OF INDIA CONSERVATIVE HYBRID FUND",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Bank of India Mutual Fund",
+      "category": "Open Ended Schemes(Hybrid Schemes - Conservative Hybrid Fund)"
+    },
+    {
+      "scheme_code": "111716",
+      "isin_primary": "INF761K01488",
+      "isin_secondary": "INF761K01470",
+      "scheme_name": "BANK OF INDIA CONSERVATIVE HYBRID FUND",
+      "nav": null,
+      "nav_date": "Monthly IDCW",
+      "amc": "Bank of India Mutual Fund",
+      "category": "Open Ended Schemes(Hybrid Schemes - Conservative Hybrid Fund)"
+    },
+    {
+      "scheme_code": "111713",
+      "isin_primary": "INF761K01504",
+      "isin_secondary": "INF761K01496",
+      "scheme_name": "BANK OF INDIA CONSERVATIVE HYBRID FUND",
+      "nav": null,
+      "nav_date": "Quarterly IDCW",
+      "amc": "Bank of India Mutual Fund",
       "category": "Open Ended Schemes(Hybrid Schemes - Conservative Hybrid Fund)"
     },
     {
