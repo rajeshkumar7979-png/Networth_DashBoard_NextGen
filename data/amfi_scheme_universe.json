@@ -1,5 +1,5 @@
 {
-  "fetched_at": "2026-09-30T10:41:11+00:00",
+  "fetched_at": "2026-10-01T11:07:55+00:00",
   "rows": [
     {
       "scheme_code": "135762",
@@ -80,86 +80,6 @@
       "nav_date": "IDCW Option",
       "amc": "Axis Mutual Fund",
       "category": "Open Ended Schemes(Childrenâs Fund - Childrens' Fund)"
-    },
-    {
-      "scheme_code": "119551",
-      "isin_primary": "INF209KA12Z1",
-      "isin_secondary": "INF209KA13Z9",
-      "scheme_name": "Aditya Birla Sun Life Banking & PSU Debt Fund",
-      "nav": null,
-      "nav_date": "IDCW-Re-investment",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Open Ended Schemes(Debt Scheme - Banking and PSU Fund)"
-    },
-    {
-      "scheme_code": "119552",
-      "isin_primary": "INF209K01YM2",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life Banking & PSU Debt Fund",
-      "nav": null,
-      "nav_date": "MONTHLY DCW Payout",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Open Ended Schemes(Debt Scheme - Banking and PSU Fund)"
-    },
-    {
-      "scheme_code": "119553",
-      "isin_primary": "INF209K01YO8",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life Banking & PSU Debt Fund",
-      "nav": null,
-      "nav_date": "QUARTERLY IDCW Payout",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Open Ended Schemes(Debt Scheme - Banking and PSU Fund)"
-    },
-    {
-      "scheme_code": "108272",
-      "isin_primary": "INF209K01LX6",
-      "isin_secondary": "INF209KA11Z3",
-      "scheme_name": "Aditya Birla Sun Life Banking & PSU Debt Fund",
-      "nav": null,
-      "nav_date": "IDCW-Re-investment",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Open Ended Schemes(Debt Scheme - Banking and PSU Fund)"
-    },
-    {
-      "scheme_code": "110282",
-      "isin_primary": "INF209K01LU2",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life Banking & PSU Debt Fund",
-      "nav": null,
-      "nav_date": "MONTHLY IDCW Payout",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Open Ended Schemes(Debt Scheme - Banking and PSU Fund)"
-    },
-    {
-      "scheme_code": "108274",
-      "isin_primary": "INF209K01LN7",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life Banking & PSU Debt Fund",
-      "nav": null,
-      "nav_date": "QUARTERLY IDCW Payout",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Open Ended Schemes(Debt Scheme - Banking and PSU Fund)"
-    },
-    {
-      "scheme_code": "108273",
-      "isin_primary": "INF209K01LV0",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life Banking & PSU Debt Fund",
-      "nav": null,
-      "nav_date": "GROWTH",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Open Ended Schemes(Debt Scheme - Banking and PSU Fund)"
-    },
-    {
-      "scheme_code": "119550",
-      "isin_primary": "INF209K01YN0",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life Banking & PSU Debt Fund",
-      "nav": null,
-      "nav_date": "GROWTH",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Open Ended Schemes(Debt Scheme - Banking and PSU Fund)"
     },
     {
       "scheme_code": "129008",
@@ -4200,116 +4120,6 @@
       "nav_date": "Half-yearly IDCW Option",
       "amc": "Union Mutual Fund",
       "category": "Open Ended Schemes(Debt Scheme - Gilt Fund)"
-    },
-    {
-      "scheme_code": "100047",
-      "isin_primary": "INF209K01RU9",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life Liquid Fund",
-      "nav": null,
-      "nav_date": "GROWTH",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Open Ended Schemes(Debt Scheme - Liquid Fund)"
-    },
-    {
-      "scheme_code": "119568",
-      "isin_primary": "INF209K01VA3",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life Liquid Fund",
-      "nav": null,
-      "nav_date": "GROWTH",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Open Ended Schemes(Debt Scheme - Liquid Fund)"
-    },
-    {
-      "scheme_code": "100046",
-      "isin_primary": "INF209K01KQ2",
-      "isin_secondary": "INF209K01SQ5",
-      "scheme_name": "Aditya Birla Sun Life Liquid Fund",
-      "nav": null,
-      "nav_date": "Daily IDCW",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Open Ended Schemes(Debt Scheme - Liquid Fund)"
-    },
-    {
-      "scheme_code": "119569",
-      "isin_primary": "INF209K01UZ2",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life Liquid Fund",
-      "nav": null,
-      "nav_date": "Daily IDCW",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Open Ended Schemes(Debt Scheme - Liquid Fund)"
-    },
-    {
-      "scheme_code": "119571",
-      "isin_primary": "INF209K01VD7",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life Liquid Fund",
-      "nav": null,
-      "nav_date": "IDCW",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Open Ended Schemes(Debt Scheme - Liquid Fund)"
-    },
-    {
-      "scheme_code": "119570",
-      "isin_primary": "INF209K01VC9",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life Liquid Fund",
-      "nav": null,
-      "nav_date": "Weekly IDCW",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Open Ended Schemes(Debt Scheme - Liquid Fund)"
-    },
-    {
-      "scheme_code": "100041",
-      "isin_primary": "",
-      "isin_secondary": "INF209K01KN9",
-      "scheme_name": "Aditya Birla Sun Life Liquid Fund",
-      "nav": null,
-      "nav_date": "",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Open Ended Schemes(Debt Scheme - Liquid Fund)"
-    },
-    {
-      "scheme_code": "100048",
-      "isin_primary": "INF209KA1LK7",
-      "isin_secondary": "INF209K01KY6",
-      "scheme_name": "Aditya Birla Sun Life Liquid Fund",
-      "nav": null,
-      "nav_date": "",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Open Ended Schemes(Debt Scheme - Liquid Fund)"
-    },
-    {
-      "scheme_code": "103885",
-      "isin_primary": "INF209KA1LI1",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life Liquid Fund",
-      "nav": null,
-      "nav_date": "IDCW",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Open Ended Schemes(Debt Scheme - Liquid Fund)"
-    },
-    {
-      "scheme_code": "100044",
-      "isin_primary": "",
-      "isin_secondary": "INF209K01KP4",
-      "scheme_name": "Aditya Birla Sun Life Liquid Fund",
-      "nav": null,
-      "nav_date": "",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Open Ended Schemes(Debt Scheme - Liquid Fund)"
-    },
-    {
-      "scheme_code": "100051",
-      "isin_primary": "INF209K01KU4",
-      "isin_secondary": "INF209KA1LJ9",
-      "scheme_name": "Aditya Birla Sun Life Liquid Fund",
-      "nav": null,
-      "nav_date": "Weekly IDCW",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Open Ended Schemes(Debt Scheme - Liquid Fund)"
     },
     {
       "scheme_code": "151835",
@@ -20542,46 +20352,6 @@
       "category": "Open Ended Schemes(Equity Scheme - Sectoral/ Thematic)"
     },
     {
-      "scheme_code": "119576",
-      "isin_primary": "INF209K01VL0",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life Commodity Equities Fund - Global Agri Plan",
-      "nav": null,
-      "nav_date": "",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Open Ended Schemes(Equity Scheme - Sectoral/ Thematic)"
-    },
-    {
-      "scheme_code": "111349",
-      "isin_primary": "INF209K01207",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life Commodity Equities Fund - Global Agri Plan",
-      "nav": null,
-      "nav_date": "",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Open Ended Schemes(Equity Scheme - Sectoral/ Thematic)"
-    },
-    {
-      "scheme_code": "119575",
-      "isin_primary": "INF209K01P64",
-      "isin_secondary": "INF209K01VM8",
-      "scheme_name": "Aditya Birla Sun Life Commodity Equities Fund - Global Agri Plan",
-      "nav": null,
-      "nav_date": "",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Open Ended Schemes(Equity Scheme - Sectoral/ Thematic)"
-    },
-    {
-      "scheme_code": "111348",
-      "isin_primary": "INF209K01199",
-      "isin_secondary": "INF209K01CG0",
-      "scheme_name": "Aditya Birla Sun Life Commodity Equities Fund - Global Agri Plan",
-      "nav": null,
-      "nav_date": "",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Open Ended Schemes(Equity Scheme - Sectoral/ Thematic)"
-    },
-    {
       "scheme_code": "153124",
       "isin_primary": "INF209KC1373",
       "isin_secondary": "",
@@ -20818,46 +20588,6 @@
       "scheme_name": "Aditya Birla Sun Life International Equity Fund",
       "nav": null,
       "nav_date": "IDCW",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Open Ended Schemes(Equity Scheme - Sectoral/ Thematic)"
-    },
-    {
-      "scheme_code": "119519",
-      "isin_primary": "INF209K01Q97",
-      "isin_secondary": "INF209K01WV7",
-      "scheme_name": "Aditya Birla Sun Life International Equity Fund Plan B",
-      "nav": null,
-      "nav_date": "",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Open Ended Schemes(Equity Scheme - Sectoral/ Thematic)"
-    },
-    {
-      "scheme_code": "119518",
-      "isin_primary": "INF209K01WU9",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life International Equity Fund Plan B",
-      "nav": null,
-      "nav_date": "",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Open Ended Schemes(Equity Scheme - Sectoral/ Thematic)"
-    },
-    {
-      "scheme_code": "106876",
-      "isin_primary": "INF209K01546",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life International Equity Fund Plan B",
-      "nav": null,
-      "nav_date": "",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Open Ended Schemes(Equity Scheme - Sectoral/ Thematic)"
-    },
-    {
-      "scheme_code": "106875",
-      "isin_primary": "INF209K01538",
-      "isin_secondary": "INF209K01CW7",
-      "scheme_name": "Aditya Birla Sun Life International Equity Fund Plan B",
-      "nav": null,
-      "nav_date": "",
       "amc": "Aditya Birla Sun Life Mutual Fund",
       "category": "Open Ended Schemes(Equity Scheme - Sectoral/ Thematic)"
     },
@@ -41082,6 +40812,46 @@
       "category": "Open Ended Schemes(Fund of Funds Scheme (Domestic) - Fund of Funds Scheme (Domestic))"
     },
     {
+      "scheme_code": "154727",
+      "isin_primary": "INF680P01653",
+      "isin_secondary": "",
+      "scheme_name": "Shriram Gold ETF Passive FOF",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Shriram Mutual Fund",
+      "category": "Open Ended Schemes(Fund of Funds Scheme (Domestic) - Fund of Funds Scheme (Domestic))"
+    },
+    {
+      "scheme_code": "154726",
+      "isin_primary": "",
+      "isin_secondary": "INF680P01695",
+      "scheme_name": "Shriram Gold ETF Passive FOF",
+      "nav": null,
+      "nav_date": "IDCWREINVESTMENT",
+      "amc": "Shriram Mutual Fund",
+      "category": "Open Ended Schemes(Fund of Funds Scheme (Domestic) - Fund of Funds Scheme (Domestic))"
+    },
+    {
+      "scheme_code": "154724",
+      "isin_primary": "INF680P01661",
+      "isin_secondary": "",
+      "scheme_name": "Shriram Gold ETF Passive FOF",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Shriram Mutual Fund",
+      "category": "Open Ended Schemes(Fund of Funds Scheme (Domestic) - Fund of Funds Scheme (Domestic))"
+    },
+    {
+      "scheme_code": "154728",
+      "isin_primary": "",
+      "isin_secondary": "INF680P01703",
+      "scheme_name": "Shriram Gold ETF Passive FOF",
+      "nav": null,
+      "nav_date": "REINVESTMENT",
+      "amc": "Shriram Mutual Fund",
+      "category": "Open Ended Schemes(Fund of Funds Scheme (Domestic) - Fund of Funds Scheme (Domestic))"
+    },
+    {
       "scheme_code": "154409",
       "isin_primary": "INF277KA1EV6",
       "isin_secondary": "",
@@ -53822,6 +53592,86 @@
       "category": "Open Ended Schemes(Income/Debt Oriented Schemes - 10-year Constant Maturity Gilt Fund)"
     },
     {
+      "scheme_code": "119551",
+      "isin_primary": "INF209KA12Z1",
+      "isin_secondary": "INF209KA13Z9",
+      "scheme_name": "Aditya Birla Sun Life Banking & PSU Debt Fund",
+      "nav": null,
+      "nav_date": "IDCW-Re-investment",
+      "amc": "Aditya Birla Sun Life Mutual Fund",
+      "category": "Open Ended Schemes(Income/Debt Oriented Schemes - Banking and PSU Debt Fund)"
+    },
+    {
+      "scheme_code": "119552",
+      "isin_primary": "INF209K01YM2",
+      "isin_secondary": "",
+      "scheme_name": "Aditya Birla Sun Life Banking & PSU Debt Fund",
+      "nav": null,
+      "nav_date": "MONTHLY DCW Payout",
+      "amc": "Aditya Birla Sun Life Mutual Fund",
+      "category": "Open Ended Schemes(Income/Debt Oriented Schemes - Banking and PSU Debt Fund)"
+    },
+    {
+      "scheme_code": "119553",
+      "isin_primary": "INF209K01YO8",
+      "isin_secondary": "",
+      "scheme_name": "Aditya Birla Sun Life Banking & PSU Debt Fund",
+      "nav": null,
+      "nav_date": "QUARTERLY IDCW Payout",
+      "amc": "Aditya Birla Sun Life Mutual Fund",
+      "category": "Open Ended Schemes(Income/Debt Oriented Schemes - Banking and PSU Debt Fund)"
+    },
+    {
+      "scheme_code": "108272",
+      "isin_primary": "INF209K01LX6",
+      "isin_secondary": "INF209KA11Z3",
+      "scheme_name": "Aditya Birla Sun Life Banking & PSU Debt Fund",
+      "nav": null,
+      "nav_date": "IDCW-Re-investment",
+      "amc": "Aditya Birla Sun Life Mutual Fund",
+      "category": "Open Ended Schemes(Income/Debt Oriented Schemes - Banking and PSU Debt Fund)"
+    },
+    {
+      "scheme_code": "110282",
+      "isin_primary": "INF209K01LU2",
+      "isin_secondary": "",
+      "scheme_name": "Aditya Birla Sun Life Banking & PSU Debt Fund",
+      "nav": null,
+      "nav_date": "MONTHLY IDCW Payout",
+      "amc": "Aditya Birla Sun Life Mutual Fund",
+      "category": "Open Ended Schemes(Income/Debt Oriented Schemes - Banking and PSU Debt Fund)"
+    },
+    {
+      "scheme_code": "108274",
+      "isin_primary": "INF209K01LN7",
+      "isin_secondary": "",
+      "scheme_name": "Aditya Birla Sun Life Banking & PSU Debt Fund",
+      "nav": null,
+      "nav_date": "QUARTERLY IDCW Payout",
+      "amc": "Aditya Birla Sun Life Mutual Fund",
+      "category": "Open Ended Schemes(Income/Debt Oriented Schemes - Banking and PSU Debt Fund)"
+    },
+    {
+      "scheme_code": "108273",
+      "isin_primary": "INF209K01LV0",
+      "isin_secondary": "",
+      "scheme_name": "Aditya Birla Sun Life Banking & PSU Debt Fund",
+      "nav": null,
+      "nav_date": "GROWTH",
+      "amc": "Aditya Birla Sun Life Mutual Fund",
+      "category": "Open Ended Schemes(Income/Debt Oriented Schemes - Banking and PSU Debt Fund)"
+    },
+    {
+      "scheme_code": "119550",
+      "isin_primary": "INF209K01YN0",
+      "isin_secondary": "",
+      "scheme_name": "Aditya Birla Sun Life Banking & PSU Debt Fund",
+      "nav": null,
+      "nav_date": "GROWTH",
+      "amc": "Aditya Birla Sun Life Mutual Fund",
+      "category": "Open Ended Schemes(Income/Debt Oriented Schemes - Banking and PSU Debt Fund)"
+    },
+    {
       "scheme_code": "128952",
       "isin_primary": "INF846K01NF8",
       "isin_secondary": "",
@@ -60352,6 +60202,86 @@
       "category": "Open Ended Schemes(Income/Debt Oriented Schemes - Liquid Fund)"
     },
     {
+      "scheme_code": "100047",
+      "isin_primary": "INF209K01RU9",
+      "isin_secondary": "",
+      "scheme_name": "Aditya Birla Sun Life Liquid Fund",
+      "nav": null,
+      "nav_date": "GROWTH",
+      "amc": "Aditya Birla Sun Life Mutual Fund",
+      "category": "Open Ended Schemes(Income/Debt Oriented Schemes - Liquid Fund)"
+    },
+    {
+      "scheme_code": "119568",
+      "isin_primary": "INF209K01VA3",
+      "isin_secondary": "",
+      "scheme_name": "Aditya Birla Sun Life Liquid Fund",
+      "nav": null,
+      "nav_date": "GROWTH",
+      "amc": "Aditya Birla Sun Life Mutual Fund",
+      "category": "Open Ended Schemes(Income/Debt Oriented Schemes - Liquid Fund)"
+    },
+    {
+      "scheme_code": "100046",
+      "isin_primary": "INF209K01KQ2",
+      "isin_secondary": "INF209K01SQ5",
+      "scheme_name": "Aditya Birla Sun Life Liquid Fund",
+      "nav": null,
+      "nav_date": "Daily IDCW",
+      "amc": "Aditya Birla Sun Life Mutual Fund",
+      "category": "Open Ended Schemes(Income/Debt Oriented Schemes - Liquid Fund)"
+    },
+    {
+      "scheme_code": "119569",
+      "isin_primary": "INF209K01UZ2",
+      "isin_secondary": "",
+      "scheme_name": "Aditya Birla Sun Life Liquid Fund",
+      "nav": null,
+      "nav_date": "Daily IDCW",
+      "amc": "Aditya Birla Sun Life Mutual Fund",
+      "category": "Open Ended Schemes(Income/Debt Oriented Schemes - Liquid Fund)"
+    },
+    {
+      "scheme_code": "119571",
+      "isin_primary": "INF209K01VD7",
+      "isin_secondary": "",
+      "scheme_name": "Aditya Birla Sun Life Liquid Fund",
+      "nav": null,
+      "nav_date": "IDCW",
+      "amc": "Aditya Birla Sun Life Mutual Fund",
+      "category": "Open Ended Schemes(Income/Debt Oriented Schemes - Liquid Fund)"
+    },
+    {
+      "scheme_code": "119570",
+      "isin_primary": "INF209K01VC9",
+      "isin_secondary": "",
+      "scheme_name": "Aditya Birla Sun Life Liquid Fund",
+      "nav": null,
+      "nav_date": "Weekly IDCW",
+      "amc": "Aditya Birla Sun Life Mutual Fund",
+      "category": "Open Ended Schemes(Income/Debt Oriented Schemes - Liquid Fund)"
+    },
+    {
+      "scheme_code": "103885",
+      "isin_primary": "INF209KA1LI1",
+      "isin_secondary": "",
+      "scheme_name": "Aditya Birla Sun Life Liquid Fund",
+      "nav": null,
+      "nav_date": "IDCW",
+      "amc": "Aditya Birla Sun Life Mutual Fund",
+      "category": "Open Ended Schemes(Income/Debt Oriented Schemes - Liquid Fund)"
+    },
+    {
+      "scheme_code": "100051",
+      "isin_primary": "INF209K01KU4",
+      "isin_secondary": "INF209KA1LJ9",
+      "scheme_name": "Aditya Birla Sun Life Liquid Fund",
+      "nav": null,
+      "nav_date": "Weekly IDCW",
+      "amc": "Aditya Birla Sun Life Mutual Fund",
+      "category": "Open Ended Schemes(Income/Debt Oriented Schemes - Liquid Fund)"
+    },
+    {
       "scheme_code": "154591",
       "isin_primary": "",
       "isin_secondary": "INF2XUU01039",
@@ -63912,16 +63842,6 @@
       "category": "Open Ended Schemes(Income/Debt Oriented Schemes - Medium Term Fund)"
     },
     {
-      "scheme_code": "111777",
-      "isin_primary": "INF209K01LD8",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life Medium to Long Term Fund",
-      "nav": null,
-      "nav_date": "",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Open Ended Schemes(Income/Debt Oriented Schemes - Medium to Long Term Fund)"
-    },
-    {
       "scheme_code": "133446",
       "isin_primary": "INF209KA1WL2",
       "isin_secondary": "INF209KA1WM0",
@@ -64948,16 +64868,6 @@
       "scheme_name": "Aditya Birla Sun Life Money Market Fund",
       "nav": null,
       "nav_date": "GROWTH",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Open Ended Schemes(Income/Debt Oriented Schemes - Money Market Fund)"
-    },
-    {
-      "scheme_code": "101972",
-      "isin_primary": "",
-      "isin_secondary": "INF209K01JZ5",
-      "scheme_name": "Aditya Birla Sun Life Money Market Fund",
-      "nav": null,
-      "nav_date": "",
       "amc": "Aditya Birla Sun Life Mutual Fund",
       "category": "Open Ended Schemes(Income/Debt Oriented Schemes - Money Market Fund)"
     },
@@ -68960,16 +68870,6 @@
       "nav_date": "Monthly IDCW",
       "amc": "UTI Mutual Fund",
       "category": "Open Ended Schemes(Income/Debt Oriented Schemes - Short Term Fund)"
-    },
-    {
-      "scheme_code": "112016",
-      "isin_primary": "INF209K01JT8",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life Ultra Short Term Fund",
-      "nav": null,
-      "nav_date": "",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Open Ended Schemes(Income/Debt Oriented Schemes - Ultra Short Term Fund)"
     },
     {
       "scheme_code": "119501",
@@ -76142,6 +76042,46 @@
       "category": "Open Ended Schemes(Index Funds - Equity Funds)"
     },
     {
+      "scheme_code": "154145",
+      "isin_primary": "INF174KA1YP0",
+      "isin_secondary": "",
+      "scheme_name": "Kotak Nifty200 Value 30 Index Fund",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Kotak Mahindra Mutual Fund",
+      "category": "Open Ended Schemes(Index Funds - Equity Funds)"
+    },
+    {
+      "scheme_code": "154146",
+      "isin_primary": "INF174KA1YQ8",
+      "isin_secondary": "INF174KA1YR6",
+      "scheme_name": "Kotak Nifty200 Value 30 Index Fund",
+      "nav": null,
+      "nav_date": "IDCW",
+      "amc": "Kotak Mahindra Mutual Fund",
+      "category": "Open Ended Schemes(Index Funds - Equity Funds)"
+    },
+    {
+      "scheme_code": "154148",
+      "isin_primary": "INF174KA1YS4",
+      "isin_secondary": "",
+      "scheme_name": "Kotak Nifty200 Value 30 Index Fund",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Kotak Mahindra Mutual Fund",
+      "category": "Open Ended Schemes(Index Funds - Equity Funds)"
+    },
+    {
+      "scheme_code": "154147",
+      "isin_primary": "INF174KA1YT2",
+      "isin_secondary": "INF174KA1YU0",
+      "scheme_name": "Kotak Nifty200 Value 30 Index Fund",
+      "nav": null,
+      "nav_date": "IDCW",
+      "amc": "Kotak Mahindra Mutual Fund",
+      "category": "Open Ended Schemes(Index Funds - Equity Funds)"
+    },
+    {
       "scheme_code": "154720",
       "isin_primary": "INF769K01RO5",
       "isin_secondary": "",
@@ -81622,46 +81562,6 @@
       "category": "Open Ended Schemes(Other Scheme - Index Funds)"
     },
     {
-      "scheme_code": "150938",
-      "isin_primary": "INF209KB10P4",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life Crisil IBX 60:40 SDL+ AAA PSU APR 2026 Index Fund",
-      "nav": null,
-      "nav_date": "",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Open Ended Schemes(Other Scheme - Index Funds)"
-    },
-    {
-      "scheme_code": "150939",
-      "isin_primary": "INF209KB11P2",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life Crisil IBX 60:40 SDL+ AAA PSU APR 2026 Index Fund",
-      "nav": null,
-      "nav_date": "",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Open Ended Schemes(Other Scheme - Index Funds)"
-    },
-    {
-      "scheme_code": "150936",
-      "isin_primary": "INF209KB18O0",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life Crisil IBX 60:40 SDL+ AAA PSU APR 2026 Index Fund",
-      "nav": null,
-      "nav_date": "",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Open Ended Schemes(Other Scheme - Index Funds)"
-    },
-    {
-      "scheme_code": "150937",
-      "isin_primary": "INF209KB19O8",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life Crisil IBX 60:40 SDL+ AAA PSU APR 2026 Index Fund",
-      "nav": null,
-      "nav_date": "",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Open Ended Schemes(Other Scheme - Index Funds)"
-    },
-    {
       "scheme_code": "150353",
       "isin_primary": "INF209KB19H2",
       "isin_secondary": "",
@@ -81858,46 +81758,6 @@
       "scheme_name": "Aditya Birla Sun Life Crisil IBX Gilt June 2027 Index Fund",
       "nav": null,
       "nav_date": "IDCW Payout",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Open Ended Schemes(Other Scheme - Index Funds)"
-    },
-    {
-      "scheme_code": "150699",
-      "isin_primary": "INF209KB11N7",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life Crisil IBX Gilt-April 2026 Index Fund",
-      "nav": null,
-      "nav_date": "",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Open Ended Schemes(Other Scheme - Index Funds)"
-    },
-    {
-      "scheme_code": "150698",
-      "isin_primary": "INF209KB10N9",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life Crisil IBX Gilt-April 2026 Index Fund",
-      "nav": null,
-      "nav_date": "GROWTH",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Open Ended Schemes(Other Scheme - Index Funds)"
-    },
-    {
-      "scheme_code": "150701",
-      "isin_primary": "INF209KB18M4",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life Crisil IBX Gilt-April 2026 Index Fund",
-      "nav": null,
-      "nav_date": "",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Open Ended Schemes(Other Scheme - Index Funds)"
-    },
-    {
-      "scheme_code": "150700",
-      "isin_primary": "INF209KB19M2",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life Crisil IBX Gilt-April 2026 Index Fund",
-      "nav": null,
-      "nav_date": "",
       "amc": "Aditya Birla Sun Life Mutual Fund",
       "category": "Open Ended Schemes(Other Scheme - Index Funds)"
     },
@@ -82208,46 +82068,6 @@
       "scheme_name": "Aditya Birla Sun Life Nifty SDL Plus PSU Bond SEP 2026 60:40 Index Fund",
       "nav": null,
       "nav_date": "IDCW Payout",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Open Ended Schemes(Other Scheme - Index Funds)"
-    },
-    {
-      "scheme_code": "150663",
-      "isin_primary": "INF209KB10M1",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life Nifty SDL SEP 2025 Index Fund",
-      "nav": null,
-      "nav_date": "",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Open Ended Schemes(Other Scheme - Index Funds)"
-    },
-    {
-      "scheme_code": "150664",
-      "isin_primary": "INF209KB11M9",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life Nifty SDL SEP 2025 Index Fund",
-      "nav": null,
-      "nav_date": "",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Open Ended Schemes(Other Scheme - Index Funds)"
-    },
-    {
-      "scheme_code": "150665",
-      "isin_primary": "INF209KB18L6",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life Nifty SDL SEP 2025 Index Fund",
-      "nav": null,
-      "nav_date": "",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Open Ended Schemes(Other Scheme - Index Funds)"
-    },
-    {
-      "scheme_code": "150667",
-      "isin_primary": "INF209KB19L4",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life Nifty SDL SEP 2025 Index Fund",
-      "nav": null,
-      "nav_date": "",
       "amc": "Aditya Birla Sun Life Mutual Fund",
       "category": "Open Ended Schemes(Other Scheme - Index Funds)"
     },
@@ -87948,46 +87768,6 @@
       "scheme_name": "Kotak Nifty Top 10 Equal Weight Index Fund",
       "nav": null,
       "nav_date": "IDCW-Payout and Reinvestment",
-      "amc": "Kotak Mahindra Mutual Fund",
-      "category": "Open Ended Schemes(Other Scheme - Index Funds)"
-    },
-    {
-      "scheme_code": "154145",
-      "isin_primary": "INF174KA1YP0",
-      "isin_secondary": "",
-      "scheme_name": "Kotak Nifty200 Value 30 Index Fund",
-      "nav": null,
-      "nav_date": "Growth",
-      "amc": "Kotak Mahindra Mutual Fund",
-      "category": "Open Ended Schemes(Other Scheme - Index Funds)"
-    },
-    {
-      "scheme_code": "154146",
-      "isin_primary": "INF174KA1YQ8",
-      "isin_secondary": "INF174KA1YR6",
-      "scheme_name": "Kotak Nifty200 Value 30 Index Fund",
-      "nav": null,
-      "nav_date": "IDCW",
-      "amc": "Kotak Mahindra Mutual Fund",
-      "category": "Open Ended Schemes(Other Scheme - Index Funds)"
-    },
-    {
-      "scheme_code": "154148",
-      "isin_primary": "INF174KA1YS4",
-      "isin_secondary": "",
-      "scheme_name": "Kotak Nifty200 Value 30 Index Fund",
-      "nav": null,
-      "nav_date": "Growth",
-      "amc": "Kotak Mahindra Mutual Fund",
-      "category": "Open Ended Schemes(Other Scheme - Index Funds)"
-    },
-    {
-      "scheme_code": "154147",
-      "isin_primary": "INF174KA1YT2",
-      "isin_secondary": "INF174KA1YU0",
-      "scheme_name": "Kotak Nifty200 Value 30 Index Fund",
-      "nav": null,
-      "nav_date": "IDCW",
       "amc": "Kotak Mahindra Mutual Fund",
       "category": "Open Ended Schemes(Other Scheme - Index Funds)"
     },
@@ -100122,126 +99902,6 @@
       "category": "Close Ended Schemes(Growth)"
     },
     {
-      "scheme_code": "152250",
-      "isin_primary": "INF209KB11Y4",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life Fixed Maturity Plan - Series UQ (92 days)",
-      "nav": null,
-      "nav_date": "",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Close Ended Schemes(Income)"
-    },
-    {
-      "scheme_code": "152251",
-      "isin_primary": "INF209KB12Y2",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life Fixed Maturity Plan - Series UQ (92 days)",
-      "nav": null,
-      "nav_date": "",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Close Ended Schemes(Income)"
-    },
-    {
-      "scheme_code": "152253",
-      "isin_primary": "INF209KB19X9",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life Fixed Maturity Plan - Series UQ (92 days)",
-      "nav": null,
-      "nav_date": "",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Close Ended Schemes(Income)"
-    },
-    {
-      "scheme_code": "152252",
-      "isin_primary": "INF209KB10Y6",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life Fixed Maturity Plan - Series UQ (92 days)",
-      "nav": null,
-      "nav_date": "",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Close Ended Schemes(Income)"
-    },
-    {
-      "scheme_code": "152259",
-      "isin_primary": "INF209KB15Y5",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life Fixed Maturity Plan - Series UR (85 days)",
-      "nav": null,
-      "nav_date": "",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Close Ended Schemes(Income)"
-    },
-    {
-      "scheme_code": "152262",
-      "isin_primary": "INF209KB16Y3",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life Fixed Maturity Plan - Series UR (85 days)",
-      "nav": null,
-      "nav_date": "",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Close Ended Schemes(Income)"
-    },
-    {
-      "scheme_code": "152260",
-      "isin_primary": "INF209KB13Y0",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life Fixed Maturity Plan - Series UR (85 days)",
-      "nav": null,
-      "nav_date": "",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Close Ended Schemes(Income)"
-    },
-    {
-      "scheme_code": "152261",
-      "isin_primary": "INF209KB14Y8",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life Fixed Maturity Plan - Series UR (85 days)",
-      "nav": null,
-      "nav_date": "",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Close Ended Schemes(Income)"
-    },
-    {
-      "scheme_code": "152332",
-      "isin_primary": "INF209KB13Z7",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life Fixed Maturity Plan - Series US (100 days)",
-      "nav": null,
-      "nav_date": "",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Close Ended Schemes(Income)"
-    },
-    {
-      "scheme_code": "152333",
-      "isin_primary": "INF209KB14Z5",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life Fixed Maturity Plan - Series US (100 days)",
-      "nav": null,
-      "nav_date": "",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Close Ended Schemes(Income)"
-    },
-    {
-      "scheme_code": "152334",
-      "isin_primary": "INF209KB11Z1",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life Fixed Maturity Plan - Series US (100 days)",
-      "nav": null,
-      "nav_date": "",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Close Ended Schemes(Income)"
-    },
-    {
-      "scheme_code": "152335",
-      "isin_primary": "INF209KB12Z9",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life Fixed Maturity Plan - Series US (100 days)",
-      "nav": null,
-      "nav_date": "",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Close Ended Schemes(Income)"
-    },
-    {
       "scheme_code": "149017",
       "isin_primary": "INF209KB12A2",
       "isin_secondary": "",
@@ -100346,116 +100006,6 @@
       "isin_primary": "INF209KB13H5",
       "isin_secondary": "",
       "scheme_name": "Aditya Birla Sun Life Fixed Term Plan - Series TQ (1879 days)",
-      "nav": null,
-      "nav_date": "",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Close Ended Schemes(Income)"
-    },
-    {
-      "scheme_code": "151186",
-      "isin_primary": "INF209KB18P7",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life Fixed Term Plan - Series UB (1224 days)",
-      "nav": null,
-      "nav_date": "",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Close Ended Schemes(Income)"
-    },
-    {
-      "scheme_code": "151189",
-      "isin_primary": "INF209KB17P9",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life Fixed Term Plan - Series UB (1224 days)",
-      "nav": null,
-      "nav_date": "",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Close Ended Schemes(Income)"
-    },
-    {
-      "scheme_code": "151188",
-      "isin_primary": "INF209KB16P1",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life Fixed Term Plan - Series UB (1224 days)",
-      "nav": null,
-      "nav_date": "",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Close Ended Schemes(Income)"
-    },
-    {
-      "scheme_code": "151519",
-      "isin_primary": "INF209KB18S1",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life Fixed Term Plan - Series UF (180 days)",
-      "nav": null,
-      "nav_date": "",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Close Ended Schemes(Income)"
-    },
-    {
-      "scheme_code": "151522",
-      "isin_primary": "INF209KB19S9",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life Fixed Term Plan - Series UF (180 days)",
-      "nav": null,
-      "nav_date": "",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Close Ended Schemes(Income)"
-    },
-    {
-      "scheme_code": "151521",
-      "isin_primary": "INF209KB16S5",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life Fixed Term Plan - Series UF (180 days)",
-      "nav": null,
-      "nav_date": "",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Close Ended Schemes(Income)"
-    },
-    {
-      "scheme_code": "151520",
-      "isin_primary": "INF209KB17S3",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life Fixed Term Plan - Series UF (180 days)",
-      "nav": null,
-      "nav_date": "",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Close Ended Schemes(Income)"
-    },
-    {
-      "scheme_code": "151700",
-      "isin_primary": "INF209KB13V6",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life Fixed Term Plan - Series UJ (1110 days)",
-      "nav": null,
-      "nav_date": "",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Close Ended Schemes(Income)"
-    },
-    {
-      "scheme_code": "151702",
-      "isin_primary": "INF209KB14V4",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life Fixed Term Plan - Series UJ (1110 days)",
-      "nav": null,
-      "nav_date": "",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Close Ended Schemes(Income)"
-    },
-    {
-      "scheme_code": "151703",
-      "isin_primary": "INF209KB11V0",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life Fixed Term Plan - Series UJ (1110 days)",
-      "nav": null,
-      "nav_date": "",
-      "amc": "Aditya Birla Sun Life Mutual Fund",
-      "category": "Close Ended Schemes(Income)"
-    },
-    {
-      "scheme_code": "151701",
-      "isin_primary": "INF209KB12V8",
-      "isin_secondary": "",
-      "scheme_name": "Aditya Birla Sun Life Fixed Term Plan - Series UJ (1110 days)",
       "nav": null,
       "nav_date": "",
       "amc": "Aditya Birla Sun Life Mutual Fund",
