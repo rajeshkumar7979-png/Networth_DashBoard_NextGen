@@ -1,5 +1,5 @@
 {
-  "fetched_at": "2026-10-01T11:07:55+00:00",
+  "fetched_at": "2026-10-02T10:41:24+00:00",
   "rows": [
     {
       "scheme_code": "135762",
@@ -37622,6 +37622,16 @@
       "category": "Open Ended Schemes(Exchange Traded Funds (ETFs) - Equity ETF)"
     },
     {
+      "scheme_code": "154768",
+      "isin_primary": "INF740KA1ZR8",
+      "isin_secondary": "",
+      "scheme_name": "DSP BSE Insurance ETF",
+      "nav": null,
+      "nav_date": "",
+      "amc": "DSP Mutual Fund",
+      "category": "Open Ended Schemes(Exchange Traded Funds (ETFs) - Equity ETF)"
+    },
+    {
       "scheme_code": "154528",
       "isin_primary": "INF740KA1ZH9",
       "isin_secondary": "",
@@ -39928,6 +39938,46 @@
       "scheme_name": "Kotak Multi Asset Active FOF",
       "nav": null,
       "nav_date": "IDCW",
+      "amc": "Kotak Mahindra Mutual Fund",
+      "category": "Open Ended Schemes(Fund of Funds Scheme (Domestic) - Fund of Funds Scheme (Domestic))"
+    },
+    {
+      "scheme_code": "154730",
+      "isin_primary": "INF174KA1F40",
+      "isin_secondary": "",
+      "scheme_name": "Kotak Multi Sector Omni FOF",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Kotak Mahindra Mutual Fund",
+      "category": "Open Ended Schemes(Fund of Funds Scheme (Domestic) - Fund of Funds Scheme (Domestic))"
+    },
+    {
+      "scheme_code": "154732",
+      "isin_primary": "INF174KA1F57",
+      "isin_secondary": "INF174KA1F65",
+      "scheme_name": "Kotak Multi Sector Omni FOF",
+      "nav": null,
+      "nav_date": "IDCW - Dividend Payout & Reinvestment",
+      "amc": "Kotak Mahindra Mutual Fund",
+      "category": "Open Ended Schemes(Fund of Funds Scheme (Domestic) - Fund of Funds Scheme (Domestic))"
+    },
+    {
+      "scheme_code": "154731",
+      "isin_primary": "INF174KA1F73",
+      "isin_secondary": "",
+      "scheme_name": "Kotak Multi Sector Omni FOF",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Kotak Mahindra Mutual Fund",
+      "category": "Open Ended Schemes(Fund of Funds Scheme (Domestic) - Fund of Funds Scheme (Domestic))"
+    },
+    {
+      "scheme_code": "154733",
+      "isin_primary": "INF174KA1F81",
+      "isin_secondary": "INF174KA1F99",
+      "scheme_name": "Kotak Multi Sector Omni FOF",
+      "nav": null,
+      "nav_date": "IDCW - Dividend Payout & Reinvestment",
       "amc": "Kotak Mahindra Mutual Fund",
       "category": "Open Ended Schemes(Fund of Funds Scheme (Domestic) - Fund of Funds Scheme (Domestic))"
     },
