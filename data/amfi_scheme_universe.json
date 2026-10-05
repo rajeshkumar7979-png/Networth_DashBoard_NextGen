@@ -1,5 +1,5 @@
 {
-  "fetched_at": "2026-10-04T10:43:31+00:00",
+  "fetched_at": "2026-10-05T11:46:43+00:00",
   "rows": [
     {
       "scheme_code": "135762",
@@ -143490,86 +143490,6 @@
       "nav_date": "",
       "amc": "UTI Mutual Fund",
       "category": "Close Ended Schemes(Income)"
-    },
-    {
-      "scheme_code": "154240",
-      "isin_primary": "INF846KA1440",
-      "isin_secondary": "",
-      "scheme_name": "Axis Fixed Maturity Plan - Series 129 (108 Days)",
-      "nav": null,
-      "nav_date": "Growth Option",
-      "amc": "Axis Mutual Fund",
-      "category": "Close Ended Schemes(Income/Debt Oriented Schemes - Fixed Term Plan)"
-    },
-    {
-      "scheme_code": "154243",
-      "isin_primary": "INF846KA1465",
-      "isin_secondary": "",
-      "scheme_name": "Axis Fixed Maturity Plan - Series 129 (108 Days)",
-      "nav": null,
-      "nav_date": "IDCW Option",
-      "amc": "Axis Mutual Fund",
-      "category": "Close Ended Schemes(Income/Debt Oriented Schemes - Fixed Term Plan)"
-    },
-    {
-      "scheme_code": "154241",
-      "isin_primary": "INF846KA1432",
-      "isin_secondary": "",
-      "scheme_name": "Axis Fixed Maturity Plan - Series 129 (108 Days)",
-      "nav": null,
-      "nav_date": "Growth Option",
-      "amc": "Axis Mutual Fund",
-      "category": "Close Ended Schemes(Income/Debt Oriented Schemes - Fixed Term Plan)"
-    },
-    {
-      "scheme_code": "154242",
-      "isin_primary": "INF846KA1457",
-      "isin_secondary": "",
-      "scheme_name": "Axis Fixed Maturity Plan - Series 129 (108 Days)",
-      "nav": null,
-      "nav_date": "IDCW Option",
-      "amc": "Axis Mutual Fund",
-      "category": "Close Ended Schemes(Income/Debt Oriented Schemes - Fixed Term Plan)"
-    },
-    {
-      "scheme_code": "154292",
-      "isin_primary": "INF846KA1481",
-      "isin_secondary": "",
-      "scheme_name": "Axis Fixed Maturity Plan - Series 130 (92 Days)",
-      "nav": null,
-      "nav_date": "Growth Option",
-      "amc": "Axis Mutual Fund",
-      "category": "Close Ended Schemes(Income/Debt Oriented Schemes - Fixed Term Plan)"
-    },
-    {
-      "scheme_code": "154293",
-      "isin_primary": "INF846KA1507",
-      "isin_secondary": "",
-      "scheme_name": "Axis Fixed Maturity Plan - Series 130 (92 Days)",
-      "nav": null,
-      "nav_date": "IDCW Option",
-      "amc": "Axis Mutual Fund",
-      "category": "Close Ended Schemes(Income/Debt Oriented Schemes - Fixed Term Plan)"
-    },
-    {
-      "scheme_code": "154290",
-      "isin_primary": "INF846KA1473",
-      "isin_secondary": "",
-      "scheme_name": "Axis Fixed Maturity Plan - Series 130 (92 Days)",
-      "nav": null,
-      "nav_date": "Growth Option",
-      "amc": "Axis Mutual Fund",
-      "category": "Close Ended Schemes(Income/Debt Oriented Schemes - Fixed Term Plan)"
-    },
-    {
-      "scheme_code": "154291",
-      "isin_primary": "INF846KA1499",
-      "isin_secondary": "",
-      "scheme_name": "Axis Fixed Maturity Plan - Series 130 (92 Days)",
-      "nav": null,
-      "nav_date": "IDCW Option",
-      "amc": "Axis Mutual Fund",
-      "category": "Close Ended Schemes(Income/Debt Oriented Schemes - Fixed Term Plan)"
     },
     {
       "scheme_code": "151485",
