@@ -1,14 +1,8 @@
 # AI Research Provider v1 — orchestration pipeline.
 #
-# run_ai_research() is the single entry point invoked by the Command Center on
-# an EXPLICIT user action (a button press). It is never called during page
-# load. It owns every failure path:
-#   not configured  -> AIOutcome(status="not_configured")  [no network]
-#   empty evidence  -> AIOutcome(status="insufficient_evidence")  [no network]
-#   provider errors -> AIOutcome(status="failed")   [timeout/unavailable/HTTP]
-#   malformed text  -> AIOutcome(status="malformed")
-# In every non-ok outcome, `fallback_used` is True and the caller keeps using
-# the unchanged deterministic ResearchBrief.synthesis.
+# run_ai_research() is the single entry point invoked on an EXPLICIT user
+# action. facts/evidence are sent in a bounded block and still used to
+# validate claims. They are no longer validator-only.
 from __future__ import annotations
 
 import logging
@@ -39,6 +33,7 @@ from lib.intelligence.ai.config import (
     provider_is_configured,
     redact,
 )
+from lib.intelligence.ai.grounding import verified_context_block
 from lib.intelligence.ai.health import check_ollama_health, ollama_failure_hint
 from lib.intelligence.ai.model import (
     STATUS_FAILED,
@@ -58,9 +53,6 @@ from lib.intelligence.ai.validator import (
 )
 
 logger = logging.getLogger(__name__)
-
-# Bounded raw-response excerpt for the DEBUG log — never the full reply, and
-# always redacted so a stray key echo can never reach the logs (§8).
 _RAW_EXCERPT_LIMIT = 1500
 
 
@@ -83,12 +75,6 @@ def _has_research_content(brief) -> bool:
 
 
 def _fallback_config(primary_config: AIConfig) -> Optional[AIConfig]:
-    """Build an AIConfig for the wired fallback, if one exists.
-
-    Groq/openai_compat → keyless Ollama. Ollama → Groq only when a key is
-    already on the primary config (Streamlit secrets / AI_API_KEY). Returns
-    None when there is nowhere to cascade.
-    """
     if primary_config.provider == OLLAMA_LOCAL_PROVIDER and primary_config.api_key.strip():
         return AIConfig(
             api_key=primary_config.api_key,
@@ -105,7 +91,7 @@ def _fallback_config(primary_config: AIConfig) -> Optional[AIConfig]:
     if not fallback_name or fallback_name == primary_config.provider:
         return None
     return AIConfig(
-        api_key="",  # keyless local server
+        api_key="",
         provider=fallback_name,
         base_url=OLLAMA_BASE_URL,
         model=OLLAMA_MODEL,
@@ -149,6 +135,17 @@ def _ollama_is_up() -> bool:
     return bool(probe.get("ok"))
 
 
+def _with_verified_context(ctx, facts, evidence):
+    block, extra_ids = verified_context_block(facts, evidence)
+    if not block:
+        return ctx
+    ctx["user"] = ctx["user"] + "\n\n" + block
+    allowed = set(ctx.get("allowed_evidence_ids") or ())
+    allowed.update(extra_ids)
+    ctx["allowed_evidence_ids"] = frozenset(allowed)
+    return ctx
+
+
 def run_ai_research(
         *,
         brief,
@@ -158,17 +155,10 @@ def run_ai_research(
         evidence=(),
         question: Optional[str] = None,
         now: Optional[datetime] = None) -> AIOutcome:
-    """Explicitly invoke the AI research provider for one ResearchBrief.
+    """Invoke the AI provider for one ResearchBrief.
 
-    `facts`/`evidence` are the deterministic facts and evidence the page has
-    already built (exposure facts + EvidenceBag items); they are used only to
-    construct the Briefing for validate_claims — never sent to the provider.
-
-    Cascade: when the primary provider fails with a retriable network error
-    (timeout / connection refused) and no explicit client was injected, the
-    pipeline tries the wired fallback provider (Groq → Ollama local → "AI
-    unavailable"). An explicit ``client=`` override disables the cascade so
-    callers own the full failure path.
+    facts and evidence are included in the user prompt and remain the claim
+    validator inputs. An empty block is a no-op.
     """
     if now is None:
         now = getattr(brief, "as_of", None) or datetime.now()
@@ -200,6 +190,7 @@ def run_ai_research(
 
     ctx = build_context(brief=brief, question=question,
                         max_evidence=config.max_evidence_catalog)
+    ctx = _with_verified_context(ctx, facts, evidence)
     messages = (
         {"role": "system", "content": ctx["system"]},
         {"role": "user", "content": ctx["user"]},
@@ -215,9 +206,6 @@ def run_ai_research(
     response = None
     cli = client
 
-    # Local Ollama is keyless, so provider_is_configured is True even on a
-    # host with nothing listening on :11434 (Streamlit Cloud). Probe first
-    # on the default path so we never wait 180s or dump urllib internals.
     if client is None and config.provider == OLLAMA_LOCAL_PROVIDER and not _ollama_is_up():
         fb_cfg = _fallback_config(config)
         if fb_cfg is not None:
@@ -250,23 +238,20 @@ def run_ai_research(
     if response is None:
         cli = client if client is not None else build_client(config)
 
-    # --- primary provider --------------------------------------------------
     try:
         if response is None:
             response = cli.complete(request, api_key=config.api_key)
     except (AIProviderTimeout, AIProviderUnavailable) as exc:
-        # Retriable network error: try the wired fallback when no explicit
-        # client was injected (the CC button path uses client=None).
         if client is None:
             fb_cfg = _fallback_config(config)
             if fb_cfg is not None:
                 logger.debug(
-                    "AI research cascading %s -> %s after retriable "
-                    "failure", config.provider, fb_cfg.provider)
+                    "AI research cascading %s -> %s after retriable failure",
+                    config.provider, fb_cfg.provider)
                 try:
                     fb_cli = build_client(fb_cfg)
                     response = fb_cli.complete(request, api_key=fb_cfg.api_key)
-                except Exception:  # fallback also failed — fall through
+                except Exception:
                     pass
         if response is None:
             return AIOutcome(
@@ -286,13 +271,12 @@ def run_ai_research(
             model=config.model,
             fallback_used=True,
         )
-    except Exception as exc:  # defensive: never let an AI hiccup break the page
+    except Exception as exc:
         return AIOutcome(
             status=STATUS_FAILED,
             created_at=now,
             reason=_clean_reason(
-                f"Unexpected AI provider failure: "
-                f"{type(exc).__name__}: {exc}",
+                f"Unexpected AI provider failure: {type(exc).__name__}: {exc}",
                 config,
                 rewrite_local=(client is None),
             ),
@@ -303,7 +287,6 @@ def run_ai_research(
 
     latency_ms = (time.perf_counter() - start) * 1000.0
     mode = (response.meta or {}).get("format", "json_object")
-
     logger.debug(
         "AI research raw response (provider=%s model=%s mode=%s len=%d): %s",
         response.provider, response.model, mode, len(response.text),
