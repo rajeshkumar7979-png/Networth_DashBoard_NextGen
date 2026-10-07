@@ -10,8 +10,6 @@ st.set_page_config(
 )
 
 inject_css()
-# Desktop: inset the main column by the rail and hide the mobile bar, so a
-# maximised window does not push tabs off the right edge.
 st.markdown(
     """
 <style>
@@ -29,12 +27,15 @@ st.markdown(
   .st-key-nb_mobile_bar { display: none !important; }
   .stTabs [data-baseweb="tab-list"] { width: 100% !important; overflow-x: auto !important; }
 }
+[data-testid="stDataFrame"] { width: 100% !important; }
+[data-testid="stDataFrame"] [role="gridcell"] {
+  white-space: normal !important;
+  overflow: visible !important;
+}
 </style>
 """,
     unsafe_allow_html=True,
 )
-# One publisher for every page. Command Center still overwrites these keys
-# with its live valuation when that page runs.
 ensure_published_book()
 
 pg = st.navigation(
