@@ -14,4 +14,4 @@ def test_upstox_tape_uses_quote_and_ratios_without_network():
     assert "Last price" in labels
     assert "Trailing P/E" in labels
     assert "ROE" in labels
-    assert tape["source"] == "Upstox market data"
+    assert tape["source"] == "Upstox Analytics token"
