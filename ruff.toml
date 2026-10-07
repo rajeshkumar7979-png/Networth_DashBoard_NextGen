@@ -34,4 +34,5 @@ select = ["E", "F"]
 # as single lines for faithful maintenance and are not "new" logic issues.
 "lib/theme.py" = ["E501"]
 "lib/ui/components.py" = ["E501"]
+"lib/asset_intelligence.py" = ["E501"]
 "scripts/*.py" = ["F401", "S110", "E501"]
