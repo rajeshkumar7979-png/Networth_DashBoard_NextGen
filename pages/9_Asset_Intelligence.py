@@ -7,6 +7,7 @@ import streamlit as st
 
 from lib.asset_intelligence import build_asset_pack, pack_prompt_extras
 from lib.company_tape import fetch_yahoo_equity, format_tape_value, yahoo_ticker
+from lib.upstox_tape import fetch_upstox_equity, read_upstox_token
 from lib.intelligence import ai as intel_ai
 from lib.intelligence.ai.config import load_ai_config, provider_is_configured
 from lib.intelligence.ai.health import ollama_failure_hint
@@ -23,6 +24,11 @@ st.markdown(page_header_html(
 ), unsafe_allow_html=True)
 
 BOOK_KIND = {"MF": "mf", "Stocks": "stocks", "Gold": "gold", "FD": "fd"}
+
+
+@st.cache_data(ttl=900, show_spinner=False)
+def _upstox_tape(isin: str, exchange: str):
+    return fetch_upstox_equity(isin, exchange)
 
 
 @st.cache_data(ttl=21600, show_spinner=False)
@@ -100,11 +106,34 @@ tape = None
 if str(row.get("Kind")) == "Stocks":
     symbol = str(rec.get("Symbol") or row.get("Key") or "").strip()
     exchange = str(rec.get("Exchange") or "NSE").strip() or "NSE"
+    isin = str(rec.get("ISIN") or row.get("Key") or "").strip()
     tape_key = f"ai_tape_{row['Key']}"
-    if st.button(f"Load company tape for {symbol or 'this stock'} (Yahoo, opt-in)", key=tape_key):
+    has_token = bool(read_upstox_token())
+    c1, c2 = st.columns(2)
+    with c1:
+        load_upstox = st.button(
+            f"Load Upstox tape for {symbol or 'this stock'}",
+            key=tape_key + "_upstox",
+            disabled=not has_token,
+        )
+    with c2:
+        load_yahoo = st.button(
+            f"Yahoo fallback ({yahoo_ticker(symbol, exchange)})",
+            key=tape_key,
+        )
+    if not has_token:
+        st.markdown(caption(
+            "Upstox token is not in Streamlit secrets yet. Yahoo remains available."
+        ), unsafe_allow_html=True)
+    if load_upstox:
+        with st.spinner("Fetching Upstox quote, ratios and daily candles…"):
+            st.session_state[tape_key + "_data"] = _upstox_tape(isin, exchange)
+    if load_yahoo:
         with st.spinner(f"Fetching {yahoo_ticker(symbol, exchange)}…"):
             st.session_state[tape_key + "_data"] = _yahoo_tape(symbol, exchange)
     tape = st.session_state.get(tape_key + "_data")
+    if isinstance(tape, dict) and tape.get("error"):
+        st.markdown(caption(str(tape.get("error"))), unsafe_allow_html=True)
 
 pack = build_asset_pack(
     row=row, rec=rec, books=books, assets=assets, research_brief=brief,
@@ -196,7 +225,7 @@ if run_ai:
     else:
         store = st.session_state.setdefault("asset_intel_ai_hour", {})
         ck = "|".join((
-            "asset-intel-v1",
+            "asset-intel-v2",
             pack.key,
             str(getattr(pack.brief, "evidence_count", 0)),
             str(getattr(ai_cfg, "provider", "") or ""),
@@ -207,12 +236,17 @@ if run_ai:
             out = hit["out"]
             st.markdown(caption("Reusing the last hour's pack reading."), unsafe_allow_html=True)
         else:
+            question = pack_prompt_extras(pack) + (
+                "\nRestate every verified parameter already listed, including 3Y % and 5Y % "
+                "when they are present. Do not say those figures are missing if they "
+                "are in the parameter list. Do not recommend adding, selling, or rebalancing."
+            )
             with st.spinner("AI is reading the Asset Intelligence pack…"):
                 out = intel_ai.run_ai_research(
                     brief=pack.brief,
                     facts=getattr(briefing, "facts", ()) or (),
                     evidence=getattr(briefing, "evidence", ()) or (),
-                    question=pack_prompt_extras(pack),
+                    question=question,
                 )
             stt = str(getattr(out, "status", "") or "")
             if stt == "ok" or (stt == "failed" and getattr(out, "provider", "") == "groq"):
