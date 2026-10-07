@@ -10,27 +10,25 @@ st.set_page_config(
 )
 
 inject_css()
+# Do not take the sidebar out of flow and do not hide the mobile bar.
+# A collapsed rail plus a hidden bar is what left the page with no tabs.
 st.markdown(
     """
 <style>
-@media (min-width: 992px) {
-  [data-testid="stSidebar"] {
-    position: fixed; top: 0; left: 0; height: 100vh;
-    width: 15.5rem !important; z-index: 100;
-  }
-  [data-testid="stAppViewContainer"] > .main,
-  [data-testid="stMain"] {
-    margin-left: 15.5rem !important;
-    width: calc(100vw - 15.5rem) !important;
-    max-width: calc(100vw - 15.5rem) !important;
-  }
-  .st-key-nb_mobile_bar { display: none !important; }
-  .stTabs [data-baseweb="tab-list"] { width: 100% !important; overflow-x: auto !important; }
+[data-testid="stSidebar"] {
+  display: block !important;
+  visibility: visible !important;
+  transform: none !important;
+  min-width: 16rem !important;
+}
+[data-testid="stSidebarCollapsedControl"],
+[data-testid="stSidebarCollapseButton"] {
+  display: none !important;
 }
 [data-testid="stDataFrame"] { width: 100% !important; }
-[data-testid="stDataFrame"] [role="gridcell"] {
-  white-space: normal !important;
-  overflow: visible !important;
+.stTabs [data-baseweb="tab-list"] {
+  width: 100% !important;
+  overflow-x: auto !important;
 }
 </style>
 """,
