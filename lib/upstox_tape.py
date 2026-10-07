@@ -1,12 +1,10 @@
 """Opt-in Upstox market tape for a direct equity line.
 
-Reads the access token from Streamlit secrets or UPSTOX_ACCESS_TOKEN.
-Never writes the token. Uses the ISIN already on the book:
-  instrument key NSE_EQ|{ISIN}
-  quote:        GET /v2/market-quote/quotes
-  ratios:       GET /v2/fundamentals/{isin}/key-ratios
-  daily bars:   GET /v2/historical-candle/{key}/day/{to}/{from}
-Missing fields stay missing. This does not value mutual funds.
+The secret is the Analytics token from Upstox Developer Apps → Analytics.
+That token is read-only and valid for one year from creation. It is not the
+daily OAuth access token. Market quote, historical candles and fundamentals
+work from Cloud without a static IP. Holdings and orders need a whitelisted
+static IP and are not called here.
 """
 from __future__ import annotations
 
@@ -17,8 +15,13 @@ import pandas as pd
 
 from lib.company_tape import rsi_wilder, sma
 
-SOURCE = "Upstox market data"
+SOURCE = "Upstox Analytics token"
 BASE = "https://api.upstox.com/v2"
+TOKEN_NOTE = (
+    "Uses the Upstox Analytics token (Apps → Analytics). "
+    "Valid until the expiry date shown there, not for 24 hours. "
+    "Quote, candles and ratios do not need a static IP."
+)
 
 
 def _finite(value):
@@ -43,12 +46,13 @@ def instrument_key(isin: str, exchange: str = "NSE") -> str:
 
 
 def read_upstox_token() -> str:
-    """Secret only. Returns empty when unset. Never logs the value."""
+    """Analytics token from secrets. Empty when unset. Never logged."""
     try:
         import streamlit as st
         secrets = st.secrets
         for path in (
             ("upstox", "ACCESS_TOKEN"),
+            ("upstox", "ANALYTICS_TOKEN"),
             ("upstox", "access_token"),
             ("UPSTOX_ACCESS_TOKEN",),
         ):
@@ -109,7 +113,6 @@ def tape_from_payloads(isin, quote=None, ratios=None, candles=None, retrieved_at
         if sector is not None:
             add(label + " sector", sector, "Upstox sector benchmark")
 
-    frame = pd.DataFrame()
     if isinstance(candles, dict):
         raw = ((candles.get("data") or {}).get("candles")) or []
         closes = []
@@ -118,8 +121,7 @@ def tape_from_payloads(isin, quote=None, ratios=None, candles=None, retrieved_at
                 closes.append(_finite(bar[4]))
         closes = [c for c in closes if c is not None]
         if closes:
-            frame = pd.DataFrame({"Close": list(reversed(closes))})
-            series = frame["Close"]
+            series = pd.DataFrame({"Close": list(reversed(closes))})["Close"]
             add("SMA 20", sma(series, 20), "Upstox daily")
             add("SMA 50", sma(series, 50), "Upstox daily")
             add("SMA 200", sma(series, 200), "Upstox daily")
@@ -144,9 +146,19 @@ def fetch_upstox_equity(isin: str, exchange: str = "NSE") -> dict:
     key = instrument_key(isin, exchange)
     retrieved = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     if not token:
-        return {"ok": False, "source": SOURCE, "error": "Upstox token is not in Streamlit secrets.", "retrieved_at": retrieved}
+        return {
+            "ok": False,
+            "source": SOURCE,
+            "error": "Analytics token is not in Streamlit secrets.",
+            "retrieved_at": retrieved,
+        }
     if not key:
-        return {"ok": False, "source": SOURCE, "error": "This line has no ISIN, so Upstox cannot be queried.", "retrieved_at": retrieved}
+        return {
+            "ok": False,
+            "source": SOURCE,
+            "error": "This line has no ISIN, so Upstox cannot be queried.",
+            "retrieved_at": retrieved,
+        }
     import requests
     headers = {"Accept": "application/json", "Authorization": "Bearer " + token}
     to_date = datetime.now(timezone.utc).date()
@@ -164,7 +176,8 @@ def fetch_upstox_equity(isin: str, exchange: str = "NSE") -> dict:
     quote = get(BASE + "/market-quote/quotes", {"instrument_key": key})
     ratios = get(BASE + "/fundamentals/" + isin.strip().upper() + "/key-ratios")
     candles = get(
-        BASE + "/historical-candle/" + key + "/day/" + to_date.isoformat() + "/" + from_date.isoformat()
+        BASE + "/historical-candle/" + key + "/day/"
+        + to_date.isoformat() + "/" + from_date.isoformat()
     )
     tape = tape_from_payloads(isin, quote, ratios, candles, retrieved)
     if not tape.get("ok") and not tape.get("error"):
