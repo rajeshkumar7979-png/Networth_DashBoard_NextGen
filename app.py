@@ -1,5 +1,6 @@
 import streamlit as st
 from lib.theme import inject_css
+from lib.book_session import ensure_published_book
 
 st.set_page_config(
     page_title="NORTHLINE · Family desk",
@@ -9,6 +10,32 @@ st.set_page_config(
 )
 
 inject_css()
+# Desktop: inset the main column by the rail and hide the mobile bar, so a
+# maximised window does not push tabs off the right edge.
+st.markdown(
+    """
+<style>
+@media (min-width: 992px) {
+  [data-testid="stSidebar"] {
+    position: fixed; top: 0; left: 0; height: 100vh;
+    width: 15.5rem !important; z-index: 100;
+  }
+  [data-testid="stAppViewContainer"] > .main,
+  [data-testid="stMain"] {
+    margin-left: 15.5rem !important;
+    width: calc(100vw - 15.5rem) !important;
+    max-width: calc(100vw - 15.5rem) !important;
+  }
+  .st-key-nb_mobile_bar { display: none !important; }
+  .stTabs [data-baseweb="tab-list"] { width: 100% !important; overflow-x: auto !important; }
+}
+</style>
+""",
+    unsafe_allow_html=True,
+)
+# One publisher for every page. Command Center still overwrites these keys
+# with its live valuation when that page runs.
+ensure_published_book()
 
 pg = st.navigation(
     {
@@ -22,18 +49,13 @@ pg = st.navigation(
         "INTELLIGENCE": [
             st.Page("pages/6_Intelligence.py", title="Intelligence", url_path="intelligence"),
             st.Page("pages/4_News.py", title="Pulse", url_path="pulse"),
-            st.Page("pages/9_Asset_Intelligence.py", 
-            title="Asset Intelligence",
-            url_path="asset-intelligence",
-)
+            st.Page("pages/9_Asset_Intelligence.py",
+                    title="Asset Intelligence", url_path="asset-intelligence"),
         ],
         "PLANNING": [
             st.Page("pages/2_Deep_Health.py", title="Decision Desk", url_path="decisions"),
         ],
     },
-    # The navigation widget itself is hidden: lib/ui/nav.py renders the brand
-    # rail (desktop st.sidebar + mobile bottom bar) with state-preserving
-    # st.page_link elements. url_paths above feed those page links.
     position="hidden",
 )
 pg.run()
