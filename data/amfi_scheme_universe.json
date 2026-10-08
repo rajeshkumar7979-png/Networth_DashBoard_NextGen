@@ -1,5 +1,5 @@
 {
-  "fetched_at": "2026-10-07T11:17:17+00:00",
+  "fetched_at": "2026-10-08T11:33:52+00:00",
   "rows": [
     {
       "scheme_code": "135762",
@@ -61218,6 +61218,16 @@
       "scheme_name": "JioBlackRock Liquid Fund",
       "nav": null,
       "nav_date": "Growth Option",
+      "amc": "Jio BlackRock Mutual Fund",
+      "category": "Open Ended Schemes(Income/Debt Oriented Schemes - Liquid Fund)"
+    },
+    {
+      "scheme_code": "154117",
+      "isin_primary": "INF22M001127",
+      "isin_secondary": "INF22M001135",
+      "scheme_name": "JioBlackRock Liquid Fund",
+      "nav": null,
+      "nav_date": "Weekly IDCW Option",
       "amc": "Jio BlackRock Mutual Fund",
       "category": "Open Ended Schemes(Income/Debt Oriented Schemes - Liquid Fund)"
     },
