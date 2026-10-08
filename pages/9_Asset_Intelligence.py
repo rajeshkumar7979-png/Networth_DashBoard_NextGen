@@ -54,6 +54,50 @@ def _flag_frame(items):
     ])
 
 
+def _show_upstox_extra(tape):
+    if not isinstance(tape, dict) or tape.get("source") != "Upstox Analytics token":
+        return
+    statements = tape.get("statements") or []
+    holding = tape.get("shareholding") or []
+    actions = tape.get("actions") or []
+    news = tape.get("news") or []
+    if statements:
+        st.markdown(section_header_html("Financial statements", "Upstox, consolidated, latest period"), unsafe_allow_html=True)
+        st.dataframe(pd.DataFrame(statements), hide_index=True, use_container_width=True)
+    left, right = st.columns(2)
+    with left:
+        if holding:
+            st.markdown(section_header_html("Shareholding", "promoter / FII / DII / public"), unsafe_allow_html=True)
+            st.dataframe(pd.DataFrame(holding), hide_index=True, use_container_width=True)
+    with right:
+        if actions:
+            st.markdown(section_header_html("Corporate actions", "dividend, bonus, split, rights"), unsafe_allow_html=True)
+            st.dataframe(pd.DataFrame(actions), hide_index=True, use_container_width=True)
+    if news:
+        st.markdown(section_header_html("Instrument news", "Upstox, last 7 days"), unsafe_allow_html=True)
+        st.dataframe(
+            pd.DataFrame(news),
+            hide_index=True,
+            use_container_width=True,
+            column_config={"Link": st.column_config.LinkColumn("Link")},
+        )
+
+
+def _upstox_prompt(tape):
+    if not isinstance(tape, dict):
+        return ""
+    lines = []
+    for row in (tape.get("statements") or [])[:6]:
+        lines.append("%s %s: %s (%s)" % (row.get("Statement"), row.get("Line"), row.get("Latest"), row.get("Period")))
+    for row in (tape.get("shareholding") or [])[:4]:
+        lines.append("Holding %s: %s" % (row.get("Holder"), row.get("Percent")))
+    for row in (tape.get("news") or [])[:3]:
+        lines.append("News: %s" % row.get("Headline"))
+    if not lines:
+        return ""
+    return "\nVerified Upstox facts. Restate these. Do not invent figures.\n" + "\n".join(lines)
+
+
 books = st.session_state.get("cc_books")
 assets = st.session_state.get("cc_assets")
 cohort = st.session_state.get("cc_live_cohort")
@@ -123,10 +167,10 @@ if str(row.get("Kind")) == "Stocks":
         )
     if not has_token:
         st.markdown(caption(
-            "Upstox token is not in Streamlit secrets yet. Yahoo remains available."
+            "Analytics token is not in Streamlit secrets yet. Yahoo remains available."
         ), unsafe_allow_html=True)
     if load_upstox:
-        with st.spinner("Fetching Upstox quote, ratios and daily candles…"):
+        with st.spinner("Fetching Upstox quote, ratios, statements and news…"):
             st.session_state[tape_key + "_data"] = _upstox_tape(isin, exchange)
     if load_yahoo:
         with st.spinner(f"Fetching {yahoo_ticker(symbol, exchange)}…"):
@@ -156,6 +200,8 @@ if pack.parameters:
         shown = format_tape_value(label, val, str(item.get("Unit") or "")) if not isinstance(val, str) else val
         view.append({"Parameter": label, "Value": shown, "Source": item.get("Source")})
     st.dataframe(pd.DataFrame(view), hide_index=True, use_container_width=True)
+
+_show_upstox_extra(tape)
 
 row1_l, row1_r = st.columns(2)
 with row1_l:
@@ -225,7 +271,7 @@ if run_ai:
     else:
         store = st.session_state.setdefault("asset_intel_ai_hour", {})
         ck = "|".join((
-            "asset-intel-v2",
+            "asset-intel-v3",
             pack.key,
             str(getattr(pack.brief, "evidence_count", 0)),
             str(getattr(ai_cfg, "provider", "") or ""),
@@ -236,7 +282,7 @@ if run_ai:
             out = hit["out"]
             st.markdown(caption("Reusing the last hour's pack reading."), unsafe_allow_html=True)
         else:
-            question = pack_prompt_extras(pack) + (
+            question = pack_prompt_extras(pack) + _upstox_prompt(tape) + (
                 "\nRestate every verified parameter already listed, including 3Y % and 5Y % "
                 "when they are present. Do not say those figures are missing if they "
                 "are in the parameter list. Do not recommend adding, selling, or rebalancing."
