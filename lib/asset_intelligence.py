@@ -165,10 +165,7 @@ def _family_overlap(isin, session_holdings):
         except (TypeError, ValueError):
             raw = cache.get(str(scheme)) or []
         cleaned, _ = _normalize_holdings(raw if isinstance(raw, list) else [])
-        hit = next(
-            (x for x in cleaned if _text(x.get("isin")).upper() == code),
-            None,
-        )
+        hit = next((x for x in cleaned if _text(x.get("isin")).upper() == code), None)
         if not hit:
             continue
         fund = _text(holding.get("Fund Name") or scheme)
@@ -189,34 +186,29 @@ def _mapped_developments(cohort, index):
         return []
     try:
         from lib.intelligence.live import development_rows
-        return [
-            row for row in development_rows(cohort, index, None)
-            if row.get("Relevance") == "mapped"
-        ]
+        return [row for row in development_rows(cohort, index, None) if row.get("Relevance") == "mapped"]
     except Exception:
         return []
 
 
-def _flag_tape(rows, green, red, watch, gaps):
+def _flag_tape(rows, green, red, watch, gaps, source="upstox-tape"):
     present = {str(r.get("label") or "").strip().lower() for r in rows}
     wanted = [
-        "Sector", "Industry", "Market cap", "Trailing P/E", "Forward P/E",
-        "Price / Book", "Trailing EPS", "Profit margin", "ROE",
-        "Debt / Equity", "Beta", "Dividend yield",
-        "SMA 20", "SMA 50", "SMA 200", "RSI-14", "In 52-week range",
+        "Trailing P/E", "Price / Book", "ROE", "ROCE",
+        "SMA 20", "SMA 50", "RSI-14",
     ]
     for label in wanted:
         if label.lower() not in present:
-            _add(gaps, "gap", label, label + " is not on the observed tape this session.", "yahoo-tape")
+            _add(gaps, "gap", label, label + " was not returned on this tape.", source)
     for row in rows:
         label = _text(row.get("label"))
         tone = metric_tone(label, row.get("value"))
         if tone == "ok":
-            _add(green, "green", label, label + " is inside the conservative observed band.", "yahoo-tape")
+            _add(green, "green", label, label + " is inside the conservative observed band.", source)
         elif tone == "watch":
-            _add(watch, "watch", label, label + " is on the watch band of the observed tape.", "yahoo-tape")
+            _add(watch, "watch", label, label + " is on the watch band of the observed tape.", source)
         elif tone == "elevated":
-            _add(red, "red", label, label + " is on the elevated band of the observed tape.", "yahoo-tape")
+            _add(red, "red", label, label + " is on the elevated band of the observed tape.", source)
 
 
 def _flag_concentration(weight_pct, green, red, watch, gaps):
@@ -283,18 +275,23 @@ def build_asset_pack(
     if kind == "Stocks":
         tape_rows = _tape_rows(tape)
         tape_ok = bool(tape and tape.get("ok") and tape_rows)
+        source = _text((tape or {}).get("source")) or "Upstox Analytics token"
         if tape_ok:
-            freshness.append("Yahoo tape %s" % (tape.get("retrieved_at") or "loaded"))
+            freshness.append("%s %s" % (source, (tape or {}).get("retrieved_at") or "loaded"))
             for item in tape_rows:
                 parameters.append({
                     "Parameter": item.get("label"),
                     "Value": item.get("value"),
                     "Unit": item.get("sub") or "",
-                    "Source": "Yahoo Finance (opt-in tape)",
+                    "Source": source,
                 })
-            _flag_tape(tape_rows, green, red, watch, gaps)
+            _flag_tape(tape_rows, green, red, watch, gaps, source=source)
         else:
-            _add(gaps, "gap", "Company tape", "Yahoo tape is not loaded this session.", "yahoo-tape")
+            _add(
+                gaps, "gap", "Company tape",
+                "Upstox tape is not loaded. Click Load Upstox tape. Yahoo is only the fallback.",
+                "upstox-tape",
+            )
         family_overlap = _family_overlap(isin, session_holdings)
         if family_overlap:
             _add(watch, "watch", "MF overlap", "%d family fund-row(s) also disclose this ISIN." % len(family_overlap), "mf-holdings-cache")
@@ -360,12 +357,8 @@ def build_asset_pack(
 AI_QUESTION = (
     "You are interpreting an Asset Intelligence Pack, not a holdings summary. "
     "Use ONLY the catalog, verified parameters, and deterministic flags already in this brief. "
-    "Structure the reading as: overall investor view; green flags; red flags; "
-    "watch items; key evidence; what could change / invalidate this view; "
-    "data gaps. Do not restate quantity, average buy price, invested amount "
-    "or current value unless they are needed to explain concentration or "
-    "trailing performance. Do not invent PE, RSI, XIRR, SIP history, tax, "
-    "or buy/sell instructions. Decision-support only."
+    "Do not tell the user to load Yahoo. If the tape is missing, say click Load Upstox tape. "
+    "Do not invent PE, RSI, XIRR, or buy/sell instructions. Decision-support only."
 )
 
 
