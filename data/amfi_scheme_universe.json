@@ -1,5 +1,5 @@
 {
-  "fetched_at": "2026-10-08T11:33:52+00:00",
+  "fetched_at": "2026-10-09T11:28:41+00:00",
   "rows": [
     {
       "scheme_code": "135762",
@@ -49162,6 +49162,26 @@
       "category": "Open Ended Schemes(Hybrid Schemes - Balanced Advantage Fund/ Dynamic Asset Allocation)"
     },
     {
+      "scheme_code": "154701",
+      "isin_primary": "INF22M001366",
+      "isin_secondary": "",
+      "scheme_name": "JioBlackRock Balanced Advantage Fund",
+      "nav": null,
+      "nav_date": "Growth Option",
+      "amc": "Jio BlackRock Mutual Fund",
+      "category": "Open Ended Schemes(Hybrid Schemes - Balanced Advantage Fund/ Dynamic Asset Allocation)"
+    },
+    {
+      "scheme_code": "154702",
+      "isin_primary": "INF22M001374",
+      "isin_secondary": "",
+      "scheme_name": "JioBlackRock Balanced Advantage Fund",
+      "nav": null,
+      "nav_date": "Growth Option",
+      "amc": "Jio BlackRock Mutual Fund",
+      "category": "Open Ended Schemes(Hybrid Schemes - Balanced Advantage Fund/ Dynamic Asset Allocation)"
+    },
+    {
       "scheme_code": "149406",
       "isin_primary": "INF174V01BE0",
       "isin_secondary": "",
@@ -76002,6 +76022,86 @@
       "category": "Open Ended Schemes(Index Funds - Equity Funds)"
     },
     {
+      "scheme_code": "154719",
+      "isin_primary": "INF205KA1CM6",
+      "isin_secondary": "",
+      "scheme_name": "Invesco India Nifty Chemical Index Fund",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Invesco Mutual Fund",
+      "category": "Open Ended Schemes(Index Funds - Equity Funds)"
+    },
+    {
+      "scheme_code": "154718",
+      "isin_primary": "INF205KA1CN4",
+      "isin_secondary": "INF205KA1CO2",
+      "scheme_name": "Invesco India Nifty Chemical Index Fund",
+      "nav": null,
+      "nav_date": "IDCW",
+      "amc": "Invesco Mutual Fund",
+      "category": "Open Ended Schemes(Index Funds - Equity Funds)"
+    },
+    {
+      "scheme_code": "154716",
+      "isin_primary": "INF205KA1CJ2",
+      "isin_secondary": "",
+      "scheme_name": "Invesco India Nifty Chemical Index Fund",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Invesco Mutual Fund",
+      "category": "Open Ended Schemes(Index Funds - Equity Funds)"
+    },
+    {
+      "scheme_code": "154717",
+      "isin_primary": "INF205KA1CK0",
+      "isin_secondary": "INF205KA1CL8",
+      "scheme_name": "Invesco India Nifty Chemical Index Fund",
+      "nav": null,
+      "nav_date": "IDCW",
+      "amc": "Invesco Mutual Fund",
+      "category": "Open Ended Schemes(Index Funds - Equity Funds)"
+    },
+    {
+      "scheme_code": "154712",
+      "isin_primary": "INF205KA1CG8",
+      "isin_secondary": "",
+      "scheme_name": "Invesco India Nifty India Defence Index Fund",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Invesco Mutual Fund",
+      "category": "Open Ended Schemes(Index Funds - Equity Funds)"
+    },
+    {
+      "scheme_code": "154714",
+      "isin_primary": "INF205KA1CH6",
+      "isin_secondary": "INF205KA1CI4",
+      "scheme_name": "Invesco India Nifty India Defence Index Fund",
+      "nav": null,
+      "nav_date": "IDCW",
+      "amc": "Invesco Mutual Fund",
+      "category": "Open Ended Schemes(Index Funds - Equity Funds)"
+    },
+    {
+      "scheme_code": "154713",
+      "isin_primary": "INF205KA1CD5",
+      "isin_secondary": "",
+      "scheme_name": "Invesco India Nifty India Defence Index Fund",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Invesco Mutual Fund",
+      "category": "Open Ended Schemes(Index Funds - Equity Funds)"
+    },
+    {
+      "scheme_code": "154715",
+      "isin_primary": "INF205KA1CE3",
+      "isin_secondary": "INF205KA1CF0",
+      "scheme_name": "Invesco India Nifty India Defence Index Fund",
+      "nav": null,
+      "nav_date": "IDCW",
+      "amc": "Invesco Mutual Fund",
+      "category": "Open Ended Schemes(Index Funds - Equity Funds)"
+    },
+    {
       "scheme_code": "153787",
       "isin_primary": "INF22M001044",
       "isin_secondary": "",
@@ -76116,6 +76216,46 @@
       "isin_primary": "INF174KA1D00",
       "isin_secondary": "INF174KA1D18",
       "scheme_name": "Kotak Nifty Bank Index Fund",
+      "nav": null,
+      "nav_date": "IDCW",
+      "amc": "Kotak Mahindra Mutual Fund",
+      "category": "Open Ended Schemes(Index Funds - Equity Funds)"
+    },
+    {
+      "scheme_code": "154754",
+      "isin_primary": "INF174KA1G07",
+      "isin_secondary": "",
+      "scheme_name": "Kotak Nifty Capital Markets Index Fund",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Kotak Mahindra Mutual Fund",
+      "category": "Open Ended Schemes(Index Funds - Equity Funds)"
+    },
+    {
+      "scheme_code": "154755",
+      "isin_primary": "INF174KA1G15",
+      "isin_secondary": "INF174KA1G23",
+      "scheme_name": "Kotak Nifty Capital Markets Index Fund",
+      "nav": null,
+      "nav_date": "IDCW",
+      "amc": "Kotak Mahindra Mutual Fund",
+      "category": "Open Ended Schemes(Index Funds - Equity Funds)"
+    },
+    {
+      "scheme_code": "154756",
+      "isin_primary": "INF174KA1G31",
+      "isin_secondary": "",
+      "scheme_name": "Kotak Nifty Capital Markets Index Fund",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Kotak Mahindra Mutual Fund",
+      "category": "Open Ended Schemes(Index Funds - Equity Funds)"
+    },
+    {
+      "scheme_code": "154757",
+      "isin_primary": "INF174KA1G49",
+      "isin_secondary": "INF174KA1G56",
+      "scheme_name": "Kotak Nifty Capital Markets Index Fund",
       "nav": null,
       "nav_date": "IDCW",
       "amc": "Kotak Mahindra Mutual Fund",
