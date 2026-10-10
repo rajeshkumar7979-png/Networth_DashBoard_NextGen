@@ -1,5 +1,5 @@
 {
-  "fetched_at": "2026-10-09T11:28:41+00:00",
+  "fetched_at": "2026-10-10T10:45:53+00:00",
   "rows": [
     {
       "scheme_code": "135762",
@@ -72608,6 +72608,16 @@
       "scheme_name": "Kotak Ultra Short to Short Term Fund",
       "nav": null,
       "nav_date": "Monthly - Reinvestment & Payout of Income Distribution cum Capital Withdrawal Option",
+      "amc": "Kotak Mahindra Mutual Fund",
+      "category": "Open Ended Schemes(Income/Debt Oriented Schemes - Ultra Short to Short Term Fund)"
+    },
+    {
+      "scheme_code": "154360",
+      "isin_primary": "INF174KA1ZV5",
+      "isin_secondary": "INF174KA1ZX1",
+      "scheme_name": "Kotak Ultra Short to Short Term Fund",
+      "nav": null,
+      "nav_date": "Weekly - Reinvestment & Payout of Income Distribution cum Capital Withdrawal Option",
       "amc": "Kotak Mahindra Mutual Fund",
       "category": "Open Ended Schemes(Income/Debt Oriented Schemes - Ultra Short to Short Term Fund)"
     },
