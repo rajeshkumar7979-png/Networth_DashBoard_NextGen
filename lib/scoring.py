@@ -12,15 +12,19 @@ def score_allocation(equity_pct, target=50):
 
 
 def score_concentration(top5_pct):
-    if top5_pct <= 35: return 100
-    if top5_pct >= 80: return 0
+    if top5_pct <= 35:
+        return 100
+    if top5_pct >= 80:
+        return 0
     return 100 - (top5_pct - 35) / 45 * 100
 
 
 def score_liquidity_nri(true_liquid_pct):
     # Adequate deployable liquidity for NRI: ~12–35% of NW in liquid MF + near maturities
-    if 12 <= true_liquid_pct <= 35: return 100
-    if true_liquid_pct < 12: return max(0, 100 - (12 - true_liquid_pct) * 5)
+    if 12 <= true_liquid_pct <= 35:
+        return 100
+    if true_liquid_pct < 12:
+        return max(0, 100 - (12 - true_liquid_pct) * 5)
     return max(0, 100 - (true_liquid_pct - 35) * 1.5)
 
 
