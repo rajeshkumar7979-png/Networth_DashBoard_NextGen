@@ -1,5 +1,5 @@
 {
-  "fetched_at": "2026-10-12T12:20:49+00:00",
+  "fetched_at": "2026-10-13T12:04:46+00:00",
   "rows": [
     {
       "scheme_code": "135762",
@@ -37672,6 +37672,16 @@
       "category": "Open Ended Schemes(Exchange Traded Funds (ETFs) - Equity ETF)"
     },
     {
+      "scheme_code": "154765",
+      "isin_primary": "INF179KC1LA2",
+      "isin_secondary": "",
+      "scheme_name": "HDFC FTSE India Equity ETF",
+      "nav": null,
+      "nav_date": "Growth Option",
+      "amc": "HDFC Mutual Fund",
+      "category": "Open Ended Schemes(Exchange Traded Funds (ETFs) - Equity ETF)"
+    },
+    {
       "scheme_code": "154504",
       "isin_primary": "",
       "isin_secondary": "",
@@ -40856,6 +40866,46 @@
       "isin_primary": "INF200KB1BS9",
       "isin_secondary": "INF200KB1BT7",
       "scheme_name": "SBI Nifty Midcap 150 Momentum 50 ETF FOF",
+      "nav": null,
+      "nav_date": "IDCW",
+      "amc": "SBI Mutual Fund",
+      "category": "Open Ended Schemes(Fund of Funds Scheme (Domestic) - Fund of Funds Scheme (Domestic))"
+    },
+    {
+      "scheme_code": "154760",
+      "isin_primary": "INF200KB1CG2",
+      "isin_secondary": "",
+      "scheme_name": "SBI Nifty200 Value 30 ETF FOF",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "SBI Mutual Fund",
+      "category": "Open Ended Schemes(Fund of Funds Scheme (Domestic) - Fund of Funds Scheme (Domestic))"
+    },
+    {
+      "scheme_code": "154761",
+      "isin_primary": "INF200KB1CH0",
+      "isin_secondary": "INF200KB1CI8",
+      "scheme_name": "SBI Nifty200 Value 30 ETF FOF",
+      "nav": null,
+      "nav_date": "IDCW",
+      "amc": "SBI Mutual Fund",
+      "category": "Open Ended Schemes(Fund of Funds Scheme (Domestic) - Fund of Funds Scheme (Domestic))"
+    },
+    {
+      "scheme_code": "154758",
+      "isin_primary": "INF200KB1CD9",
+      "isin_secondary": "",
+      "scheme_name": "SBI Nifty200 Value 30 ETF FOF",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "SBI Mutual Fund",
+      "category": "Open Ended Schemes(Fund of Funds Scheme (Domestic) - Fund of Funds Scheme (Domestic))"
+    },
+    {
+      "scheme_code": "154759",
+      "isin_primary": "INF200KB1CE7",
+      "isin_secondary": "INF200KB1CF4",
+      "scheme_name": "SBI Nifty200 Value 30 ETF FOF",
       "nav": null,
       "nav_date": "IDCW",
       "amc": "SBI Mutual Fund",
@@ -76960,36 +77010,6 @@
       "nav_date": "Growth",
       "amc": "Zerodha Mutual Fund",
       "category": "Open Ended Schemes(Life Cycle Funds - Life Cycle Fund with Maturity of 5 Years)"
-    },
-    {
-      "scheme_code": "139619",
-      "isin_primary": "",
-      "isin_secondary": "",
-      "scheme_name": "Taurus Investor Education Pool (Greater than 3 yrs)",
-      "nav": null,
-      "nav_date": "",
-      "amc": "Taurus Mutual Fund",
-      "category": "Open Ended Schemes(Money Market)"
-    },
-    {
-      "scheme_code": "139618",
-      "isin_primary": "",
-      "isin_secondary": "",
-      "scheme_name": "Taurus Investor Education Pool (Greater than 3 yrs)",
-      "nav": null,
-      "nav_date": "Growth",
-      "amc": "Taurus Mutual Fund",
-      "category": "Open Ended Schemes(Money Market)"
-    },
-    {
-      "scheme_code": "139617",
-      "isin_primary": "",
-      "isin_secondary": "",
-      "scheme_name": "Taurus Unclaimed Dividend & Redemption Liability (Less than 3 yrs)",
-      "nav": null,
-      "nav_date": "Growth",
-      "amc": "Taurus Mutual Fund",
-      "category": "Open Ended Schemes(Money Market)"
     },
     {
       "scheme_code": "132175",
