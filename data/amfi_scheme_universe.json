@@ -1,5 +1,5 @@
 {
-  "fetched_at": "2026-10-13T12:04:46+00:00",
+  "fetched_at": "2026-10-14T09:40:40+00:00",
   "rows": [
     {
       "scheme_code": "135762",
@@ -49085,6 +49085,16 @@
       "scheme_code": "154734",
       "isin_primary": "INF0R8701491",
       "isin_secondary": "INF0R8701509",
+      "scheme_name": "Helios Balanced Advantage Fund",
+      "nav": null,
+      "nav_date": "Monthly IDCW",
+      "amc": "Helios Mutual Fund",
+      "category": "Open Ended Schemes(Hybrid Schemes - Balanced Advantage Fund/ Dynamic Asset Allocation)"
+    },
+    {
+      "scheme_code": "154735",
+      "isin_primary": "INF0R8701475",
+      "isin_secondary": "INF0R8701483",
       "scheme_name": "Helios Balanced Advantage Fund",
       "nav": null,
       "nav_date": "Monthly IDCW",
