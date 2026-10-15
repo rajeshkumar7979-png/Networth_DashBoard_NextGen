@@ -1,5 +1,5 @@
 {
-  "fetched_at": "2026-10-14T09:40:40+00:00",
+  "fetched_at": "2026-10-15T09:19:50+00:00",
   "rows": [
     {
       "scheme_code": "135762",
@@ -38192,6 +38192,16 @@
       "category": "Open Ended Schemes(Exchange Traded Funds (ETFs) - Equity ETF)"
     },
     {
+      "scheme_code": "154764",
+      "isin_primary": "INF0R8F01257",
+      "isin_secondary": "",
+      "scheme_name": "Zerodha Nifty Next 100 ETF",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Zerodha Mutual Fund",
+      "category": "Open Ended Schemes(Exchange Traded Funds (ETFs) - Equity ETF)"
+    },
+    {
       "scheme_code": "149379",
       "isin_primary": "INF769K01HS7",
       "isin_secondary": "",
@@ -38239,6 +38249,16 @@
       "nav": null,
       "nav_date": "Growth Option",
       "amc": "Baroda BNP Paribas Mutual Fund",
+      "category": "Open Ended Schemes(Exchange Traded Funds (ETFs) - Gold ETF)"
+    },
+    {
+      "scheme_code": "153933",
+      "isin_primary": "INF2KCX01012",
+      "isin_secondary": "",
+      "scheme_name": "Choice Gold ETF",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Choice Mutual Fund",
       "category": "Open Ended Schemes(Exchange Traded Funds (ETFs) - Gold ETF)"
     },
     {
@@ -75472,6 +75492,46 @@
       "category": "Open Ended Schemes(Index Funds - Equity Funds)"
     },
     {
+      "scheme_code": "154301",
+      "isin_primary": "INF2KCX01020",
+      "isin_secondary": "",
+      "scheme_name": "Choice Nifty 50 Index Fund",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Choice Mutual Fund",
+      "category": "Open Ended Schemes(Index Funds - Equity Funds)"
+    },
+    {
+      "scheme_code": "154302",
+      "isin_primary": "INF2KCX01038",
+      "isin_secondary": "",
+      "scheme_name": "Choice Nifty 50 Index Fund",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Choice Mutual Fund",
+      "category": "Open Ended Schemes(Index Funds - Equity Funds)"
+    },
+    {
+      "scheme_code": "154304",
+      "isin_primary": "INF2KCX01046",
+      "isin_secondary": "",
+      "scheme_name": "Choice Nifty Next 50 Index Fund",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Choice Mutual Fund",
+      "category": "Open Ended Schemes(Index Funds - Equity Funds)"
+    },
+    {
+      "scheme_code": "154303",
+      "isin_primary": "INF2KCX01053",
+      "isin_secondary": "",
+      "scheme_name": "Choice Nifty Next 50 Index Fund",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Choice Mutual Fund",
+      "category": "Open Ended Schemes(Index Funds - Equity Funds)"
+    },
+    {
       "scheme_code": "154548",
       "isin_primary": "INF754K01XJ5",
       "isin_secondary": "",
@@ -81632,16 +81692,6 @@
       "category": "Open Ended Schemes(Other Scheme - Gold ETF)"
     },
     {
-      "scheme_code": "153933",
-      "isin_primary": "INF2KCX01012",
-      "isin_secondary": "",
-      "scheme_name": "Choice Gold ETF",
-      "nav": null,
-      "nav_date": "Growth",
-      "amc": "Choice Mutual Fund",
-      "category": "Open Ended Schemes(Other Scheme - Gold ETF)"
-    },
-    {
       "scheme_code": "152193",
       "isin_primary": "INF754K01SE6",
       "isin_secondary": "",
@@ -83529,46 +83579,6 @@
       "nav": null,
       "nav_date": "Growth Option",
       "amc": "Baroda BNP Paribas Mutual Fund",
-      "category": "Open Ended Schemes(Other Scheme - Index Funds)"
-    },
-    {
-      "scheme_code": "154301",
-      "isin_primary": "INF2KCX01020",
-      "isin_secondary": "",
-      "scheme_name": "Choice Nifty 50 Index Fund",
-      "nav": null,
-      "nav_date": "Growth",
-      "amc": "Choice Mutual Fund",
-      "category": "Open Ended Schemes(Other Scheme - Index Funds)"
-    },
-    {
-      "scheme_code": "154302",
-      "isin_primary": "INF2KCX01038",
-      "isin_secondary": "",
-      "scheme_name": "Choice Nifty 50 Index Fund",
-      "nav": null,
-      "nav_date": "Growth",
-      "amc": "Choice Mutual Fund",
-      "category": "Open Ended Schemes(Other Scheme - Index Funds)"
-    },
-    {
-      "scheme_code": "154304",
-      "isin_primary": "INF2KCX01046",
-      "isin_secondary": "",
-      "scheme_name": "Choice Nifty Next 50 Index Fund",
-      "nav": null,
-      "nav_date": "Growth",
-      "amc": "Choice Mutual Fund",
-      "category": "Open Ended Schemes(Other Scheme - Index Funds)"
-    },
-    {
-      "scheme_code": "154303",
-      "isin_primary": "INF2KCX01053",
-      "isin_secondary": "",
-      "scheme_name": "Choice Nifty Next 50 Index Fund",
-      "nav": null,
-      "nav_date": "Growth",
-      "amc": "Choice Mutual Fund",
       "category": "Open Ended Schemes(Other Scheme - Index Funds)"
     },
     {
