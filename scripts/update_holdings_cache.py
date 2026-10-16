@@ -1,21 +1,18 @@
 # scripts/update_holdings_cache.py
-"""Refresh complete MF holdings for funds present in Networth_Raw_Data.xlsx.
+"""Refresh complete MF holdings and keep a durable history.
 
-Phase 1 rules:
-- Resolve AMFI scheme code from the portfolio's ISIN using official AMFI NAVAll.
-- Prefer AMC-statutory holdings via the OpenFin GitHub/jsDelivr CDN
-  (kushagra-agarwal-a/fund-holdings-data). The old Vercel API is gone.
-- Fall back to mfdata.in family holdings.
-- Never truncate holdings to top-N.
-- Never replace a previously good cache entry with an empty/failed response.
-- Never invent a filing month the source did not publish.
-- Write per-fund provenance/quality metadata separately.
+Rules:
+- Never replace a good cache entry with an empty response.
+- Never invent a filing date.
+- Archive each reporting period so a later month does not erase the prior one.
+- Write a daily MF value row from workbook units times AMFI NAV.
 """
 
 from __future__ import annotations
 
 import json
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -25,6 +22,7 @@ import requests
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from lib.mf_diff import diff_snapshots  # noqa: E402
 from lib.mf_holdings import (  # noqa: E402
     HOLDINGS_CACHE,
     HOLDINGS_META_CACHE,
@@ -36,9 +34,13 @@ from lib.mf_holdings import (  # noqa: E402
 )
 
 RAW_XLSX = ROOT / "data" / "Networth_Raw_Data.xlsx"
+SNAPSHOT_DIR = ROOT / "data" / "mf_snapshots"
+PORTFOLIO_HISTORY = ROOT / "data" / "portfolio_history.csv"
 
 ISIN_ALIASES = {"isin", "isin code", "isin number", "isin no", "isin id"}
 FUND_ALIASES = {"fund name", "mutual fund", "scheme name", "scheme", "fund"}
+UNITS_ALIASES = {"units", "unit", "balance units"}
+INVESTED_ALIASES = {"invested amount", "invested", "cost"}
 
 
 def _norm_col(value: Any) -> str:
@@ -50,7 +52,6 @@ def _find_column(columns, aliases):
     for alias in aliases:
         if alias in normalized:
             return normalized[alias]
-    # relaxed contains match
     for norm, original in normalized.items():
         if any(alias in norm for alias in aliases):
             return original
@@ -60,10 +61,8 @@ def _find_column(columns, aliases):
 def discover_mf_rows() -> pd.DataFrame:
     if not RAW_XLSX.exists():
         raise FileNotFoundError(f"Missing {RAW_XLSX}")
-
     xls = pd.ExcelFile(RAW_XLSX)
     candidates: List[pd.DataFrame] = []
-
     for sheet in xls.sheet_names:
         try:
             df = pd.read_excel(RAW_XLSX, sheet_name=sheet)
@@ -71,27 +70,25 @@ def discover_mf_rows() -> pd.DataFrame:
             continue
         if df.empty:
             continue
-
         isin_col = _find_column(df.columns, ISIN_ALIASES)
-        fund_col = _find_column(df.columns, FUND_ALIASES)
         if not isin_col:
             continue
-
+        fund_col = _find_column(df.columns, FUND_ALIASES)
+        units_col = _find_column(df.columns, UNITS_ALIASES)
+        invested_col = _find_column(df.columns, INVESTED_ALIASES)
         out = pd.DataFrame({
             "isin": df[isin_col].astype(str).str.strip().str.upper(),
             "fund_name": df[fund_col].astype(str).str.strip() if fund_col else "",
+            "units": pd.to_numeric(df[units_col], errors="coerce") if units_col else None,
+            "invested": pd.to_numeric(df[invested_col], errors="coerce") if invested_col else None,
             "sheet": sheet,
         })
         out = out[out["isin"].str.match(r"^IN[A-Z0-9]{8,}$", na=False)]
         if not out.empty:
             candidates.append(out)
-
     if not candidates:
         raise RuntimeError("Could not find an ISIN column in any workbook sheet")
-
-    result = pd.concat(candidates, ignore_index=True)
-    result = result.drop_duplicates(subset=["isin"], keep="first")
-    return result
+    return pd.concat(candidates, ignore_index=True).drop_duplicates(subset=["isin"], keep="first")
 
 
 def choose_scheme(isin: str, fund_name: str, isin_index: Dict[str, List[Dict[str, Any]]]) -> Dict[str, Any] | None:
@@ -100,8 +97,6 @@ def choose_scheme(isin: str, fund_name: str, isin_index: Dict[str, List[Dict[str
         return None
     if len(candidates) == 1:
         return candidates[0]
-
-    # Exact fund-name match wins. ISIN is already the primary identity key.
     fn = " ".join(str(fund_name or "").lower().replace("-", " ").split())
     scored = []
     for row in candidates:
@@ -120,17 +115,67 @@ def choose_scheme(isin: str, fund_name: str, isin_index: Dict[str, List[Dict[str
     return scored[0][1]
 
 
-def main() -> int:
-    print("=== MF holdings refresh: Phase 1 ===")
-    print(f"Workbook: {RAW_XLSX}")
+def archive_snapshot(scheme_code: str, as_of: str, holdings: list) -> None:
+    """Write an immutable period file. Same period may be refreshed; it is not a new month."""
+    if not scheme_code or not as_of or not holdings:
+        return
+    folder = SNAPSHOT_DIR / str(scheme_code)
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / f"{as_of}.json"
+    save_json_atomic(path, {
+        "scheme_code": str(scheme_code),
+        "as_of": as_of,
+        "archived_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+        "holdings": holdings,
+    })
 
+
+def write_mf_value_row(portfolio: pd.DataFrame, isin_index: Dict[str, List[Dict[str, Any]]]) -> None:
+    """Durable MF book row: units x AMFI NAV. Missing NAV stays missing, not zero."""
+    current = 0.0
+    invested = 0.0
+    priced = 0
+    missing = 0
+    for _, row in portfolio.iterrows():
+        scheme = choose_scheme(str(row["isin"]), str(row.get("fund_name") or ""), isin_index)
+        inv = row.get("invested")
+        if pd.notna(inv):
+            invested += float(inv)
+        units = row.get("units")
+        nav = scheme.get("nav") if scheme else None
+        if pd.notna(units) and nav:
+            current += float(units) * float(nav)
+            priced += 1
+        else:
+            missing += 1
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    row = {
+        "date": today,
+        "mf_current_inr": round(current, 2),
+        "mf_invested_inr": round(invested, 2),
+        "schemes_priced": priced,
+        "schemes_missing_nav": missing,
+        "note": "MF book only. Units x AMFI NAV. Not full net worth.",
+    }
+    PORTFOLIO_HISTORY.parent.mkdir(parents=True, exist_ok=True)
+    if PORTFOLIO_HISTORY.exists():
+        hist = pd.read_csv(PORTFOLIO_HISTORY)
+        hist = hist[hist["date"].astype(str) != today]
+    else:
+        hist = pd.DataFrame()
+    hist = pd.concat([hist, pd.DataFrame([row])], ignore_index=True)
+    hist.to_csv(PORTFOLIO_HISTORY, index=False)
+
+
+def main() -> int:
+    print("=== MF holdings refresh ===")
     portfolio = discover_mf_rows()
     print(f"Unique portfolio ISINs found: {len(portfolio)}")
-
     session = requests.Session()
     amfi_rows = fetch_amfi_universe(session, force=True)
     isin_index = build_isin_index(amfi_rows)
     print(f"AMFI universe rows: {len(amfi_rows)}")
+    write_mf_value_row(portfolio, isin_index)
 
     cache = load_json(HOLDINGS_CACHE, {})
     meta = load_json(HOLDINGS_META_CACHE, {})
@@ -139,39 +184,40 @@ def main() -> int:
     if not isinstance(meta, dict):
         meta = {}
 
-    success = 0
-    failed = 0
-    unresolved = 0
-
+    success = failed = unresolved = 0
     for _, row in portfolio.iterrows():
         isin = str(row["isin"]).strip().upper()
         fund_name = str(row.get("fund_name") or "").strip()
         scheme = choose_scheme(isin, fund_name, isin_index)
-
         if not scheme:
             unresolved += 1
-            meta[isin] = {
-                "status": "UNRESOLVED_AMFI",
-                "isin": isin,
-                "fund_name": fund_name,
-                "updated_at": pd.Timestamp.utcnow().isoformat(),
-            }
+            meta[isin] = {"status": "UNRESOLVED_AMFI", "isin": isin, "fund_name": fund_name,
+                          "updated_at": pd.Timestamp.utcnow().isoformat()}
             print(f"[UNRESOLVED] {fund_name} | {isin}")
             continue
 
         scheme_code = str(scheme["scheme_code"])
         display_name = scheme.get("scheme_name") or fund_name
         print(f"[FETCH] {display_name} | {isin} | AMFI {scheme_code}")
-
         try:
             holdings, source_meta = ingest_scheme_holdings(session, scheme_code)
             if not holdings:
                 raise RuntimeError("Source returned empty holdings")
-
-            # IMPORTANT: preserve the old entry if a future source unexpectedly
-            # returns an empty dataset. Successful non-empty data replaces it.
+            prior_meta = meta.get(scheme_code) if isinstance(meta.get(scheme_code), dict) else {}
+            prior_as_of = str(prior_meta.get("as_of") or "")
+            prior_holdings = cache.get(scheme_code) if isinstance(cache.get(scheme_code), list) else []
+            new_as_of = str(source_meta.get("as_of") or "")
+            if prior_holdings and prior_as_of:
+                archive_snapshot(scheme_code, prior_as_of, prior_holdings)
+            if new_as_of:
+                archive_snapshot(scheme_code, new_as_of, holdings)
+            if prior_as_of and new_as_of and prior_as_of != new_as_of:
+                change = diff_snapshots(prior_holdings, holdings)
+            elif prior_as_of == new_as_of:
+                change = {"status": "SAME_PERIOD", "added": [], "exited": [], "changed": []}
+            else:
+                change = {"status": "NO_PRIOR", "added": [], "exited": [], "changed": []}
             cache[scheme_code] = holdings
-            validation = source_meta.get("validation", {})
             meta[scheme_code] = {
                 "status": "OK",
                 "isin": isin,
@@ -181,39 +227,29 @@ def main() -> int:
                 "amc": scheme.get("amc"),
                 "category": scheme.get("category"),
                 **source_meta,
-                "validation": validation,
+                "validation": source_meta.get("validation", {}),
+                "comparison_status": change.get("status"),
+                "added_count": len(change.get("added") or []),
+                "exited_count": len(change.get("exited") or []),
+                "changed_count": len(change.get("changed") or []),
+                "prior_as_of": prior_as_of or None,
             }
             success += 1
-            print(f"  -> {len(holdings)} complete holdings | {source_meta.get('source')} | {validation.get('weight_check')}")
+            print(f"  -> {len(holdings)} holdings | {new_as_of} | {change.get('status')}")
         except Exception as exc:
             failed += 1
-            # Do NOT erase a previous good cache entry.
             meta[scheme_code] = {
                 **(meta.get(scheme_code) if isinstance(meta.get(scheme_code), dict) else {}),
-                "status": "ERROR",
-                "isin": isin,
-                "fund_name": fund_name,
-                "amfi_scheme_code": scheme_code,
-                "amfi_scheme_name": display_name,
-                "error": str(exc),
-                "updated_at": pd.Timestamp.utcnow().isoformat(),
+                "status": "ERROR", "isin": isin, "fund_name": fund_name,
+                "amfi_scheme_code": scheme_code, "amfi_scheme_name": display_name,
+                "error": str(exc), "updated_at": pd.Timestamp.utcnow().isoformat(),
                 "cache_preserved": scheme_code in cache,
             }
             print(f"  !! FAILED: {exc}")
 
     save_json_atomic(HOLDINGS_CACHE, cache)
     save_json_atomic(HOLDINGS_META_CACHE, meta)
-
-    print("\n=== RESULT ===")
-    print(f"Successful:  {success}")
-    print(f"Failed:      {failed}")
-    print(f"Unresolved:  {unresolved}")
-    print(f"Cache funds: {len([k for k in cache if str(k).isdigit()])}")
-    print(f"Holdings cache: {HOLDINGS_CACHE}")
-    print(f"Metadata:       {HOLDINGS_META_CACHE}")
-
-    # Fail the GitHub Action only if absolutely nothing succeeded and no prior
-    # cache exists. A partial outage should not destroy the deployed app.
+    print(f"Successful: {success}  Failed: {failed}  Unresolved: {unresolved}")
     if success == 0 and not cache:
         return 1
     return 0
