@@ -48,10 +48,10 @@ def _verdict(pack, tape):
     sector = _num(_row(tape, "Trailing P/E sector"))
     premium = pe / sector if pe and sector else None
     if pack.red or (premium and premium >= 2):
-        return "RED", "Elevated observed band. Not a sell."
+        return "RED", "Rule band: elevated on loaded inputs. Not a sell."
     if pack.watch or (premium and premium >= 1.3):
-        return "AMBER", "Watch band. Not an order."
-    return "GREEN", "No elevated band on the loaded tape. Not a buy."
+        return "AMBER", "Rule band: watch. Not an order."
+    return "GREEN", "Rule band: no elevated input. Not a buy."
 
 
 def _lines(flags):
@@ -118,7 +118,7 @@ def render_stock_board(st, pack, tape, rec):
         "<div><span class='ni-k'>Sector P/E</span>%s</div>"
         "<div><span class='ni-k'>P/B</span>%s <span class='ni-k'>sector %s</span></div>"
         "<div><span class='ni-k'>Portfolio</span>%s</div></div>"
-        "<div class='ni-sec'>INVESTOR VERDICT</div>"
+        "<div class='ni-sec'>RULE BAND</div>"
         "<div class='ni-verdict %s'><b>%s</b><div>%s</div></div>"
         "<div class='ni-sec'>GREEN · RED · WATCH · GAPS</div>"
         "<div class='ni-grid'><div class='ni-box ni-g'><b>Green</b>%s</div>"
