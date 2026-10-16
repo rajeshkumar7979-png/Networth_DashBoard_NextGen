@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_run:
+    workflows: ["Refresh MF Holdings"]
+    types: [completed]
 
 jobs:
   test-and-lint:
