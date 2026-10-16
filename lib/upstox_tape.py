@@ -141,6 +141,7 @@ def tape_from_payloads(isin, quote=None, ratios=None, candles=None, retrieved_at
     tech = {"SMA 20", "SMA 50", "SMA 200", "RSI-14", "52-week high", "52-week low", "Last price"}
     return {
         "ok": bool(rows or statements or news_rows),
+        "sections": {"quote": bool(rows), "statements": bool(statements), "shareholding": bool(shareholding), "news": bool(news_rows)},
         "source": SOURCE,
         "ticker": isin,
         "name": str(node.get("symbol") or ""),
@@ -154,40 +155,3 @@ def tape_from_payloads(isin, quote=None, ratios=None, candles=None, retrieved_at
         "news": news_rows,
         "error": None if rows else "Upstox returned no usable fields for this ISIN.",
     }
-
-
-def fetch_upstox_equity(isin: str, exchange: str = "NSE") -> dict:
-    token = read_upstox_token()
-    key = instrument_key(isin, exchange)
-    retrieved = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    if not token:
-        return {"ok": False, "source": SOURCE, "error": "Analytics token is not in Streamlit secrets.", "retrieved_at": retrieved}
-    if not key:
-        return {"ok": False, "source": SOURCE, "error": "This line has no ISIN, so Upstox cannot be queried.", "retrieved_at": retrieved}
-    import requests
-    headers = {"Accept": "application/json", "Authorization": "Bearer " + token, "User-Agent": "NorthlineFamilyDesk/1.0"}
-    code = isin.strip().upper()
-    to_date = datetime.now(timezone.utc).date()
-    from_date = to_date - timedelta(days=400)
-
-    def get(url, params=None):
-        try:
-            response = requests.get(url, headers=headers, params=params, timeout=20)
-            return response.json() if response.status_code == 200 else {}
-        except Exception:
-            return {}
-
-    root = BASE + "/fundamentals/" + code
-    return tape_from_payloads(
-        isin,
-        quote=get(BASE + "/market-quote/quotes", {"instrument_key": key}),
-        ratios=get(root + "/key-ratios"),
-        candles=get(BASE + "/historical-candle/" + key + "/day/" + to_date.isoformat() + "/" + from_date.isoformat()),
-        income=get(root + "/income-statement", {"type": "consolidated", "time_period": "yearly"}),
-        cash_flow=get(root + "/cash-flow", {"type": "consolidated"}),
-        balance=get(root + "/balance-sheet", {"type": "consolidated"}),
-        holdings=get(root + "/share-holdings"),
-        actions=get(root + "/corporate-actions"),
-        news=get(BASE + "/news", {"category": "instrument_keys", "instrument_keys": key, "page_size": 5}),
-        retrieved_at=retrieved,
-    )
