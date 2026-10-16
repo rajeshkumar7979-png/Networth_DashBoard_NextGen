@@ -25,7 +25,7 @@
     "source": "fund-disclosures",
     "transport": "github-cdn",
     "endpoint": "https://cdn.jsdelivr.net/gh/kushagra-agarwal-a/fund-holdings-data@main/portfolios/asof/2026-09-30/100176.json",
-    "retrieved_at": "2026-10-15T09:21:21+00:00",
+    "retrieved_at": "2026-10-16T09:13:34+00:00",
     "catalog_commit": "718b3fd9d463a11c7e5dcc7a119603eb1fe26b38",
     "amfi_code": "120828",
     "http_request_id": null,
@@ -37,7 +37,12 @@
       "has_isin": 115,
       "has_market_value": 116
     },
-    "fallback_used": false
+    "fallback_used": false,
+    "comparison_status": "SAME_PERIOD",
+    "added_count": 0,
+    "exited_count": 0,
+    "changed_count": 0,
+    "prior_as_of": "2026-09-30"
   },
   "133036": {
     "status": "OK",
@@ -65,7 +70,7 @@
     "source": "fund-disclosures",
     "transport": "github-cdn",
     "endpoint": "https://cdn.jsdelivr.net/gh/kushagra-agarwal-a/fund-holdings-data@main/portfolios/asof/2026-09-30/100286.json",
-    "retrieved_at": "2026-10-15T09:21:26+00:00",
+    "retrieved_at": "2026-10-16T09:13:34+00:00",
     "catalog_commit": "718b3fd9d463a11c7e5dcc7a119603eb1fe26b38",
     "amfi_code": "133036",
     "http_request_id": null,
@@ -77,7 +82,12 @@
       "has_isin": 110,
       "has_market_value": 111
     },
-    "fallback_used": false
+    "fallback_used": false,
+    "comparison_status": "SAME_PERIOD",
+    "added_count": 0,
+    "exited_count": 0,
+    "changed_count": 0,
+    "prior_as_of": "2026-09-30"
   },
   "133801": {
     "status": "OK",
@@ -105,7 +115,7 @@
     "source": "fund-disclosures",
     "transport": "github-cdn",
     "endpoint": "https://cdn.jsdelivr.net/gh/kushagra-agarwal-a/fund-holdings-data@main/portfolios/asof/2026-09-30/133796.json",
-    "retrieved_at": "2026-10-15T09:21:32+00:00",
+    "retrieved_at": "2026-10-16T09:13:36+00:00",
     "catalog_commit": "718b3fd9d463a11c7e5dcc7a119603eb1fe26b38",
     "amfi_code": "133801",
     "http_request_id": null,
@@ -117,7 +127,12 @@
       "has_isin": 48,
       "has_market_value": 49
     },
-    "fallback_used": false
+    "fallback_used": false,
+    "comparison_status": "SAME_PERIOD",
+    "added_count": 0,
+    "exited_count": 0,
+    "changed_count": 0,
+    "prior_as_of": "2026-09-30"
   },
   "120465": {
     "status": "OK",
@@ -145,7 +160,7 @@
     "source": "fund-disclosures",
     "transport": "github-cdn",
     "endpoint": "https://cdn.jsdelivr.net/gh/kushagra-agarwal-a/fund-holdings-data@main/portfolios/asof/2026-09-30/112277.json",
-    "retrieved_at": "2026-10-15T09:21:38+00:00",
+    "retrieved_at": "2026-10-16T09:13:36+00:00",
     "catalog_commit": "718b3fd9d463a11c7e5dcc7a119603eb1fe26b38",
     "amfi_code": "120465",
     "http_request_id": null,
@@ -157,7 +172,12 @@
       "has_isin": 48,
       "has_market_value": 49
     },
-    "fallback_used": false
+    "fallback_used": false,
+    "comparison_status": "SAME_PERIOD",
+    "added_count": 0,
+    "exited_count": 0,
+    "changed_count": 0,
+    "prior_as_of": "2026-09-30"
   },
   "120323": {
     "status": "OK",
@@ -185,7 +205,7 @@
     "source": "fund-disclosures",
     "transport": "github-cdn",
     "endpoint": "https://cdn.jsdelivr.net/gh/kushagra-agarwal-a/fund-holdings-data@main/portfolios/asof/2026-09-30/102594.json",
-    "retrieved_at": "2026-10-15T09:21:43+00:00",
+    "retrieved_at": "2026-10-16T09:13:37+00:00",
     "catalog_commit": "718b3fd9d463a11c7e5dcc7a119603eb1fe26b38",
     "amfi_code": "120323",
     "http_request_id": null,
@@ -197,7 +217,12 @@
       "has_isin": 65,
       "has_market_value": 70
     },
-    "fallback_used": false
+    "fallback_used": false,
+    "comparison_status": "SAME_PERIOD",
+    "added_count": 0,
+    "exited_count": 0,
+    "changed_count": 0,
+    "prior_as_of": "2026-09-30"
   },
   "143903": {
     "status": "OK",
@@ -225,7 +250,7 @@
     "source": "fund-disclosures",
     "transport": "github-cdn",
     "endpoint": "https://cdn.jsdelivr.net/gh/kushagra-agarwal-a/fund-holdings-data@main/portfolios/asof/2026-09-30/143903.json",
-    "retrieved_at": "2026-10-15T09:21:48+00:00",
+    "retrieved_at": "2026-10-16T09:13:38+00:00",
     "catalog_commit": "718b3fd9d463a11c7e5dcc7a119603eb1fe26b38",
     "amfi_code": "143903",
     "http_request_id": null,
@@ -237,7 +262,12 @@
       "has_isin": 1,
       "has_market_value": 2
     },
-    "fallback_used": false
+    "fallback_used": false,
+    "comparison_status": "SAME_PERIOD",
+    "added_count": 0,
+    "exited_count": 0,
+    "changed_count": 0,
+    "prior_as_of": "2026-09-30"
   },
   "119250": {
     "status": "OK",
@@ -265,7 +295,7 @@
     "source": "fund-disclosures",
     "transport": "github-cdn",
     "endpoint": "https://cdn.jsdelivr.net/gh/kushagra-agarwal-a/fund-holdings-data@main/portfolios/asof/2026-09-30/101635.json",
-    "retrieved_at": "2026-10-15T09:21:54+00:00",
+    "retrieved_at": "2026-10-16T09:13:38+00:00",
     "catalog_commit": "718b3fd9d463a11c7e5dcc7a119603eb1fe26b38",
     "amfi_code": "119250",
     "http_request_id": null,
@@ -277,7 +307,12 @@
       "has_isin": 41,
       "has_market_value": 42
     },
-    "fallback_used": false
+    "fallback_used": false,
+    "comparison_status": "SAME_PERIOD",
+    "added_count": 0,
+    "exited_count": 0,
+    "changed_count": 0,
+    "prior_as_of": "2026-09-30"
   },
   "102000": {
     "status": "OK",
@@ -305,7 +340,7 @@
     "source": "fund-disclosures",
     "transport": "github-cdn",
     "endpoint": "https://cdn.jsdelivr.net/gh/kushagra-agarwal-a/fund-holdings-data@main/portfolios/asof/2026-09-30/102000.json",
-    "retrieved_at": "2026-10-15T09:21:59+00:00",
+    "retrieved_at": "2026-10-16T09:13:39+00:00",
     "catalog_commit": "718b3fd9d463a11c7e5dcc7a119603eb1fe26b38",
     "amfi_code": "102000",
     "http_request_id": null,
@@ -317,7 +352,12 @@
       "has_isin": 47,
       "has_market_value": 48
     },
-    "fallback_used": false
+    "fallback_used": false,
+    "comparison_status": "SAME_PERIOD",
+    "added_count": 0,
+    "exited_count": 0,
+    "changed_count": 0,
+    "prior_as_of": "2026-09-30"
   },
   "115833": {
     "status": "OK",
@@ -345,7 +385,7 @@
     "source": "fund-disclosures",
     "transport": "github-cdn",
     "endpoint": "https://cdn.jsdelivr.net/gh/kushagra-agarwal-a/fund-holdings-data@main/portfolios/asof/2026-09-30/115833.json",
-    "retrieved_at": "2026-10-15T09:22:04+00:00",
+    "retrieved_at": "2026-10-16T09:13:39+00:00",
     "catalog_commit": "718b3fd9d463a11c7e5dcc7a119603eb1fe26b38",
     "amfi_code": "115833",
     "http_request_id": null,
@@ -357,7 +397,12 @@
       "has_isin": 1,
       "has_market_value": 2
     },
-    "fallback_used": false
+    "fallback_used": false,
+    "comparison_status": "SAME_PERIOD",
+    "added_count": 0,
+    "exited_count": 0,
+    "changed_count": 0,
+    "prior_as_of": "2026-09-30"
   },
   "146381": {
     "status": "OK",
@@ -385,7 +430,7 @@
     "source": "fund-disclosures",
     "transport": "github-cdn",
     "endpoint": "https://cdn.jsdelivr.net/gh/kushagra-agarwal-a/fund-holdings-data@main/portfolios/asof/2026-09-30/146380.json",
-    "retrieved_at": "2026-10-15T09:22:10+00:00",
+    "retrieved_at": "2026-10-16T09:13:40+00:00",
     "catalog_commit": "718b3fd9d463a11c7e5dcc7a119603eb1fe26b38",
     "amfi_code": "146381",
     "http_request_id": null,
@@ -397,7 +442,12 @@
       "has_isin": 50,
       "has_market_value": 51
     },
-    "fallback_used": false
+    "fallback_used": false,
+    "comparison_status": "SAME_PERIOD",
+    "added_count": 0,
+    "exited_count": 0,
+    "changed_count": 0,
+    "prior_as_of": "2026-09-30"
   },
   "140228": {
     "status": "OK",
@@ -425,7 +475,7 @@
     "source": "fund-disclosures",
     "transport": "github-cdn",
     "endpoint": "https://cdn.jsdelivr.net/gh/kushagra-agarwal-a/fund-holdings-data@main/portfolios/asof/2026-09-30/140225.json",
-    "retrieved_at": "2026-10-15T09:22:15+00:00",
+    "retrieved_at": "2026-10-16T09:13:41+00:00",
     "catalog_commit": "718b3fd9d463a11c7e5dcc7a119603eb1fe26b38",
     "amfi_code": "140228",
     "http_request_id": null,
@@ -437,7 +487,12 @@
       "has_isin": 106,
       "has_market_value": 107
     },
-    "fallback_used": false
+    "fallback_used": false,
+    "comparison_status": "SAME_PERIOD",
+    "added_count": 0,
+    "exited_count": 0,
+    "changed_count": 0,
+    "prior_as_of": "2026-09-30"
   },
   "119091": {
     "status": "OK",
@@ -465,7 +520,7 @@
     "source": "fund-disclosures",
     "transport": "github-cdn",
     "endpoint": "https://cdn.jsdelivr.net/gh/kushagra-agarwal-a/fund-holdings-data@main/portfolios/asof/2026-09-30/100868.json",
-    "retrieved_at": "2026-10-15T09:22:21+00:00",
+    "retrieved_at": "2026-10-16T09:13:42+00:00",
     "catalog_commit": "718b3fd9d463a11c7e5dcc7a119603eb1fe26b38",
     "amfi_code": "119091",
     "http_request_id": null,
@@ -477,7 +532,12 @@
       "has_isin": 140,
       "has_market_value": 141
     },
-    "fallback_used": false
+    "fallback_used": false,
+    "comparison_status": "SAME_PERIOD",
+    "added_count": 0,
+    "exited_count": 0,
+    "changed_count": 0,
+    "prior_as_of": "2026-09-30"
   },
   "120621": {
     "status": "OK",
@@ -505,7 +565,7 @@
     "source": "fund-disclosures",
     "transport": "github-cdn",
     "endpoint": "https://cdn.jsdelivr.net/gh/kushagra-agarwal-a/fund-holdings-data@main/portfolios/asof/2026-09-30/103149.json",
-    "retrieved_at": "2026-10-15T09:22:26+00:00",
+    "retrieved_at": "2026-10-16T09:13:43+00:00",
     "catalog_commit": "718b3fd9d463a11c7e5dcc7a119603eb1fe26b38",
     "amfi_code": "120621",
     "http_request_id": null,
@@ -517,7 +577,12 @@
       "has_isin": 80,
       "has_market_value": 81
     },
-    "fallback_used": false
+    "fallback_used": false,
+    "comparison_status": "SAME_PERIOD",
+    "added_count": 0,
+    "exited_count": 0,
+    "changed_count": 0,
+    "prior_as_of": "2026-09-30"
   },
   "147919": {
     "status": "OK",
@@ -545,7 +610,7 @@
     "source": "fund-disclosures",
     "transport": "github-cdn",
     "endpoint": "https://cdn.jsdelivr.net/gh/kushagra-agarwal-a/fund-holdings-data@main/portfolios/asof/2026-09-30/147917.json",
-    "retrieved_at": "2026-10-15T09:22:32+00:00",
+    "retrieved_at": "2026-10-16T09:13:44+00:00",
     "catalog_commit": "718b3fd9d463a11c7e5dcc7a119603eb1fe26b38",
     "amfi_code": "147919",
     "http_request_id": null,
@@ -557,7 +622,12 @@
       "has_isin": 86,
       "has_market_value": 87
     },
-    "fallback_used": false
+    "fallback_used": false,
+    "comparison_status": "SAME_PERIOD",
+    "added_count": 0,
+    "exited_count": 0,
+    "changed_count": 0,
+    "prior_as_of": "2026-09-30"
   },
   "122639": {
     "status": "OK",
@@ -585,7 +655,7 @@
     "source": "fund-disclosures",
     "transport": "github-cdn",
     "endpoint": "https://cdn.jsdelivr.net/gh/kushagra-agarwal-a/fund-holdings-data@main/portfolios/asof/2026-09-30/122639.json",
-    "retrieved_at": "2026-10-15T09:22:37+00:00",
+    "retrieved_at": "2026-10-16T09:13:45+00:00",
     "catalog_commit": "718b3fd9d463a11c7e5dcc7a119603eb1fe26b38",
     "amfi_code": "122639",
     "http_request_id": null,
@@ -597,7 +667,12 @@
       "has_isin": 100,
       "has_market_value": 101
     },
-    "fallback_used": false
+    "fallback_used": false,
+    "comparison_status": "SAME_PERIOD",
+    "added_count": 0,
+    "exited_count": 0,
+    "changed_count": 0,
+    "prior_as_of": "2026-09-30"
   },
   "119835": {
     "status": "OK",
@@ -625,7 +700,7 @@
     "source": "fund-disclosures",
     "transport": "github-cdn",
     "endpoint": "https://cdn.jsdelivr.net/gh/kushagra-agarwal-a/fund-holdings-data@main/portfolios/asof/2026-09-30/100915.json",
-    "retrieved_at": "2026-10-15T09:22:43+00:00",
+    "retrieved_at": "2026-10-16T09:13:45+00:00",
     "catalog_commit": "718b3fd9d463a11c7e5dcc7a119603eb1fe26b38",
     "amfi_code": "119835",
     "http_request_id": null,
@@ -637,7 +712,12 @@
       "has_isin": 93,
       "has_market_value": 99
     },
-    "fallback_used": false
+    "fallback_used": false,
+    "comparison_status": "SAME_PERIOD",
+    "added_count": 0,
+    "exited_count": 0,
+    "changed_count": 0,
+    "prior_as_of": "2026-09-30"
   },
   "119132": {
     "status": "OK",
@@ -665,7 +745,7 @@
     "source": "fund-disclosures",
     "transport": "github-cdn",
     "endpoint": "https://cdn.jsdelivr.net/gh/kushagra-agarwal-a/fund-holdings-data@main/portfolios/asof/2026-09-30/115934.json",
-    "retrieved_at": "2026-10-15T09:22:48+00:00",
+    "retrieved_at": "2026-10-16T09:13:46+00:00",
     "catalog_commit": "718b3fd9d463a11c7e5dcc7a119603eb1fe26b38",
     "amfi_code": "119132",
     "http_request_id": null,
@@ -677,7 +757,12 @@
       "has_isin": 1,
       "has_market_value": 2
     },
-    "fallback_used": false
+    "fallback_used": false,
+    "comparison_status": "SAME_PERIOD",
+    "added_count": 0,
+    "exited_count": 0,
+    "changed_count": 0,
+    "prior_as_of": "2026-09-30"
   },
   "118989": {
     "status": "OK",
@@ -705,7 +790,7 @@
     "source": "fund-disclosures",
     "transport": "github-cdn",
     "endpoint": "https://cdn.jsdelivr.net/gh/kushagra-agarwal-a/fund-holdings-data@main/portfolios/asof/2026-09-30/105757.json",
-    "retrieved_at": "2026-10-15T09:22:54+00:00",
+    "retrieved_at": "2026-10-16T09:13:47+00:00",
     "catalog_commit": "718b3fd9d463a11c7e5dcc7a119603eb1fe26b38",
     "amfi_code": "118989",
     "http_request_id": null,
@@ -717,7 +802,12 @@
       "has_isin": 79,
       "has_market_value": 80
     },
-    "fallback_used": false
+    "fallback_used": false,
+    "comparison_status": "SAME_PERIOD",
+    "added_count": 0,
+    "exited_count": 0,
+    "changed_count": 0,
+    "prior_as_of": "2026-09-30"
   },
   "145137": {
     "status": "OK",
@@ -745,7 +835,7 @@
     "source": "fund-disclosures",
     "transport": "github-cdn",
     "endpoint": "https://cdn.jsdelivr.net/gh/kushagra-agarwal-a/fund-holdings-data@main/portfolios/asof/2026-09-30/145137.json",
-    "retrieved_at": "2026-10-15T09:22:59+00:00",
+    "retrieved_at": "2026-10-16T09:13:48+00:00",
     "catalog_commit": "718b3fd9d463a11c7e5dcc7a119603eb1fe26b38",
     "amfi_code": "145137",
     "http_request_id": null,
@@ -757,7 +847,12 @@
       "has_isin": 75,
       "has_market_value": 76
     },
-    "fallback_used": false
+    "fallback_used": false,
+    "comparison_status": "SAME_PERIOD",
+    "added_count": 0,
+    "exited_count": 0,
+    "changed_count": 0,
+    "prior_as_of": "2026-09-30"
   },
   "143269": {
     "status": "OK",
@@ -785,7 +880,7 @@
     "source": "fund-disclosures",
     "transport": "github-cdn",
     "endpoint": "https://cdn.jsdelivr.net/gh/kushagra-agarwal-a/fund-holdings-data@main/portfolios/asof/2026-09-30/143260.json",
-    "retrieved_at": "2026-10-15T09:23:04+00:00",
+    "retrieved_at": "2026-10-16T09:13:49+00:00",
     "catalog_commit": "718b3fd9d463a11c7e5dcc7a119603eb1fe26b38",
     "amfi_code": "143269",
     "http_request_id": null,
@@ -797,7 +892,12 @@
       "has_isin": 40,
       "has_market_value": 41
     },
-    "fallback_used": false
+    "fallback_used": false,
+    "comparison_status": "SAME_PERIOD",
+    "added_count": 0,
+    "exited_count": 0,
+    "changed_count": 0,
+    "prior_as_of": "2026-09-30"
   },
   "143341": {
     "status": "OK",
@@ -825,7 +925,7 @@
     "source": "fund-disclosures",
     "transport": "github-cdn",
     "endpoint": "https://cdn.jsdelivr.net/gh/kushagra-agarwal-a/fund-holdings-data@main/portfolios/asof/2026-09-30/143340.json",
-    "retrieved_at": "2026-10-15T09:23:07+00:00",
+    "retrieved_at": "2026-10-16T09:13:50+00:00",
     "catalog_commit": "718b3fd9d463a11c7e5dcc7a119603eb1fe26b38",
     "amfi_code": "143341",
     "http_request_id": null,
@@ -837,6 +937,11 @@
       "has_isin": 50,
       "has_market_value": 51
     },
-    "fallback_used": false
+    "fallback_used": false,
+    "comparison_status": "SAME_PERIOD",
+    "added_count": 0,
+    "exited_count": 0,
+    "changed_count": 0,
+    "prior_as_of": "2026-09-30"
   }
 }

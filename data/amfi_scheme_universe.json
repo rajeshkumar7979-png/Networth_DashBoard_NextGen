@@ -1,5 +1,5 @@
 {
-  "fetched_at": "2026-10-15T09:19:50+00:00",
+  "fetched_at": "2026-10-16T09:13:31+00:00",
   "rows": [
     {
       "scheme_code": "135762",
@@ -38559,6 +38559,16 @@
       "nav": null,
       "nav_date": "",
       "amc": "ICICI Prudential Mutual Fund",
+      "category": "Open Ended Schemes(Exchange Traded Funds (ETFs) - Other ETF)"
+    },
+    {
+      "scheme_code": "154789",
+      "isin_primary": "INF204KC1HS1",
+      "isin_secondary": "",
+      "scheme_name": "Nippon India CRISIL-IBX FAR Gilt ETF",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Nippon India Mutual Fund",
       "category": "Open Ended Schemes(Exchange Traded Funds (ETFs) - Other ETF)"
     },
     {
