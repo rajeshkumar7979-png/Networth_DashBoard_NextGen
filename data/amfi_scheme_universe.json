@@ -1,5 +1,5 @@
 {
-  "fetched_at": "2026-10-16T09:13:31+00:00",
+  "fetched_at": "2026-10-17T08:45:10+00:00",
   "rows": [
     {
       "scheme_code": "135762",
@@ -29142,6 +29142,46 @@
       "category": "Open Ended Schemes(Equity Schemes - Contra Fund)"
     },
     {
+      "scheme_code": "154740",
+      "isin_primary": "INF109K1A682",
+      "isin_secondary": "",
+      "scheme_name": "ICICI Prudential Contra Fund",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "ICICI Prudential Mutual Fund",
+      "category": "Open Ended Schemes(Equity Schemes - Contra Fund)"
+    },
+    {
+      "scheme_code": "154743",
+      "isin_primary": "INF109K1A708",
+      "isin_secondary": "INF109K1A690",
+      "scheme_name": "ICICI Prudential Contra Fund",
+      "nav": null,
+      "nav_date": "IDCW",
+      "amc": "ICICI Prudential Mutual Fund",
+      "category": "Open Ended Schemes(Equity Schemes - Contra Fund)"
+    },
+    {
+      "scheme_code": "154741",
+      "isin_primary": "INF109K1A658",
+      "isin_secondary": "",
+      "scheme_name": "ICICI Prudential Contra Fund",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "ICICI Prudential Mutual Fund",
+      "category": "Open Ended Schemes(Equity Schemes - Contra Fund)"
+    },
+    {
+      "scheme_code": "154742",
+      "isin_primary": "INF109K1A674",
+      "isin_secondary": "INF109K1A666",
+      "scheme_name": "ICICI Prudential Contra Fund",
+      "nav": null,
+      "nav_date": "IDCW",
+      "amc": "ICICI Prudential Mutual Fund",
+      "category": "Open Ended Schemes(Equity Schemes - Contra Fund)"
+    },
+    {
       "scheme_code": "120348",
       "isin_primary": "INF205K01LE4",
       "isin_secondary": "",
@@ -48192,12 +48232,32 @@
       "category": "Open Ended Schemes(Hybrid Schemes - Aggressive Hybrid Fund)"
     },
     {
+      "scheme_code": "154848",
+      "isin_primary": "INF03VN01BB5",
+      "isin_secondary": "INF03VN01BC3",
+      "scheme_name": "WhiteOak Capital Aggressive Hybrid Fund",
+      "nav": null,
+      "nav_date": "IDCW Option",
+      "amc": "WhiteOak Capital Mutual Fund",
+      "category": "Open Ended Schemes(Hybrid Schemes - Aggressive Hybrid Fund)"
+    },
+    {
       "scheme_code": "154393",
       "isin_primary": "INF03VN01AG6",
       "isin_secondary": "",
       "scheme_name": "WhiteOak Capital Aggressive Hybrid Fund",
       "nav": null,
       "nav_date": "Growth Option",
+      "amc": "WhiteOak Capital Mutual Fund",
+      "category": "Open Ended Schemes(Hybrid Schemes - Aggressive Hybrid Fund)"
+    },
+    {
+      "scheme_code": "154849",
+      "isin_primary": "INF03VN01BD1",
+      "isin_secondary": "INF03VN01BE9",
+      "scheme_name": "WhiteOak Capital Aggressive Hybrid Fund",
+      "nav": null,
+      "nav_date": "IDCW Option",
       "amc": "WhiteOak Capital Mutual Fund",
       "category": "Open Ended Schemes(Hybrid Schemes - Aggressive Hybrid Fund)"
     },
@@ -49622,12 +49682,32 @@
       "category": "Open Ended Schemes(Hybrid Schemes - Balanced Advantage Fund/ Dynamic Asset Allocation)"
     },
     {
+      "scheme_code": "154844",
+      "isin_primary": "INF03VN01AT9",
+      "isin_secondary": "INF03VN01AU7",
+      "scheme_name": "WhiteOak Capital Balanced Advantage Fund",
+      "nav": null,
+      "nav_date": "IDCW Option",
+      "amc": "WhiteOak Capital Mutual Fund",
+      "category": "Open Ended Schemes(Hybrid Schemes - Balanced Advantage Fund/ Dynamic Asset Allocation)"
+    },
+    {
       "scheme_code": "151268",
       "isin_primary": "INF03VN01720",
       "isin_secondary": "",
       "scheme_name": "WhiteOak Capital Balanced Advantage Fund",
       "nav": null,
       "nav_date": "Growth Option",
+      "amc": "WhiteOak Capital Mutual Fund",
+      "category": "Open Ended Schemes(Hybrid Schemes - Balanced Advantage Fund/ Dynamic Asset Allocation)"
+    },
+    {
+      "scheme_code": "154845",
+      "isin_primary": "INF03VN01AV5",
+      "isin_secondary": "INF03VN01AW3",
+      "scheme_name": "WhiteOak Capital Balanced Advantage Fund",
+      "nav": null,
+      "nav_date": "IDCW Option",
       "amc": "WhiteOak Capital Mutual Fund",
       "category": "Open Ended Schemes(Hybrid Schemes - Balanced Advantage Fund/ Dynamic Asset Allocation)"
     },
@@ -49758,6 +49838,16 @@
       "scheme_name": "WhiteOak Capital Balanced Hybrid Fund",
       "nav": null,
       "nav_date": "Growth Option",
+      "amc": "WhiteOak Capital Mutual Fund",
+      "category": "Open Ended Schemes(Hybrid Schemes - Balanced Hybrid Fund)"
+    },
+    {
+      "scheme_code": "154846",
+      "isin_primary": "INF03VN01AX1",
+      "isin_secondary": "INF03VN01AY9",
+      "scheme_name": "WhiteOak Capital Balanced Hybrid Fund",
+      "nav": null,
+      "nav_date": "IDCW Option",
       "amc": "WhiteOak Capital Mutual Fund",
       "category": "Open Ended Schemes(Hybrid Schemes - Balanced Hybrid Fund)"
     },
@@ -66980,6 +67070,46 @@
       "nav_date": "Monthly IDCW",
       "amc": "Shriram Mutual Fund",
       "category": "Open Ended Schemes(Income/Debt Oriented Schemes - Overnight Fund)"
+    },
+    {
+      "scheme_code": "154805",
+      "isin_primary": "INF209KC1779",
+      "isin_secondary": "",
+      "scheme_name": "Aditya Birla Sun Life Financial Services Sectoral Debt Fund",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Aditya Birla Sun Life Mutual Fund",
+      "category": "Open Ended Schemes(Income/Debt Oriented Schemes - Sectoral Fund)"
+    },
+    {
+      "scheme_code": "154811",
+      "isin_primary": "INF209KC1787",
+      "isin_secondary": "INF209KC1795",
+      "scheme_name": "Aditya Birla Sun Life Financial Services Sectoral Debt Fund",
+      "nav": null,
+      "nav_date": "IDCW",
+      "amc": "Aditya Birla Sun Life Mutual Fund",
+      "category": "Open Ended Schemes(Income/Debt Oriented Schemes - Sectoral Fund)"
+    },
+    {
+      "scheme_code": "154810",
+      "isin_primary": "INF209KC1803",
+      "isin_secondary": "",
+      "scheme_name": "Aditya Birla Sun Life Financial Services Sectoral Debt Fund",
+      "nav": null,
+      "nav_date": "Growth",
+      "amc": "Aditya Birla Sun Life Mutual Fund",
+      "category": "Open Ended Schemes(Income/Debt Oriented Schemes - Sectoral Fund)"
+    },
+    {
+      "scheme_code": "154812",
+      "isin_primary": "INF209KC1811",
+      "isin_secondary": "INF209KC1829",
+      "scheme_name": "Aditya Birla Sun Life Financial Services Sectoral Debt Fund",
+      "nav": null,
+      "nav_date": "IDCW",
+      "amc": "Aditya Birla Sun Life Mutual Fund",
+      "category": "Open Ended Schemes(Income/Debt Oriented Schemes - Sectoral Fund)"
     },
     {
       "scheme_code": "154654",
