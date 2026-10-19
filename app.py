@@ -1,6 +1,7 @@
 import streamlit as st
 from lib.theme import inject_css
 from lib.book_session import ensure_published_book
+from lib.deploy_meta import render_build_footer
 
 st.set_page_config(
     page_title="NORTHLINE · Family desk",
@@ -58,3 +59,4 @@ pg = st.navigation(
     position="hidden",
 )
 pg.run()
+render_build_footer(st)
