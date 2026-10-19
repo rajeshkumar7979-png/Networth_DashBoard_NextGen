@@ -39,14 +39,13 @@ def test_fd_currency_counts(fd_df):
 
 
 def test_fd_data_rows_are_well_formed(fd_df):
-    # Rows 0..22 are real deposits; rows 23..32 are blank/subtotal rows the app skips.
-    for i in range(0, 23):
+    # Public sample keeps only real deposit rows (summary rows removed during anonymization).
+    assert len(fd_df) == GOLDENS["fd_rows"]
+    for i in range(len(fd_df)):
         row = fd_df.iloc[i]
         assert row["Holder Name"] and str(row["Holder Name"]).strip().lower() not in ("nan", "nat", "none")
         assert safe_float(row["Principal Amount"]) > 0
         assert pd.notna(row["Deposit Date"]) and pd.notna(row["Maturity Date"])
-    for i in range(23, GOLDENS["fd_rows"]):
-        assert safe_float(fd_df.iloc[i]["Principal Amount"]) == 0.0
 
 
 def test_mf_shape(mf_df):
