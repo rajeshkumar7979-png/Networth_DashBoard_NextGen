@@ -23,3 +23,27 @@ def test_upstox_tape_uses_quote_ratios_and_statements_without_network():
     assert tape["statements"][0]["Line"] == "Revenue"
     assert tape["news"][0]["Headline"] == "IDFC First Bank board meeting"
     assert tape["source"] == "Upstox Analytics token"
+    assert tape["completeness"] == "partial"  # shareholding/actions still missing
+    assert tape["sections"]["quote"] is True
+    assert tape["sections"]["ratios"] is True
+    assert "partial load" in (tape.get("error") or "").lower()
+
+
+def test_upstox_partial_quote_only_is_not_complete():
+    tape = tape_from_payloads(
+        "INE092T01019",
+        quote={"data": {"NSE_EQ:IDFCFIRSTB": {
+            "symbol": "IDFCFIRSTB", "last_price": 80.5, "ohlc": {"close": 79.0},
+        }}},
+    )
+    assert tape["ok"] is True
+    assert tape["completeness"] == "partial"
+    assert tape["sections"]["quote"] is True
+    assert tape["sections"]["ratios"] is False
+    assert "missing/failed" in (tape.get("error") or "").lower()
+
+
+def test_upstox_empty_payload_is_empty_not_success():
+    tape = tape_from_payloads("INE092T01019", quote={"data": {}})
+    assert tape["ok"] is False
+    assert tape["completeness"] == "empty"
