@@ -1,5 +1,5 @@
-date,mf_current_inr,mf_invested_inr,schemes_priced,schemes_missing_nav,note
-2026-10-16,0.0,4533130.22,0,21,MF book only. Units x AMFI NAV. Not full net worth.
-2026-10-17,0.0,4533130.22,0,21,MF book only. Units x AMFI NAV. Not full net worth.
-2026-10-18,0.0,4533130.22,0,21,MF book only. Units x AMFI NAV. Not full net worth.
-2026-10-19,4920045.78,4533130.22,21,0,MF book only. Units x AMFI NAV. Not full net worth.
+date,mf_current_inr,mf_invested_inr,schemes_priced,schemes_missing_nav,note,stocks_current_inr,stocks_invested_inr,stocks_rows,stocks_mark,fd_current_inr,fd_principal_inr,fd_rows,total_assets_inr,total_invested_inr
+2026-10-16,0.0,4533130.22,0,21,MF book only. Units x AMFI NAV. Not full net worth.,,,,,,,,,
+2026-10-17,0.0,4533130.22,0,21,MF book only. Units x AMFI NAV. Not full net worth.,,,,,,,,,
+2026-10-18,0.0,4533130.22,0,21,MF book only. Units x AMFI NAV. Not full net worth.,,,,,,,,,
+2026-10-19,7588925.48,7168423.41,21,0,Full book snapshot. MF = units x AMFI NAV. Stocks = invested basis (no live mark in daily job). FD = available balance or principal. Not liabilities.,1458796.97,1458796.97,36.0,invested_basis,644009.0,669009.0,7.0,9691731.45,9296229.38
