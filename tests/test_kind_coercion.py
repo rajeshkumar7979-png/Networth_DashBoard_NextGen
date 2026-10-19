@@ -1,7 +1,5 @@
 """AI kind coercion — production parse recovers unknown kinds instead of hard-failing."""
 import json
-import pytest
-
 from lib.intelligence import ai
 
 

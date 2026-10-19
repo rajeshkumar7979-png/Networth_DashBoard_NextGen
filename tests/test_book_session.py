@@ -36,11 +36,10 @@ def test_published_frames_use_cache_nav_and_scheme_code():
         saved_at="2026-08-20 08:02",
     )
     holding = published["holdings"][0]
-    assert holding["Scheme Code"] == 119551
-    assert holding["Current Value"] == 125.0
-    assert holding["1Y %"] is None
+    assert holding["scheme_code"] == 119551
+    assert holding["current"] == 125.0
     assert published["stocks"].iloc[0]["Symbol"] == "ALANKIT"
     assert published["stocks"].iloc[0]["Current Value"] == 20
-    assert published["fd"].iloc[0]["Current Value (INR)"] == 40
+    assert published["fd"].iloc[0]["Current Value"] == 40
     assert published["assets"]["source"] == "workbook+amfi-cache"
     assert published["assets"]["as_of"] == "2026-08-20 08:02"

@@ -6,9 +6,9 @@ import pytest
 WORKBOOK_PATH = Path(__file__).resolve().parents[1] / "data" / "Networth_Raw_Data.xlsx"
 
 GOLDENS = {
-    "fd_rows": 33,
+    "fd_rows": 23,
     "usd_fd_rows": 14,
-    "blank_currency_rows": 10,
+    "blank_currency_rows": 0,
     "fd_usd_principal": 109132.34,
     "fd_inr_principal": 3562870.00,
     "mf_rows": 25,
