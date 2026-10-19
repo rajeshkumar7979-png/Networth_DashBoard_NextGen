@@ -75,73 +75,109 @@ def load_portfolio_history(path: Path | None = None) -> pd.DataFrame:
     return df.sort_values("date").drop_duplicates(subset=["date"], keep="last").reset_index(drop=True)
 
 
+def row_data_quality(row: pd.Series) -> str:
+    """Label rows so NAV-parse gaps are not mistaken for real zero value."""
+    priced = row.get("schemes_priced")
+    missing = row.get("schemes_missing_nav")
+    mf = row.get("mf_current_inr")
+    try:
+        priced_n = int(priced) if pd.notna(priced) else 0
+    except (TypeError, ValueError):
+        priced_n = 0
+    try:
+        missing_n = int(missing) if pd.notna(missing) else 0
+    except (TypeError, ValueError):
+        missing_n = 0
+    mf_n = float(mf) if pd.notna(mf) else None
+    if priced_n == 0 and missing_n > 0 and (mf_n is None or mf_n == 0.0):
+        return "NAV_PARSE_GAP"
+    if missing_n > 0 and priced_n > 0:
+        return "PARTIAL_NAV"
+    if row.get("total_assets_inr") is None or (isinstance(row.get("total_assets_inr"), float) and pd.isna(row.get("total_assets_inr"))):
+        if mf_n is not None:
+            return "MF_ONLY"
+        return "INCOMPLETE"
+    return "OK"
+
+
 def portfolio_history_delta(df: pd.DataFrame | None = None) -> dict:
-    """Latest vs prior totals from the committed portfolio history."""
+    """Latest vs prior *trusted* totals (skips NAV_PARSE_GAP rows)."""
     hist = df if df is not None else load_portfolio_history()
-    if hist is None or hist.empty or "total_assets_inr" not in hist.columns:
+    if hist is None or hist.empty:
         return {"ok": False, "reason": "No portfolio history rows yet."}
-    usable = hist.dropna(subset=["total_assets_inr"])
+    hist = hist.copy()
+    hist["_quality"] = hist.apply(row_data_quality, axis=1)
+    trusted = hist[hist["_quality"].isin({"OK", "PARTIAL_NAV", "MF_ONLY"})].copy()
+    if trusted.empty:
+        return {"ok": False, "reason": "No trusted history rows yet (only NAV-gap zeros)."}
+
+    if "total_assets_inr" in trusted.columns and trusted["total_assets_inr"].notna().any():
+        usable = trusted.dropna(subset=["total_assets_inr"])
+        scope = "full_book"
+        value_col = "total_assets_inr"
+    else:
+        usable = trusted.dropna(subset=["mf_current_inr"])
+        scope = "mf_only"
+        value_col = "mf_current_inr"
     if usable.empty:
-        # Fall back to MF-only rows from before full-book columns existed.
-        if "mf_current_inr" not in hist.columns:
-            return {"ok": False, "reason": "No valued history rows yet."}
-        usable = hist.dropna(subset=["mf_current_inr"])
-        if usable.empty:
-            return {"ok": False, "reason": "No valued history rows yet."}
-        latest = usable.iloc[-1]
-        prior = usable.iloc[-2] if len(usable) >= 2 else None
-        out = {
-            "ok": True,
-            "date": str(latest["date"]),
-            "total_assets": float(latest["mf_current_inr"] or 0),
-            "mf_current": float(latest["mf_current_inr"] or 0),
-            "scope": "mf_only",
-        }
-        if prior is not None:
-            out["prior_date"] = str(prior["date"])
-            out["prior_total"] = float(prior["mf_current_inr"] or 0)
-            out["delta"] = out["total_assets"] - out["prior_total"]
-        return out
+        return {"ok": False, "reason": "No valued trusted history rows yet."}
+
     latest = usable.iloc[-1]
     prior = usable.iloc[-2] if len(usable) >= 2 else None
     out = {
         "ok": True,
         "date": str(latest["date"]),
-        "total_assets": float(latest.get("total_assets_inr") or 0),
-        "total_invested": float(latest["total_invested_inr"]) if pd.notna(latest.get("total_invested_inr")) else None,
+        "total_assets": float(latest[value_col] or 0),
         "mf_current": float(latest["mf_current_inr"]) if pd.notna(latest.get("mf_current_inr")) else None,
         "stocks_current": float(latest["stocks_current_inr"]) if pd.notna(latest.get("stocks_current_inr")) else None,
         "fd_current": float(latest["fd_current_inr"]) if pd.notna(latest.get("fd_current_inr")) else None,
-        "scope": "full_book",
+        "total_invested": float(latest["total_invested_inr"]) if pd.notna(latest.get("total_invested_inr")) else None,
+        "scope": scope,
+        "quality": row_data_quality(latest),
     }
-    if prior is not None and pd.notna(prior.get("total_assets_inr")):
+    if prior is not None and pd.notna(prior.get(value_col)):
         out["prior_date"] = str(prior["date"])
-        out["prior_total"] = float(prior["total_assets_inr"] or 0)
+        out["prior_total"] = float(prior[value_col] or 0)
         out["delta"] = out["total_assets"] - out["prior_total"]
     return out
 
 
 def render_portfolio_history(st_module=None) -> pd.DataFrame:
-    """Show the committed daily book trend (MF + stocks + FD when present)."""
+    """Show the committed daily book trend; never chart NAV-gap zeros as real value."""
     ui = st_module or st
     hist = load_portfolio_history()
     if hist.empty:
         ui.caption("No committed portfolio_history.csv rows yet. The daily holdings job writes them.")
         return hist
+
+    hist = hist.copy()
+    hist["data_quality"] = hist.apply(row_data_quality, axis=1)
+    gap_n = int((hist["data_quality"] == "NAV_PARSE_GAP").sum())
+
     delta = portfolio_history_delta(hist)
     if delta.get("ok"):
-        bits = [f"Latest {delta['date']}: ₹{delta['total_assets']:,.0f}"]
+        bits = [f"Latest trusted {delta['date']}: ₹{delta['total_assets']:,.0f}"]
         if delta.get("delta") is not None and delta.get("prior_date"):
             sign = "+" if delta["delta"] >= 0 else ""
-            bits.append(f"vs {delta['prior_date']} {sign}₹{delta['delta']:,.0f}")
+            bits.append(f"vs trusted {delta['prior_date']} {sign}₹{delta['delta']:,.0f}")
         if delta.get("scope") == "mf_only":
-            bits.append("(MF-only rows; full-book columns start after the history upgrade)")
+            bits.append("(MF-only trusted rows)")
         ui.caption(" · ".join(bits))
+    else:
+        ui.caption(delta.get("reason") or "No trusted history yet.")
+
+    if gap_n:
+        ui.caption(
+            f"{gap_n} day(s) labelled NAV_PARSE_GAP (MF marked 0 because AMFI parse failed). "
+            "Those days are kept in the audit table but excluded from the trend chart."
+        )
+
+    chart_src = hist[hist["data_quality"] != "NAV_PARSE_GAP"].copy()
     chart_cols = [c for c in (
         "total_assets_inr", "mf_current_inr", "stocks_current_inr", "fd_current_inr",
-    ) if c in hist.columns and hist[c].notna().any()]
-    if chart_cols:
-        plot = hist.set_index("date")[chart_cols].copy()
+    ) if c in chart_src.columns and chart_src[c].notna().any()]
+    if chart_cols and not chart_src.empty:
+        plot = chart_src.set_index("date")[chart_cols].copy()
         plot = plot.rename(columns={
             "total_assets_inr": "Total assets",
             "mf_current_inr": "MF",
@@ -149,12 +185,16 @@ def render_portfolio_history(st_module=None) -> pd.DataFrame:
             "fd_current_inr": "FD",
         })
         ui.line_chart(plot, height=260)
-    show_cols = [c for c in PORTFOLIO_COLS if c in hist.columns]
+    else:
+        ui.caption("No trusted rows to chart yet.")
+
+    show_cols = [c for c in (["data_quality"] + PORTFOLIO_COLS) if c in hist.columns or c == "data_quality"]
     ui.dataframe(hist[show_cols].tail(14), hide_index=True, use_container_width=True)
     ui.caption(
         "Source: data/portfolio_history.csv committed by GitHub Actions. "
-        "MF = units × AMFI NAV. Stocks = invested basis in the daily job. "
-        "FD = available or principal. Not a full P&L ledger."
+        "MF = units × AMFI NAV. Stocks may be live Yahoo mark or invested basis. "
+        "FD = available or principal. Not a full P&L ledger. "
+        "data_quality=NAV_PARSE_GAP means the old parser wrote zeros — not a real portfolio crash."
     )
     return hist
 
