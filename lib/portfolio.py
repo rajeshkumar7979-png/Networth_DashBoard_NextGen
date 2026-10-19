@@ -6,18 +6,22 @@ For day 1: keep processing inside pages/1_Command_Center.py (copy from current
 app.py), then extract functions one by one.
 """
 from __future__ import annotations
+
 import pandas as pd
 import streamlit as st
-from lib.config import EXCEL_PATH
+
+from lib.config import resolve_book_path
+
 
 def load_excel(uploaded_file=None):
     if uploaded_file is not None:
         xls = pd.ExcelFile(uploaded_file)
     else:
+        path = resolve_book_path()
         try:
-            xls = pd.ExcelFile(EXCEL_PATH)
+            xls = pd.ExcelFile(path)
         except Exception:
-            st.error(f"Could not load {EXCEL_PATH}")
+            st.error(f"Could not load book at {path}")
             st.stop()
     sheet_map = {s.lower().strip(): s for s in xls.sheet_names}
 
