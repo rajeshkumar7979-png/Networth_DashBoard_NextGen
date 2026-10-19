@@ -72,7 +72,6 @@ def test_available_balance_used_when_meaningfully_above_principal():
 
 
 def test_available_balance_ignored_when_approx_equal_to_principal():
-    # Balance ≈ principal (< 0.1% above) is ignored and we fall to simple interest.
     current, accrued, method, notes = compute_fd_current_native(
         100000, 6.5, pd.Timestamp("2025-01-01"), pd.Timestamp("2030-01-01"), TODAY,
         available_balance=100000,
@@ -82,7 +81,6 @@ def test_available_balance_ignored_when_approx_equal_to_principal():
 
 
 def test_simple_interest_fallback_formula():
-    # Regression for the fixed `notess` bug: this path used to raise NameError.
     current, accrued, method, notes = compute_fd_current_native(
         100000, 6.5, pd.Timestamp("2025-01-01"), pd.Timestamp("2030-01-01"), TODAY,
     )
@@ -120,9 +118,6 @@ def test_zero_roi_yields_zero_accrual():
     assert current == pytest.approx(100000, abs=1e-9)
 
 
-# ---------------- workbook sweep (today-fixed golden regression) ----------------
-# Captured from the committed sample workbook with TODAY = 2026-09-08 using the
-# app-identical extraction path. Rows 23-32 are blank/subtotal rows (skipped).
 FD_GOLDEN = [
     (0, "maturity_interp", 50000.0, 52931.37),
     (1, "maturity_interp", 44009.0, 51356.75),
@@ -161,7 +156,7 @@ def test_workbook_fd_rows_process_exactly(fd_df):
         assert current is not None
         collected.append((idx, method, params["principal"], current))
     assert len([c for c in collected if c[1] != "SKIPPED"]) == 23
-    assert len([c for c in collected if c[1] == "SKIPPED"]) == 10
+    assert len([c for c in collected if c[1] == "SKIPPED"]) == 0
 
 
 @pytest.mark.parametrize("idx,method,principal,golden_current", FD_GOLDEN)
