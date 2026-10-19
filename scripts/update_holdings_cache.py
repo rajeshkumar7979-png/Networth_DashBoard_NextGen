@@ -6,7 +6,7 @@ Rules:
 - Never invent a filing date.
 - Archive each reporting period so a later month does not erase the prior one.
 - Write a daily full-book value row (MF units x AMFI NAV + stock marks +
-  FD available/principal in INR). Stocks prefer Yahoo LTP, else invested basis.
+  FD available or ROI-accrued principal in INR). Stocks prefer Yahoo LTP, else invested.
   USD FCNR is converted with spot USDINR (Frankfurter, fallback 95).
 """
 
@@ -132,10 +132,7 @@ def sum_stocks_invested(sheets: Dict[str, pd.DataFrame]) -> Tuple[float, int]:
 
 
 def mark_stocks_current(sheets: Dict[str, pd.DataFrame]) -> Tuple[float, float, int, str]:
-    """Best-effort Yahoo LTP × qty; fall back to invested basis.
-
-    Returns (current, invested, rows, mark_label).
-    """
+    """Best-effort Yahoo LTP × qty; fall back to invested basis."""
     stocks = pick_sheet(sheets, "stocks", "stock", "equities")
     invested, rows = sum_stocks_invested(sheets)
     if stocks.empty:
@@ -200,14 +197,57 @@ def fetch_usd_inr() -> float:
     return 95.0
 
 
+def _parse_date(value: Any):
+    if value is None or (isinstance(value, float) and pd.isna(value)):
+        return None
+    try:
+        ts = pd.to_datetime(value, errors="coerce")
+        if pd.isna(ts):
+            return None
+        return ts.date()
+    except Exception:
+        return None
+
+
+def accrue_fd_value(
+    principal: float | None,
+    available: float | None,
+    roi: float | None,
+    deposit,
+    maturity,
+    maturity_amt: float | None,
+) -> float | None:
+    """Prefer available; else simple ROI accrual from deposit to today, capped by maturity amount."""
+    if available not in (None, 0.0):
+        return float(available)
+    if principal is None:
+        return None
+    base = float(principal)
+    if roi is None or deposit is None:
+        return base
+    today = datetime.now(timezone.utc).date()
+    end = maturity if maturity and maturity < today else today
+    if end <= deposit:
+        return base
+    days = (end - deposit).days
+    grown = base * (1.0 + float(roi) / 100.0 * days / 365.0)
+    if maturity_amt is not None and maturity_amt > 0:
+        grown = min(grown, float(maturity_amt))
+    return max(grown, base)
+
+
 def sum_fd_current(sheets: Dict[str, pd.DataFrame], usd_inr: float | None = None) -> Tuple[float, float, int]:
-    """FD current in INR = available (else principal) × FX for USD rows."""
+    """FD current in INR = available or accrued principal × FX for USD rows."""
     fd = pick_sheet(sheets, "fd", "fixed deposits", "fixed_deposits")
     if fd.empty:
         return 0.0, 0.0, 0
     principal_col = _find_column(fd.columns, {"principal amount", "principal", "deposit amount"})
     available_col = _find_column(fd.columns, {"available balance", "available", "balance"})
     currency_col = _find_column(fd.columns, {"currency", "ccy"})
+    roi_col = _find_column(fd.columns, {"roi % p.a.", "roi", "interest rate", "rate"})
+    deposit_col = _find_column(fd.columns, {"deposit date", "start date", "value date"})
+    maturity_col = _find_column(fd.columns, {"maturity date", "end date"})
+    maturity_amt_col = _find_column(fd.columns, {"maturity amount", "maturity value"})
     fx = float(usd_inr) if usd_inr else fetch_usd_inr()
     current = 0.0
     principal_total = 0.0
@@ -215,11 +255,15 @@ def sum_fd_current(sheets: Dict[str, pd.DataFrame], usd_inr: float | None = None
     for _, row in fd.iterrows():
         principal = _num(row.get(principal_col)) if principal_col else None
         available = _num(row.get(available_col)) if available_col else None
+        roi = _num(row.get(roi_col)) if roi_col else None
+        deposit = _parse_date(row.get(deposit_col)) if deposit_col else None
+        maturity = _parse_date(row.get(maturity_col)) if maturity_col else None
+        mat_amt = _num(row.get(maturity_amt_col)) if maturity_amt_col else None
         ccy = str(row.get(currency_col) or "INR").strip().upper() if currency_col else "INR"
         mult = fx if ccy in {"USD", "US$"} else 1.0
         if principal is not None:
             principal_total += principal * mult
-        value = available if available not in (None, 0.0) else principal
+        value = accrue_fd_value(principal, available, roi, deposit, maturity, mat_amt)
         if value is None:
             continue
         current += value * mult
@@ -315,7 +359,7 @@ def write_portfolio_history_row(
         "note": (
             "Full book snapshot. MF = units x AMFI NAV. "
             f"Stocks = {stocks_mark}. "
-            f"FD = available/principal in INR (USD FCNR x USDINR {usd_inr:.2f}). "
+            f"FD = available or ROI-accrued principal in INR (USD FCNR x USDINR {usd_inr:.2f}). "
             "Not liabilities. Not gold."
         ),
     }
