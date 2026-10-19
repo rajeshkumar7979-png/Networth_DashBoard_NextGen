@@ -77,6 +77,11 @@ def _reading(pack, tape, rec):
         bits.append("Latest %s is %s %s (%s)." % (profit.get("Line"), profit.get("Latest"), profit.get("Unit") or "", profit.get("Period") or ""))
     if not tape.get("news"):
         bits.append("No instrument news was returned for the last 7 days.")
+    completeness = str(tape.get("completeness") or "").lower()
+    if completeness == "partial":
+        bits.append("Tape is partial — missing sections are not assumed zero.")
+    elif completeness == "empty":
+        bits.append("Tape is empty — no Upstox fields loaded.")
     bits.append(line)
     return tone, " ".join(bits)
 
@@ -91,6 +96,7 @@ def render_stock_board(st, pack, tape, rec):
     premium = ""
     if _num(pe) and _num(sector):
         premium = "%.1fx sector" % (_num(pe) / _num(sector))
+    completeness = str(tape.get("completeness") or "unknown").upper()
     st.markdown("""
     <style>
     .ni { color:#e8edf2; }
@@ -111,7 +117,7 @@ def render_stock_board(st, pack, tape, rec):
     """, unsafe_allow_html=True)
     st.markdown(
         "<div class='ni'><h2>%s — INVESTOR INTELLIGENCE</h2>"
-        "<div class='ni-sub'>%s · %s · %s</div>"
+        "<div class='ni-sub'>%s · %s · %s · load %s</div>"
         "<div class='ni-sec'>PRICE / VALUATION SNAPSHOT</div>"
         "<div class='ni-row'><div><span class='ni-k'>Last</span>%s</div>"
         "<div><span class='ni-k'>P/E</span>%s <span class='ni-k'>%s</span></div>"
@@ -130,6 +136,7 @@ def render_stock_board(st, pack, tape, rec):
             html.escape(pack.member or "—"),
             html.escape(pack.symbol or "NSE"),
             html.escape(str(tape.get("source") or "Tape")),
+            html.escape(completeness),
             _fmt(_row(tape, "Last price"), "px"),
             _fmt(pe),
             html.escape(premium),
@@ -147,6 +154,10 @@ def render_stock_board(st, pack, tape, rec):
         ),
         unsafe_allow_html=True,
     )
+    if tape.get("error"):
+        st.caption(str(tape["error"]))
+    if tape.get("sections_missing"):
+        st.caption("Missing/failed sections: " + ", ".join(tape["sections_missing"]))
     st.markdown("<div class='ni-sec'>VALUATION</div>", unsafe_allow_html=True)
     st.write("P/E %s vs sector %s. P/B %s vs sector %s. Forward P/E and a history of the multiple are not on this tape." % (
         _fmt(pe), _fmt(sector), _fmt(_row(tape, "Price / Book")), _fmt(_row(tape, "Price / Book sector")),
@@ -171,6 +182,8 @@ def render_stock_board(st, pack, tape, rec):
         st.markdown("<div class='ni-sec'>OWNERSHIP</div>", unsafe_allow_html=True)
         if tape.get("shareholding"):
             st.dataframe(pd.DataFrame(tape["shareholding"]), hide_index=True, use_container_width=True)
+        else:
+            st.caption("No shareholding rows returned.")
     with right:
         st.markdown("<div class='ni-sec'>CORPORATE ACTIONS</div>", unsafe_allow_html=True)
         if tape.get("actions"):
