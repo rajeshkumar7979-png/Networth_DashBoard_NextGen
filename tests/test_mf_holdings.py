@@ -158,3 +158,32 @@ def test_ingest_prefers_cdn_over_vercel(monkeypatch):
     assert holdings[0]["name"] == "X"
     assert meta["fallback_used"] is False
     assert meta["validation"]["holdings_with_weight"] == 1
+
+
+def test_parse_amfi_navall_reads_current_eight_field_feed():
+    text = (
+        "Scheme Code;ISIN Div Payout/ ISIN Growth;ISIN Div Reinvestment;"
+        "Scheme Name;Plan;Option;Net Asset Value;Date\n\n"
+        "Open Ended Schemes(Equity)\n"
+        "Quant Mutual Fund\n"
+        "120828;INF966L01689;-;Quant Small Cap Fund;Direct Plan;Growth;313.2720;16-Oct-2026\n"
+    )
+    rows = mh.parse_amfi_navall(text)
+    assert len(rows) == 1
+    assert rows[0]["scheme_code"] == "120828"
+    assert rows[0]["isin_primary"] == "INF966L01689"
+    assert rows[0]["nav"] == 313.272
+    assert rows[0]["nav_date"] == "16-Oct-2026"
+    assert "Direct Plan" in rows[0]["scheme_name"]
+
+
+def test_parse_amfi_navall_still_reads_legacy_six_field_feed():
+    text = (
+        "Open Ended Schemes(Equity)\n"
+        "Quant Mutual Fund\n"
+        "120828;INF966L01689;-;Quant Small Cap Fund;313.2720;16-Oct-2026\n"
+    )
+    rows = mh.parse_amfi_navall(text)
+    assert len(rows) == 1
+    assert rows[0]["nav"] == 313.272
+    assert rows[0]["nav_date"] == "16-Oct-2026"
