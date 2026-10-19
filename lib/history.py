@@ -193,8 +193,10 @@ def render_portfolio_history(st_module=None) -> pd.DataFrame:
     ui.caption(
         "Source: data/portfolio_history.csv committed by GitHub Actions. "
         "MF = units × AMFI NAV. Stocks may be live Yahoo mark or invested basis. "
-        "FD = available or principal. Not a full P&L ledger. "
-        "data_quality=NAV_PARSE_GAP means the old parser wrote zeros — not a real portfolio crash."
+        "FD = available or ROI-accrued principal (USD × spot USDINR). Not a full P&L ledger. "
+        "data_quality=NAV_PARSE_GAP means the old parser wrote zeros — not a real portfolio crash. "
+        "Tolerance: history can trail Command Center by a few percent (gold presentation, "
+        "FD interest model, mark source). Command Center remains live truth."
     )
     return hist
 

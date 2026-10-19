@@ -36,6 +36,11 @@ jobs:
       - name: Refresh complete MF holdings
         run: python scripts/update_holdings_cache.py
 
+      - name: Record build SHA for Cloud footer
+        run: |
+          git rev-parse HEAD > data/BUILD_SHA.txt
+          echo "BUILD_SHA=$(cat data/BUILD_SHA.txt)"
+
       - name: Verify generated cache
         run: |
           python - <<'PY'
@@ -67,7 +72,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/mf_holdings_cache.json data/mf_holdings_meta.json data/amfi_scheme_universe.json data/portfolio_history.csv data/mf_snapshots data/Networth_Raw_Data.xlsx
+          git add data/mf_holdings_cache.json data/mf_holdings_meta.json data/amfi_scheme_universe.json data/portfolio_history.csv data/mf_snapshots data/Networth_Raw_Data.xlsx data/BUILD_SHA.txt
           if git diff --cached --quiet; then
             echo "No holdings changes to commit."
             exit 0
