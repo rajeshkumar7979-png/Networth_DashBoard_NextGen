@@ -8,72 +8,83 @@ Live app: https://northline-family-desk.streamlit.app/
 
 | Capability | Status |
 |------------|--------|
-| Daily MF holdings refresh (GitHub Actions) | Yes — archives each `as_of` period under `data/mf_snapshots/` |
+| Daily MF holdings refresh (GitHub Actions) | Yes — archives each `as_of` under `data/mf_snapshots/` |
 | AMFI NAV (8-field + legacy 6-field) | Yes |
-| Durable history `data/portfolio_history.csv` | Yes — MF mark + stocks invested + FD + totals |
-| Public sample book only | Yes — `Member A/B/C/D`, no real family names on HEAD |
-| Private book path | Secrets/env — see below |
-| Upstox tape | Opt-in; reports **complete / partial / empty** |
-| MF period-over-period diff | Ready when a **new** `as_of` appears; currently all schemes are `2026-09-30` / `SAME_PERIOD` |
+| Durable history `data/portfolio_history.csv` | Yes — MF mark + Yahoo stock mark + FD (FX + ROI accrual) |
+| Public sample book | Yes — `Member A/B/C/D` only on HEAD |
+| Private book path | Secrets/env — **must be Cloud-reachable** (see below) |
+| Upstox tape | Opt-in; **complete / partial / empty** |
+| MF period-over-period diff | Ready; waiting on new AMC `as_of` (still `2026-09-30`) |
+| Command Center recon | PASS on full FCNR + INR FD book (~₹2.5 Cr) |
 
 ## Secrets (Streamlit Cloud)
 
 ```toml
 [upstox]
 ACCESS_TOKEN = "your_analytics_token"
-# or ANALYTICS_TOKEN = "..."
 
-# Optional AI (cloud cannot reach localhost Ollama)
 [ai]
-# provider settings as used by lib/intelligence/ai/config.py
+# cloud cannot reach localhost Ollama — set cloud provider keys here
 
-# Optional private workbook — path must exist *inside* the Cloud runtime.
-# A Windows laptop path will NOT work on Streamlit Cloud.
+# Private workbook (optional)
+# Streamlit Cloud **cannot** read a path on your Windows laptop.
+# Options that work:
+#   1. Upload the xlsx as a private GitHub release asset and download in an app
+#      bootstrap (not committed to public tree), or
+#   2. Host the file on a private URL / S3 and set the path after a download
+#      step into /tmp or /mount in a custom container, or
+#   3. Keep using the public sample book for the public app and run the real
+#      book only on a private local/VPS deploy.
 [book]
 path = "/mount/private_Networth_Raw_Data.xlsx"
 ```
 
 Env alternative: `UPSTOX_ACCESS_TOKEN`, `NORTHLINE_BOOK_PATH`.
 
-## Portfolio history (how you know change over time)
+**Do not commit a real family workbook to this public repo.**
 
-File: `data/portfolio_history.csv` (committed by the daily job).
+## Portfolio history (change over time)
 
-- **MF** = workbook units × AMFI NAV  
-- **Stocks** = invested basis until a live mark is wired into the job  
-- **FD** = available balance or principal  
-- **total_assets_inr** / **total_invested_inr** = sum of the above  
+File: `data/portfolio_history.csv` (committed daily).
 
-Older rows before the NAV fix may show `mf_current_inr = 0`; trust rows after the 8-field parser fix.
+| Column | Meaning |
+|--------|--------|
+| `mf_current_inr` | Units × AMFI NAV |
+| `stocks_current_inr` | Yahoo LTP × qty when possible, else invested |
+| `fd_current_inr` | Available balance if set, else **principal × (1 + ROI × days/365)** capped at maturity amount; **USD × spot USDINR** |
+| `total_assets_inr` | MF + stocks + FD (gold is inside MF/stock marks when present; CC also shows gold separately) |
+| `data_quality` (UI) | `NAV_PARSE_GAP` days are audit-only, not performance |
 
-## MF holdings change detection
+Command Center remains the live source of truth (~₹2.5 Cr). History is the durable trend (~₹2.3–2.5 Cr depending on accrual/marks).
 
-1. Daily job fetches scheme holdings and writes `data/mf_snapshots/{scheme}/{as_of}.json`.  
-2. If `as_of` is unchanged → `comparison_status = SAME_PERIOD` (not a false “no change forever”).  
-3. When AMC publishes a **new** period → prior file is kept; meta gets added/exited/changed counts.  
+## MF holdings change detection (Phase 3)
 
-**Current HEAD evidence:** all schemes still report `as_of = 2026-09-30` and `SAME_PERIOD`. October disclosures have not appeared yet; the pipeline is waiting, not broken.
+1. Daily job writes `data/mf_snapshots/{scheme}/{as_of}.json`.  
+2. Same `as_of` → `comparison_status = SAME_PERIOD` (not “never changes”).  
+3. New period → prior file kept; meta gets added / exited / changed counts.  
 
-## Deploy SHA check (do this after every Cloud refresh)
+**Current evidence:** all 21 schemes `as_of = 2026-09-30`, `SAME_PERIOD`. October AMC filings are not in the CDN source yet. The pipeline is waiting, not broken.
 
-1. Open the app → note any footer / about SHA if present, or  
-2. GitHub → latest commit on `main`  
-3. Streamlit Cloud → **Manage app → Logs / reboot** after that SHA is deployed  
-4. Confirm `data/portfolio_history.csv` on GitHub has today’s row after the Actions job  
+## Deploy check after every Cloud change
 
-Cloud is **not** gated on green CI by itself — always verify the deployed commit hash matches `main` HEAD after reboot.
+1. GitHub `main` HEAD SHA  
+2. Streamlit Cloud → **Reboot**  
+3. Command Center total should stay near **₹2.5 Cr** with FCNR ~43%  
+4. Desk history latest trusted row near that ballpark  
 
 ## Local / CI
 
 ```bash
 pip install -r requirements.txt -r requirements-dev.txt
 pytest -q
+ruff check .
 python scripts/build_sample_workbook.py
-python scripts/update_holdings_cache.py   # needs network for AMFI + holdings CDN
+python scripts/update_holdings_cache.py
 ```
 
 ## Hard rules
 
-- Do not commit a real family workbook.  
-- Do not invent NAVs, filings, or AI verdicts without evidence.  
-- Upstox **partial** load is not a full verified board — UI and AI must respect `completeness`.  
+- No real family book in the public tree.  
+- No invented NAVs, filings, or AI verdicts without evidence.  
+- Upstox **partial** is not a full verified board.  
+- This app does not place trades.  
