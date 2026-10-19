@@ -205,20 +205,34 @@ def _findings(data: dict, downgrades: list) -> tuple:
             if not text:
                 raise AIOutputError(f"Field '{section}[{index}].text' is empty.")
             kind = row.get("kind") or "interpretation"
-            if kind not in ALLOWED_KINDS:
-                raise AIOutputError(
-                    f"Field '{section}[{index}].kind' must be one of "
-                    f"{ALLOWED_KINDS}.")
+            if not isinstance(kind, str) or kind not in ALLOWED_KINDS:
+                downgrades.append(
+                    f"Field '{section}[{index}].kind' was "
+                    f"{kind!r}; coerced to 'interpretation'.")
+                kind = "interpretation"
             evidence_ids = row.get("evidence_ids") or []
-            if not isinstance(evidence_ids, list) or any(
-                    not isinstance(e, str) for e in evidence_ids):
-                raise AIOutputError(
-                    f"Field '{section}[{index}].evidence_ids' must be a list of "
-                    "strings.")
+            if isinstance(evidence_ids, str):
+                evidence_ids = [evidence_ids]
+                downgrades.append(
+                    f"Field '{section}[{index}].evidence_ids' was a string; "
+                    "coerced to a one-item list.")
+            if not isinstance(evidence_ids, list):
+                downgrades.append(
+                    f"Field '{section}[{index}].evidence_ids' was "
+                    f"{type(evidence_ids).__name__}; treated as empty.")
+                evidence_ids = []
+            cleaned_ids = []
+            for e in evidence_ids:
+                if isinstance(e, str) and e.strip():
+                    cleaned_ids.append(e.strip())
+                elif e is not None:
+                    downgrades.append(
+                        f"Field '{section}[{index}].evidence_ids' had a "
+                        f"non-string item {e!r}; dropped.")
             findings.append(AIFinding(
                 section=section,
                 text=text,
-                evidence_ids=tuple(e.strip() for e in evidence_ids if e.strip()),
+                evidence_ids=tuple(cleaned_ids),
                 kind=kind,
             ))
         if len(rows) > MAX_FINDINGS_PER_SECTION:
