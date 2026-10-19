@@ -5,8 +5,8 @@ Rules:
 - Never replace a good cache entry with an empty response.
 - Never invent a filing date.
 - Archive each reporting period so a later month does not erase the prior one.
-- Write a daily full-book value row (MF units x AMFI NAV + stocks invested +
-  FD available/principal). Stocks are invested-basis until a live mark exists.
+- Write a daily full-book value row (MF units x AMFI NAV + stock marks +
+  FD available/principal). Stocks prefer Yahoo LTP, else invested basis.
 """
 
 from __future__ import annotations
@@ -106,7 +106,6 @@ def discover_mf_rows(sheets: Optional[Dict[str, pd.DataFrame]] = None) -> pd.Dat
             candidates.append(out)
     if not candidates:
         raise RuntimeError("Could not find an ISIN column in any workbook sheet")
-    # Sum units/invested across members for the same ISIN so history is not under-counted.
     all_rows = pd.concat(candidates, ignore_index=True)
     grouped = (
         all_rows.groupby("isin", as_index=False)
@@ -129,6 +128,58 @@ def sum_stocks_invested(sheets: Dict[str, pd.DataFrame]) -> Tuple[float, int]:
         return 0.0, 0
     series = pd.to_numeric(stocks[invested_col], errors="coerce").fillna(0.0)
     return float(series.sum()), int((series > 0).sum())
+
+
+def mark_stocks_current(sheets: Dict[str, pd.DataFrame]) -> Tuple[float, float, int, str]:
+    """Best-effort Yahoo LTP × qty; fall back to invested basis.
+
+    Returns (current, invested, rows, mark_label).
+    """
+    stocks = pick_sheet(sheets, "stocks", "stock", "equities")
+    invested, rows = sum_stocks_invested(sheets)
+    if stocks.empty:
+        return 0.0, 0.0, 0, "none"
+    symbol_col = _find_column(stocks.columns, {"ticker / symbol", "ticker", "symbol"})
+    qty_col = _find_column(stocks.columns, {"quantity", "qty", "units"})
+    invested_col = _find_column(stocks.columns, INVESTED_ALIASES)
+    exchange_col = _find_column(stocks.columns, {"exchange"})
+    if not symbol_col or not qty_col:
+        return invested, invested, rows, "invested_basis"
+    try:
+        import yfinance as yf
+    except Exception:
+        return invested, invested, rows, "invested_basis"
+
+    current = 0.0
+    marked = 0
+    for _, row in stocks.iterrows():
+        inv = _num(row.get(invested_col)) if invested_col else None
+        qty = _num(row.get(qty_col))
+        sym = str(row.get(symbol_col) or "").strip().upper()
+        if not sym or qty is None:
+            if inv is not None:
+                current += inv
+            continue
+        if sym.startswith("SGB") or "-" in sym:
+            if inv is not None:
+                current += inv
+            continue
+        ex = str(row.get(exchange_col) or "NSE").strip().upper() if exchange_col else "NSE"
+        yahoo = sym if "." in sym else (sym + (".BO" if ex in {"BSE", "BOM"} else ".NS"))
+        last = None
+        try:
+            hist = yf.Ticker(yahoo).history(period="5d")
+            if hist is not None and not hist.empty and "Close" in hist.columns:
+                last = _num(hist["Close"].dropna().iloc[-1])
+        except Exception:
+            last = None
+        if last is not None:
+            current += qty * last
+            marked += 1
+        elif inv is not None:
+            current += inv
+    label = "yahoo_ltp+invested_fallback" if marked else "invested_basis"
+    return float(current), float(invested), rows, label
 
 
 def sum_fd_current(sheets: Dict[str, pd.DataFrame]) -> Tuple[float, float, int]:
@@ -197,7 +248,7 @@ def write_portfolio_history_row(
     isin_index: Dict[str, List[Dict[str, Any]]],
     sheets: Dict[str, pd.DataFrame],
 ) -> None:
-    """Durable daily row: MF mark + stocks invested + FD current + totals."""
+    """Durable daily row: MF mark + stock marks + FD current + totals."""
     mf_current = 0.0
     mf_invested = 0.0
     priced = 0
@@ -215,9 +266,7 @@ def write_portfolio_history_row(
         else:
             missing += 1
 
-    stocks_invested, stocks_rows = sum_stocks_invested(sheets)
-    # No durable live stock marks in the daily job yet — invested basis only.
-    stocks_current = stocks_invested
+    stocks_current, stocks_invested, stocks_rows, stocks_mark = mark_stocks_current(sheets)
     fd_current, fd_principal, fd_rows = sum_fd_current(sheets)
 
     total_current = mf_current + stocks_current + fd_current
@@ -233,7 +282,7 @@ def write_portfolio_history_row(
         "stocks_current_inr": round(stocks_current, 2),
         "stocks_invested_inr": round(stocks_invested, 2),
         "stocks_rows": stocks_rows,
-        "stocks_mark": "invested_basis",
+        "stocks_mark": stocks_mark,
         "fd_current_inr": round(fd_current, 2),
         "fd_principal_inr": round(fd_principal, 2),
         "fd_rows": fd_rows,
@@ -241,8 +290,8 @@ def write_portfolio_history_row(
         "total_invested_inr": round(total_invested, 2),
         "note": (
             "Full book snapshot. MF = units x AMFI NAV. "
-            "Stocks = invested basis (no live mark in daily job). "
-            "FD = available balance or principal. Not liabilities."
+            f"Stocks = {stocks_mark}. "
+            "FD = available balance or principal. Not liabilities. Not gold."
         ),
     }
     PORTFOLIO_HISTORY.parent.mkdir(parents=True, exist_ok=True)
@@ -255,7 +304,7 @@ def write_portfolio_history_row(
     hist.to_csv(PORTFOLIO_HISTORY, index=False)
     print(
         f"History row {today}: MF {row['mf_current_inr']} | "
-        f"Stocks {row['stocks_current_inr']} | FD {row['fd_current_inr']} | "
+        f"Stocks {row['stocks_current_inr']} ({stocks_mark}) | FD {row['fd_current_inr']} | "
         f"Total {row['total_assets_inr']}"
     )
 
