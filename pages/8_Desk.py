@@ -45,6 +45,15 @@ st.markdown(ui_page_header(
     ],
 ), unsafe_allow_html=True)
 
+# Durable daily book trend from the committed GitHub Actions history (not session-ephemeral).
+st.markdown(ui_section("Committed portfolio history", "daily job → portfolio_history.csv"),
+            unsafe_allow_html=True)
+try:
+    from lib.history import render_portfolio_history
+    render_portfolio_history(st)
+except Exception as _hist_exc:
+    st.caption(f"Portfolio history unavailable this run: {_hist_exc}")
+
 _books = st.session_state.get("cc_books") or {}
 _assets = st.session_state.get("cc_assets") or {}
 _rates = st.session_state.get("cc_rates") or {}
@@ -320,6 +329,17 @@ if os.path.exists(history_path):
         st.download_button("Download history CSV",
                            data=_hist.to_csv(index=False).encode("utf-8"),
                            file_name="networth_history.csv", mime="text/csv")
+
+ph_path = "data/portfolio_history.csv"
+if os.path.exists(ph_path):
+    try:
+        _ph = pd.read_csv(ph_path)
+    except Exception:
+        _ph = None
+    if _ph is not None and not _ph.empty:
+        st.download_button("Download portfolio history CSV",
+                           data=_ph.to_csv(index=False).encode("utf-8"),
+                           file_name="portfolio_history.csv", mime="text/csv")
 
 
 # --------------------------------------------------
