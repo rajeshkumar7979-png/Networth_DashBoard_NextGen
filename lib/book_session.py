@@ -80,44 +80,67 @@ def build_published_frames(fd, mf, stocks, amfi_navs=None, amfi_codes=None, save
             "Units": units,
             "Current NAV": nav,
             "Invested": invested,
-            "Current Value": current,
+            "Current Value": float(current),
+            "P&L": (float(current) - invested) if invested is not None else None,
+            "Return %": (
+                (float(current) - invested) / invested * 100.0
+                if invested else None
+            ),
+            "Currency": _text(row.get("Currency")) or "INR",
+            "Value basis": "AMFI cache NAV x units" if nav is not None else "invested amount",
         })
     mf_valid = pd.DataFrame(mf_rows)
+    total = float(mf_valid["Current Value"].sum()) if not mf_valid.empty else 0.0
+    if total > 0:
+        mf_valid["Weight %"] = mf_valid["Current Value"] / total * 100.0
+    elif not mf_valid.empty:
+        mf_valid["Weight %"] = 0.0
 
     stock_rows = []
     for _, row in stocks.iterrows():
+        ticker = _text(row.get("Ticker / Symbol") or row.get("Symbol"))
+        company = _text(row.get("Company Name"))
         invested = _num(row.get("Invested Amount"))
-        if invested is None:
+        if not ticker or invested is None:
             continue
+        isin = company if company.upper().startswith("INE") else _text(row.get("ISIN"))
         stock_rows.append({
             "Owner": _text(row.get("Owner")),
-            "Ticker / Symbol": _text(row.get("Ticker / Symbol") or row.get("Symbol")),
-            "Company Name": _text(row.get("Company Name")),
-            "Exchange": _text(row.get("Exchange")),
+            "Symbol": ticker,
+            "Company Name": company or ticker,
+            "ISIN": isin,
+            "Exchange": _text(row.get("Exchange")) or "NSE",
+            "Purchase Date": row.get("Purchase Date"),
             "Quantity": _num(row.get("Quantity")),
             "Avg Buy Price": _num(row.get("Avg Buy Price")),
             "Invested": invested,
             "Current Value": invested,
+            "P&L": 0.0,
+            "Return %": 0.0,
+            "Value basis": "invested amount; live mark not applied",
         })
     stocks_valid = pd.DataFrame(stock_rows)
 
     fd_rows = []
     for _, row in fd.iterrows():
-        principal = _num(row.get("Principal Amount") or row.get("Principal"))
-        available = _num(row.get("Available Balance") or row.get("Available"))
-        if principal is None and available is None:
+        principal = _num(row.get("Principal Amount"))
+        available = _num(row.get("Available Balance"))
+        current = available if available not in (None, 0.0) else principal
+        if current is None:
             continue
-        value = available if available not in (None, 0.0) else principal
         fd_rows.append({
             "Account Number": _text(row.get("Account Number")),
-            "Holder Name": _text(row.get("Holder Name") or row.get("Holder")),
-            "Currency": _text(row.get("Currency") or "INR") or "INR",
-            "Principal Amount": principal,
-            "Available Balance": available,
-            "Current Value": value,
-            "ROI % p.a.": _num(row.get("ROI % p.a.")),
+            "Holder Name": _text(row.get("Holder Name")),
+            "Currency": _text(row.get("Currency")) or "INR",
             "Deposit Date": row.get("Deposit Date"),
             "Maturity Date": row.get("Maturity Date"),
+            "Principal Amount": principal,
+            "Principal (INR, at deposit FX)": principal,
+            "Available Balance": available,
+            "Current Value": current,
+            "ROI % p.a.": _num(row.get("ROI % p.a.")),
+            "Lien Amount": _num(row.get("Lien Amount")),
+            "Maturity Amount": _num(row.get("Maturity Amount")),
         })
     fd_valid = pd.DataFrame(fd_rows)
 
@@ -205,7 +228,11 @@ def ensure_published_book():
     st.session_state["cc_assets"] = published["assets"]
     st.session_state["mf_holdings_for_health"] = published["holdings"]
     st.session_state["cc_book_source"] = SOURCE
-    label = "Public sample book" if "Member A" in str(published["mf"].get("Owner", pd.Series(dtype=str)).head(1).tolist()) else "Book"
+    label = (
+        "Public sample book"
+        if "Member A" in str(published["mf"].get("Owner", pd.Series(dtype=str)).head(1).tolist())
+        else "Book"
+    )
     st.session_state["cc_book_note"] = (
         f"{label} from {book_path.name}. Fund marks use the AMFI cache"
         + (f" saved {saved_at}." if saved_at else ".")
