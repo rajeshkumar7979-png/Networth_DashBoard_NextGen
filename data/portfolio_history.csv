@@ -1,5 +1,5 @@
-date,mf_current_inr,mf_invested_inr,schemes_priced,schemes_missing_nav,note,stocks_current_inr,stocks_invested_inr,stocks_rows,stocks_mark,fd_current_inr,fd_principal_inr,fd_rows,total_assets_inr,total_invested_inr
-2026-10-16,0.0,4533130.22,0,21,MF book only. Units x AMFI NAV. Not full net worth.,,,,,,,,,
-2026-10-17,0.0,4533130.22,0,21,MF book only. Units x AMFI NAV. Not full net worth.,,,,,,,,,
-2026-10-18,0.0,4533130.22,0,21,MF book only. Units x AMFI NAV. Not full net worth.,,,,,,,,,
-2026-10-19,7588925.48,7168423.41,21,0,Full book snapshot. MF = units x AMFI NAV. Stocks = yahoo_ltp+invested_fallback. FD = available balance or principal. Not liabilities. Not gold.,1811851.57,1458796.97,36.0,yahoo_ltp+invested_fallback,3647103.76,3672002.34,23.0,13047880.81,12299222.72
+date,mf_current_inr,mf_invested_inr,schemes_priced,schemes_missing_nav,note,stocks_current_inr,stocks_invested_inr,stocks_rows,stocks_mark,fd_current_inr,fd_principal_inr,fd_rows,total_assets_inr,total_invested_inr,usd_inr
+2026-10-16,0.0,4533130.22,0,21,MF book only. Units x AMFI NAV. Not full net worth.,,,,,,,,,,
+2026-10-17,0.0,4533130.22,0,21,MF book only. Units x AMFI NAV. Not full net worth.,,,,,,,,,,
+2026-10-18,0.0,4533130.22,0,21,MF book only. Units x AMFI NAV. Not full net worth.,,,,,,,,,,
+2026-10-19,7588925.48,7168423.41,21,0,Full book snapshot. MF = units x AMFI NAV. Stocks = yahoo_ltp+invested_fallback. FD = available/principal in INR (USD FCNR x USDINR 94.96). Not liabilities. Not gold.,1810683.0,1458796.97,36.0,yahoo_ltp+invested_fallback,13910707.85,13926077.01,23.0,23310316.33,22553297.39,94.96
