@@ -1,5 +1,4 @@
 """Funds — quality, overlap, concentration."""
-from lib.mf_page_part1 import PART1
-from lib.mf_page_part2 import PART2
+from lib.mf_health_body import BODY
 
-exec(PART1 + PART2, globals())
+exec(BODY, globals())
