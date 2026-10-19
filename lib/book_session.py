@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
+from pathlib import Path
 
 import pandas as pd
 
@@ -199,16 +200,17 @@ def build_published_frames(fd, mf, stocks, amfi_navs=None, amfi_codes=None, save
 def ensure_published_book():
     """Fill session keys once. Leave a Command Center publish untouched."""
     import streamlit as st
-    from lib.config import AMFI_CACHE_PATH, EXCEL_PATH
+    from lib.config import AMFI_CACHE_PATH, resolve_book_path
 
     books = st.session_state.get("cc_books")
     holdings = st.session_state.get("mf_holdings_for_health")
     if isinstance(books, dict) and books.get("mf") is not None and holdings:
         return False
-    if not EXCEL_PATH.exists():
+    book_path = resolve_book_path()
+    if not book_path.exists():
         return False
     try:
-        frames = pd.read_excel(EXCEL_PATH, sheet_name=None)
+        frames = pd.read_excel(book_path, sheet_name=None)
     except Exception:
         return False
     sheets = {str(name).lower().strip(): frame for name, frame in frames.items()}
@@ -239,10 +241,13 @@ def ensure_published_book():
     st.session_state["cc_assets"] = published["assets"]
     st.session_state["mf_holdings_for_health"] = published["holdings"]
     st.session_state["cc_book_source"] = SOURCE
+    is_sample = book_path.name == "Networth_Raw_Data.xlsx" and "sample" in str(book_path.parent).lower() or book_path.name == "Networth_Raw_Data.xlsx"
+    label = "Public sample book" if "Member A" in str(published["mf"].get("Owner", pd.Series(dtype=str)).head(1).tolist()) else "Book"
     st.session_state["cc_book_note"] = (
-        "Test book from the committed workbook. Fund marks use the AMFI cache"
+        f"{label} from {book_path.name}. Fund marks use the AMFI cache"
         + (f" saved {saved_at}." if saved_at else ".")
         + " Stock marks are invested amount until Command Center applies a live price."
         + " Trailing 1Y/3Y/5Y are not invented here."
+        + " Do not commit a real family book to the public repository."
     )
     return True
