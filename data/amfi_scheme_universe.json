@@ -1,5 +1,5 @@
 {
-  "fetched_at": "2026-10-19T06:00:20+00:00",
+  "fetched_at": "2026-10-19T06:05:37+00:00",
   "rows": [
     {
       "scheme_code": "135762",
@@ -39026,8 +39026,8 @@
       "isin_primary": "INF846KA1366",
       "isin_secondary": "",
       "scheme_name": "Axis Multi-Asset Omni FoF - Direct Plan - Growth Option",
-      "nav": 10.5858,
-      "nav_date": "15-Oct-2026",
+      "nav": 10.6086,
+      "nav_date": "16-Oct-2026",
       "amc": "Axis Mutual Fund",
       "category": "Open Ended Schemes(Fund of Funds Scheme (Domestic) - Fund of Funds Scheme (Domestic))"
     },
@@ -39036,8 +39036,8 @@
       "isin_primary": "INF846KA1374",
       "isin_secondary": "INF846KA1382",
       "scheme_name": "Axis Multi-Asset Omni FoF - Direct Plan - IDCW Option",
-      "nav": 10.5858,
-      "nav_date": "15-Oct-2026",
+      "nav": 10.6086,
+      "nav_date": "16-Oct-2026",
       "amc": "Axis Mutual Fund",
       "category": "Open Ended Schemes(Fund of Funds Scheme (Domestic) - Fund of Funds Scheme (Domestic))"
     },
@@ -39046,8 +39046,8 @@
       "isin_primary": "INF846KA1333",
       "isin_secondary": "",
       "scheme_name": "Axis Multi-Asset Omni FoF - Regular Plan - Growth Option",
-      "nav": 10.4822,
-      "nav_date": "15-Oct-2026",
+      "nav": 10.5045,
+      "nav_date": "16-Oct-2026",
       "amc": "Axis Mutual Fund",
       "category": "Open Ended Schemes(Fund of Funds Scheme (Domestic) - Fund of Funds Scheme (Domestic))"
     },
@@ -39056,8 +39056,8 @@
       "isin_primary": "INF846KA1341",
       "isin_secondary": "INF846KA1358",
       "scheme_name": "Axis Multi-Asset Omni FoF - Regular Plan - IDCW Option",
-      "nav": 10.4822,
-      "nav_date": "15-Oct-2026",
+      "nav": 10.5045,
+      "nav_date": "16-Oct-2026",
       "amc": "Axis Mutual Fund",
       "category": "Open Ended Schemes(Fund of Funds Scheme (Domestic) - Fund of Funds Scheme (Domestic))"
     },
