@@ -6,7 +6,8 @@ Rules:
 - Never invent a filing date.
 - Archive each reporting period so a later month does not erase the prior one.
 - Write a daily full-book value row (MF units x AMFI NAV + stock marks +
-  FD available/principal). Stocks prefer Yahoo LTP, else invested basis.
+  FD available/principal in INR). Stocks prefer Yahoo LTP, else invested basis.
+  USD FCNR is converted with spot USDINR (Frankfurter, fallback 95).
 """
 
 from __future__ import annotations
@@ -182,25 +183,46 @@ def mark_stocks_current(sheets: Dict[str, pd.DataFrame]) -> Tuple[float, float, 
     return float(current), float(invested), rows, label
 
 
-def sum_fd_current(sheets: Dict[str, pd.DataFrame]) -> Tuple[float, float, int]:
-    """FD current = available balance when present, else principal."""
+def fetch_usd_inr() -> float:
+    """Spot USDINR for FCNR INR conversion. Fallback 95 if network fails."""
+    try:
+        r = requests.get(
+            "https://api.frankfurter.app/latest",
+            params={"from": "USD", "to": "INR"},
+            timeout=15,
+        )
+        if r.status_code == 200:
+            rate = float((r.json().get("rates") or {}).get("INR") or 0)
+            if rate > 50:
+                return rate
+    except Exception:
+        pass
+    return 95.0
+
+
+def sum_fd_current(sheets: Dict[str, pd.DataFrame], usd_inr: float | None = None) -> Tuple[float, float, int]:
+    """FD current in INR = available (else principal) × FX for USD rows."""
     fd = pick_sheet(sheets, "fd", "fixed deposits", "fixed_deposits")
     if fd.empty:
         return 0.0, 0.0, 0
     principal_col = _find_column(fd.columns, {"principal amount", "principal", "deposit amount"})
     available_col = _find_column(fd.columns, {"available balance", "available", "balance"})
+    currency_col = _find_column(fd.columns, {"currency", "ccy"})
+    fx = float(usd_inr) if usd_inr else fetch_usd_inr()
     current = 0.0
     principal_total = 0.0
     counted = 0
     for _, row in fd.iterrows():
         principal = _num(row.get(principal_col)) if principal_col else None
         available = _num(row.get(available_col)) if available_col else None
+        ccy = str(row.get(currency_col) or "INR").strip().upper() if currency_col else "INR"
+        mult = fx if ccy in {"USD", "US$"} else 1.0
         if principal is not None:
-            principal_total += principal
+            principal_total += principal * mult
         value = available if available not in (None, 0.0) else principal
         if value is None:
             continue
-        current += value
+        current += value * mult
         counted += 1
     return float(current), float(principal_total), counted
 
@@ -267,7 +289,8 @@ def write_portfolio_history_row(
             missing += 1
 
     stocks_current, stocks_invested, stocks_rows, stocks_mark = mark_stocks_current(sheets)
-    fd_current, fd_principal, fd_rows = sum_fd_current(sheets)
+    usd_inr = fetch_usd_inr()
+    fd_current, fd_principal, fd_rows = sum_fd_current(sheets, usd_inr=usd_inr)
 
     total_current = mf_current + stocks_current + fd_current
     total_invested = mf_invested + stocks_invested + fd_principal
@@ -286,12 +309,14 @@ def write_portfolio_history_row(
         "fd_current_inr": round(fd_current, 2),
         "fd_principal_inr": round(fd_principal, 2),
         "fd_rows": fd_rows,
+        "usd_inr": round(usd_inr, 4),
         "total_assets_inr": round(total_current, 2),
         "total_invested_inr": round(total_invested, 2),
         "note": (
             "Full book snapshot. MF = units x AMFI NAV. "
             f"Stocks = {stocks_mark}. "
-            "FD = available balance or principal. Not liabilities. Not gold."
+            f"FD = available/principal in INR (USD FCNR x USDINR {usd_inr:.2f}). "
+            "Not liabilities. Not gold."
         ),
     }
     PORTFOLIO_HISTORY.parent.mkdir(parents=True, exist_ok=True)
@@ -305,7 +330,7 @@ def write_portfolio_history_row(
     print(
         f"History row {today}: MF {row['mf_current_inr']} | "
         f"Stocks {row['stocks_current_inr']} ({stocks_mark}) | FD {row['fd_current_inr']} | "
-        f"Total {row['total_assets_inr']}"
+        f"Total {row['total_assets_inr']} (USDINR {usd_inr:.2f})"
     )
 
 
