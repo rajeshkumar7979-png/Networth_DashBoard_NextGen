@@ -1,5 +1,5 @@
 {
-  "fetched_at": "2026-10-21T06:36:29+00:00",
+  "fetched_at": "2026-10-21T09:31:22+00:00",
   "rows": [
     {
       "scheme_code": "135762",
@@ -81526,8 +81526,8 @@
       "isin_primary": "INF179KC1BO4",
       "isin_secondary": "",
       "scheme_name": "HDFC Developed World Overseas Equity Passive FOF",
-      "nav": 21.901,
-      "nav_date": "16-Oct-2026",
+      "nav": 21.802,
+      "nav_date": "19-Oct-2026",
       "amc": "HDFC Mutual Fund",
       "category": "Open Ended Schemes(Other Scheme - FoF Overseas)"
     },
@@ -81536,8 +81536,8 @@
       "isin_primary": "INF179KC1BP1",
       "isin_secondary": "",
       "scheme_name": "HDFC Developed World Overseas Equity Passive FOF",
-      "nav": 21.399,
-      "nav_date": "16-Oct-2026",
+      "nav": 21.301,
+      "nav_date": "19-Oct-2026",
       "amc": "HDFC Mutual Fund",
       "category": "Open Ended Schemes(Other Scheme - FoF Overseas)"
     },
