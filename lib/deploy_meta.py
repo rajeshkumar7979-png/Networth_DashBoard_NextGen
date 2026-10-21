@@ -46,11 +46,16 @@ def resolve_build_sha() -> str:
 
 
 def render_build_footer(st_module) -> None:
-    """Global footer: build SHA + reminder that CC is live truth."""
+    """Global footer: build SHA + production honesty lines."""
     sha = resolve_build_sha()
     st_module.caption(
         f"Build {sha} · Command Center is live truth · "
         f"History is the durable trend · Read-only desk — no orders"
+    )
+    st_module.caption(
+        "Health scores are illustrative NRI allocation/liquidity indices, not rating-agency scores. "
+        "MF holdings source: OpenFin CDN (monthly AMC filings). "
+        "Public deploy uses the sample book unless a private path is configured."
     )
 
 

@@ -29,6 +29,9 @@ jobs:
           python -m pip install -r requirements.txt
           python -m pip install -r requirements-dev.txt
 
+      - name: Guard against placeholder / stub corruption
+        run: python scripts/check_critical_files.py
+
       - name: Lint (ruff)
         run: ruff check .
 
