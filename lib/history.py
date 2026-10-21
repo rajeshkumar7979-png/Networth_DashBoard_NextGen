@@ -18,6 +18,8 @@ PORTFOLIO_COLS = [
     "schemes_missing_nav",
     "stocks_current_inr",
     "stocks_invested_inr",
+    "gold_current_inr",
+    "gold_invested_inr",
     "fd_current_inr",
     "fd_principal_inr",
     "total_assets_inr",
@@ -174,14 +176,15 @@ def render_portfolio_history(st_module=None) -> pd.DataFrame:
 
     chart_src = hist[hist["data_quality"] != "NAV_PARSE_GAP"].copy()
     chart_cols = [c for c in (
-        "total_assets_inr", "mf_current_inr", "stocks_current_inr", "fd_current_inr",
+        "total_assets_inr", "mf_current_inr", "stocks_current_inr", "gold_current_inr", "fd_current_inr",
     ) if c in chart_src.columns and chart_src[c].notna().any()]
     if chart_cols and not chart_src.empty:
         plot = chart_src.set_index("date")[chart_cols].copy()
         plot = plot.rename(columns={
             "total_assets_inr": "Total assets",
             "mf_current_inr": "MF",
-            "stocks_current_inr": "Stocks",
+            "stocks_current_inr": "Equity stocks",
+            "gold_current_inr": "Gold",
             "fd_current_inr": "FD",
         })
         ui.line_chart(plot, height=260)
@@ -195,8 +198,8 @@ def render_portfolio_history(st_module=None) -> pd.DataFrame:
         "MF = units × AMFI NAV. Stocks may be live Yahoo mark or invested basis. "
         "FD = available or ROI-accrued principal (USD × spot USDINR). Not a full P&L ledger. "
         "data_quality=NAV_PARSE_GAP means the old parser wrote zeros — not a real portfolio crash. "
-        "Tolerance: history can trail Command Center by a few percent (gold presentation, "
-        "FD interest model, mark source). Command Center remains live truth."
+        "History now includes gold_current_inr (SGB/gold ETF). Gold FoF stays under MF. "
+        "FD interest model may still differ slightly from Command Center. CC remains live truth."
     )
     return hist
 
@@ -208,9 +211,6 @@ def log_snapshot(
     pnl: float,
     health_score: float,
 ) -> pd.DataFrame:
-    """Upsert today's row. Still uses local file — ephemeral on Streamlit Cloud.
-    Swap body later for Google Sheet / Supabase without changing callers.
-    """
     _ensure_dir()
     row = {
         "date": TODAY_STR,
