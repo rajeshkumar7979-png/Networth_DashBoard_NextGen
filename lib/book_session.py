@@ -79,121 +79,112 @@ def build_published_frames(fd, mf, stocks, amfi_navs=None, amfi_codes=None, save
             "Purchase Date": row.get("Purchase Date"),
             "Units": units,
             "Current NAV": nav,
-            "Invested": invested,
+            "Invested": invested if invested is not None else current,
             "Current Value": float(current),
-            "P&L": (float(current) - invested) if invested is not None else None,
-            "Return %": (
-                (float(current) - invested) / invested * 100.0
-                if invested else None
-            ),
-            "Currency": _text(row.get("Currency")) or "INR",
-            "Value basis": "AMFI cache NAV x units" if nav is not None else "invested amount",
+            "1Y %": None,
+            "3Y %": None,
+            "5Y %": None,
         })
     mf_valid = pd.DataFrame(mf_rows)
     total = float(mf_valid["Current Value"].sum()) if not mf_valid.empty else 0.0
-    if total > 0:
+    if not mf_valid.empty and total > 0:
         mf_valid["Weight %"] = mf_valid["Current Value"] / total * 100.0
     elif not mf_valid.empty:
         mf_valid["Weight %"] = 0.0
 
     stock_rows = []
     for _, row in stocks.iterrows():
-        ticker = _text(row.get("Ticker / Symbol") or row.get("Symbol"))
-        company = _text(row.get("Company Name"))
+        symbol = _text(row.get("Ticker / Symbol") or row.get("Symbol")).upper()
+        qty = _num(row.get("Quantity"))
         invested = _num(row.get("Invested Amount"))
-        if not ticker or invested is None:
+        if not symbol:
             continue
-        isin = company if company.upper().startswith("INE") else _text(row.get("ISIN"))
+        current = invested if invested is not None else 0.0
         stock_rows.append({
             "Owner": _text(row.get("Owner")),
-            "Symbol": ticker,
-            "Company Name": company or ticker,
-            "ISIN": isin,
+            "Symbol": symbol,
+            "Company": _text(row.get("Company Name") or row.get("Company")),
             "Exchange": _text(row.get("Exchange")) or "NSE",
-            "Purchase Date": row.get("Purchase Date"),
-            "Quantity": _num(row.get("Quantity")),
-            "Avg Buy Price": _num(row.get("Avg Buy Price")),
-            "Invested": invested,
-            "Current Value": invested,
-            "P&L": 0.0,
-            "Return %": 0.0,
-            "Value basis": "invested amount; live mark not applied",
+            "Quantity": qty,
+            "Avg Buy": _num(row.get("Avg Buy Price")),
+            "Invested": invested if invested is not None else current,
+            "Current Value": current,
         })
     stocks_valid = pd.DataFrame(stock_rows)
 
     fd_rows = []
     for _, row in fd.iterrows():
+        holder = _text(row.get("Holder Name"))
         principal = _num(row.get("Principal Amount"))
+        if not holder or principal is None or principal <= 0:
+            continue
         available = _num(row.get("Available Balance"))
         current = available if available not in (None, 0.0) else principal
-        if current is None:
-            continue
         fd_rows.append({
-            "Account Number": _text(row.get("Account Number")),
-            "Holder Name": _text(row.get("Holder Name")),
+            "Holder": holder,
+            "Account": _text(row.get("Account Number")),
             "Currency": _text(row.get("Currency")) or "INR",
-            "Deposit Date": row.get("Deposit Date"),
-            "Maturity Date": row.get("Maturity Date"),
-            "Principal Amount": principal,
-            "Principal (INR, at deposit FX)": principal,
-            "Available Balance": available,
+            "Principal": principal,
+            "Available": available,
             "Current Value": current,
-            "ROI % p.a.": _num(row.get("ROI % p.a.")),
-            "Lien Amount": _num(row.get("Lien Amount")),
-            "Maturity Amount": _num(row.get("Maturity Amount")),
+            "Maturity": row.get("Maturity Date"),
         })
     fd_valid = pd.DataFrame(fd_rows)
 
     holdings = []
     for _, row in mf_valid.iterrows():
         holdings.append({
-            "isin": row.get("ISIN"),
-            "fund_name": row.get("Fund Name"),
+            "Owner": row.get("Owner"),
+            "Fund Name": row.get("Fund Name"),
             "scheme_code": row.get("Scheme Code"),
-            "units": row.get("Units"),
-            "invested": row.get("Invested"),
+            "ISIN": row.get("ISIN"),
+            "Units": row.get("Units"),
             "current": row.get("Current Value"),
-            "owner": row.get("Owner"),
+            "Current Value": row.get("Current Value"),
+            "Weight %": row.get("Weight %"),
+            "1Y %": None,
+            "3Y %": None,
+            "5Y %": None,
+            "Current NAV": row.get("Current NAV"),
         })
 
-    assets_total = float(
+    assets_total = (
         (pd.to_numeric(mf_valid["Current Value"], errors="coerce").fillna(0).sum() if not mf_valid.empty else 0)
         + (pd.to_numeric(stocks_valid["Current Value"], errors="coerce").fillna(0).sum() if not stocks_valid.empty else 0)
         + (pd.to_numeric(fd_valid["Current Value"], errors="coerce").fillna(0).sum() if not fd_valid.empty else 0)
     )
-    invested = float(
-        (pd.to_numeric(mf_valid["Invested"], errors="coerce").fillna(0).sum() if not mf_valid.empty else 0)
-        + (pd.to_numeric(stocks_valid["Invested"], errors="coerce").fillna(0).sum() if not stocks_valid.empty else 0)
-        + (pd.to_numeric(fd_valid["Principal Amount"], errors="coerce").fillna(0).sum() if not fd_valid.empty else 0)
-    )
-    assets = {
-        "total_assets": assets_total,
-        "total_invested": invested,
-        "total_pnl": assets_total - invested,
-        "as_of": str(saved_at or datetime.now(timezone.utc).date()),
-        "valued_at": str(saved_at or ""),
-        "source": SOURCE,
-    }
     return {
         "mf": mf_valid,
         "stocks": stocks_valid,
-        "gold": None,
+        "gold": pd.DataFrame(),
         "fd": fd_valid,
         "holdings": holdings,
-        "assets": assets,
+        "assets": {
+            "total": float(assets_total),
+            "source": SOURCE,
+            "as_of": saved_at or datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M"),
+        },
     }
 
 
 def ensure_published_book():
     """Fill session keys once. Leave a Command Center publish untouched."""
     import streamlit as st
-    from lib.config import AMFI_CACHE_PATH, resolve_book_path
+    from lib.config import AMFI_CACHE_PATH, EXCEL_PATH, resolve_book_path
 
     books = st.session_state.get("cc_books")
     holdings = st.session_state.get("mf_holdings_for_health")
     if isinstance(books, dict) and books.get("mf") is not None and holdings:
         return False
     book_path = resolve_book_path()
+    # Honest book-mode flag for UI banners (sample vs private).
+    try:
+        resolved = book_path.resolve()
+        sample = EXCEL_PATH.resolve()
+        st.session_state["book_mode"] = "sample" if resolved == sample else "private"
+        st.session_state["book_path_display"] = str(book_path)
+    except Exception:
+        st.session_state["book_mode"] = "unknown"
     if not book_path.exists():
         return False
     try:
