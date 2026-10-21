@@ -136,7 +136,7 @@ def test_fetch_cdn_holdings_uses_latest_as_of_not_stale_row(monkeypatch):
     assert holdings[0]["name"] == "Reliance Industries"
     assert holdings[0]["weight_pct"] == 8.1
     assert meta["as_of"] == "2026-08-31"
-    assert meta["source"] == "fund-disclosures"
+    assert meta["source"] == "openfin-cdn"
     assert meta["transport"] == "github-cdn"
     assert "2026-08-31/100176.json" in seen[0]
 
@@ -144,8 +144,8 @@ def test_fetch_cdn_holdings_uses_latest_as_of_not_stale_row(monkeypatch):
 def test_ingest_prefers_cdn_over_vercel(monkeypatch):
     def cdn(session, code):
         return (
-            [{"name": "X", "isin": "INE1", "weight_pct": 50.0, "source": "fund-disclosures"}],
-            {"as_of": "2026-08-31", "source": "fund-disclosures", "transport": "github-cdn"},
+            [{"name": "X", "isin": "INE1", "weight_pct": 50.0, "source": "openfin-cdn"}],
+            {"as_of": "2026-08-31", "source": "openfin-cdn", "transport": "github-cdn"},
         )
 
     def boom(*a, **k):
