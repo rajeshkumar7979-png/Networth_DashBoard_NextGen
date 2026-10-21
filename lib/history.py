@@ -67,10 +67,11 @@ def load_portfolio_history(path: Path | None = None) -> pd.DataFrame:
     if df is None or df.empty:
         return pd.DataFrame(columns=PORTFOLIO_COLS)
     df = df.copy()
-    df["date"] = df["date"].astype(str)
+    # Drop accidental re-header rows and non-dates
+    df["date"] = df["date"].astype(str).str.strip()
     df = df[df["date"].str.match(r"^\d{4}-\d{2}-\d{2}$", na=False)]
-    for col in PORTFOLIO_COLS:
-        if col in ("date", "note"):
+    for col in list(df.columns):
+        if col in ("date", "note", "stocks_mark"):
             continue
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
@@ -191,15 +192,37 @@ def render_portfolio_history(st_module=None) -> pd.DataFrame:
     else:
         ui.caption("No trusted rows to chart yet.")
 
+    # Day-over-day on trusted full-book rows only
+    trusted = hist[hist["data_quality"].isin({"OK", "PARTIAL_NAV"})].copy()
+    if len(trusted) >= 2 and "total_assets_inr" in trusted.columns:
+        trusted = trusted.dropna(subset=["total_assets_inr"]).sort_values("date")
+        if len(trusted) >= 2:
+            dod = trusted[["date", "total_assets_inr", "mf_current_inr", "stocks_current_inr", "gold_current_inr", "fd_current_inr"]].copy()
+            for col in ("total_assets_inr", "mf_current_inr", "stocks_current_inr", "gold_current_inr", "fd_current_inr"):
+                if col in dod.columns:
+                    dod[f"d_{col}"] = dod[col].diff()
+            view = pd.DataFrame({
+                "Date": dod["date"],
+                "Total ₹": dod["total_assets_inr"].round(0),
+                "Δ Total": dod["d_total_assets_inr"].round(0),
+                "MF ₹": dod.get("mf_current_inr"),
+                "Δ MF": dod.get("d_mf_current_inr"),
+                "Stocks ₹": dod.get("stocks_current_inr"),
+                "Gold ₹": dod.get("gold_current_inr"),
+                "FD ₹": dod.get("fd_current_inr"),
+            })
+            ui.caption("Day-over-day (trusted full-book rows only — NAV_PARSE_GAP excluded)")
+            ui.dataframe(view.tail(10), hide_index=True, use_container_width=True)
+
     show_cols = [c for c in (["data_quality"] + PORTFOLIO_COLS) if c in hist.columns or c == "data_quality"]
+    ui.caption("Audit table (includes gap days for forensics)")
     ui.dataframe(hist[show_cols].tail(14), hide_index=True, use_container_width=True)
     ui.caption(
-        "Source: data/portfolio_history.csv committed by GitHub Actions. "
-        "MF = units × AMFI NAV. Stocks may be live Yahoo mark or invested basis. "
-        "FD = available or ROI-accrued principal (USD × spot USDINR). Not a full P&L ledger. "
-        "data_quality=NAV_PARSE_GAP means the old parser wrote zeros — not a real portfolio crash. "
-        "History now includes gold_current_inr (SGB/gold ETF). Gold FoF stays under MF. "
-        "FD interest model may still differ slightly from Command Center. CC remains live truth."
+        "Source: data/portfolio_history.csv committed by GitHub Actions daily job. "
+        "MF = units × AMFI NAV. Equity stocks = Yahoo LTP or invested fallback. "
+        "Gold = SGB/gold ETF (gold_current_inr). FD = available or ROI-accrued principal (USD × USDINR). "
+        "NAV_PARSE_GAP = parser wrote zeros that day — not a real crash; excluded from charts and Δ. "
+        "Command Center remains live truth; history is the durable trend."
     )
     return hist
 
