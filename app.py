@@ -36,6 +36,11 @@ st.markdown(
     unsafe_allow_html=True,
 )
 ensure_published_book()
+_mode = st.session_state.get("book_mode") or "unknown"
+if _mode == "sample":
+    st.caption("Book mode: PUBLIC SAMPLE (Member A–D). Not the private family workbook.")
+elif _mode == "private":
+    st.caption("Book mode: PRIVATE workbook path loaded.")
 
 pg = st.navigation(
     {
