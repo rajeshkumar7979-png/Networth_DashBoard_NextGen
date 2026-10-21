@@ -120,8 +120,24 @@ if str(row.get("Kind")) == "Stocks":
         with st.spinner(f"Fetching {yahoo_ticker(symbol, exchange)}…"):
             st.session_state[tape_key + "_data"] = _yahoo_tape(symbol, exchange)
     tape = st.session_state.get(tape_key + "_data")
-    if isinstance(tape, dict) and tape.get("error"):
-        st.markdown(caption(str(tape.get("error"))), unsafe_allow_html=True)
+    if isinstance(tape, dict):
+        completeness = str(tape.get("completeness") or "").lower()
+        if tape.get("error"):
+            st.markdown(caption(str(tape.get("error"))), unsafe_allow_html=True)
+        if completeness == "partial":
+            st.warning(
+                "Upstox tape is PARTIAL — some sections loaded, others empty or failed. "
+                "Do not treat missing ratios/news as zeros."
+            )
+        elif completeness == "empty":
+            st.warning(
+                "Upstox tape is EMPTY for this instrument — no usable fields. "
+                "Try Yahoo fallback or check the access token."
+            )
+        elif completeness == "complete":
+            st.caption("Upstox tape completeness: complete")
+        elif not read_upstox_token() and not tape.get("ok"):
+            st.caption("No Upstox token in secrets — Yahoo fallback only if you load it.")
 
 pack = build_asset_pack(
     row=row, rec=rec, books=books, assets=assets, research_brief=brief,
@@ -187,9 +203,13 @@ if stored is not None and getattr(stored, "status", "") == "ok" and getattr(stor
     st.markdown(caption("Decision-support only. Not an order."), unsafe_allow_html=True)
 elif stored is not None:
     reason = str(getattr(stored, "reason", "") or "").strip()
-    line = "AI did not produce a grounded reading."
+    line = "AI did not produce a grounded reading — no verdict is shown."
     if reason:
         line += " " + reason
     if not ai_ready:
-        line += " Configure Groq in Streamlit secrets if you want a reading."
-    st.markdown(caption(line), unsafe_allow_html=True)
+        line += " Configure [ai] AI_API_KEY / AI_PROVIDER=groq in Streamlit secrets if you want a reading."
+    st.warning(line)
+    st.caption(
+        "Deterministic green/red/watch flags above remain valid without AI. "
+        "Never treat a failed AI call as a neutral or positive assessment."
+    )
