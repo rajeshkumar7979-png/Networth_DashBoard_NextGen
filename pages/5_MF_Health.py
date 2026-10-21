@@ -7,6 +7,7 @@ import pandas as pd
 import streamlit as st
 
 from lib.deploy_meta import mf_period_status
+from lib.mf_period_table import scheme_period_table
 from lib.formatters import format_inr_compact
 from lib.mf_health import analyze_fund, get_holdings_for_funds
 from lib.overlap import (
@@ -64,6 +65,15 @@ if _period.get("ok"):
     )
 else:
     st.caption(_period.get("reason") or "Holdings meta unavailable")
+
+_period_tbl = scheme_period_table()
+if _period_tbl is not None and not _period_tbl.empty:
+    with st.expander("Scheme filing status (as_of / SAME_PERIOD / source)", expanded=False):
+        st.dataframe(_period_tbl, hide_index=True, use_container_width=True)
+        st.caption(
+            "SAME_PERIOD = AMC has not published a newer monthly portfolio yet. "
+            "+ / - / ~ are holding-line adds, exits, and weight changes vs prior filing."
+        )
 
 raw_results = []
 for row in mf_list:
