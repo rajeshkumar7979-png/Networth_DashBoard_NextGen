@@ -12,6 +12,10 @@ jobs:
   test-and-lint:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # Skip the holdings-triggered path when the holdings job itself failed.
+    if: >
+      github.event_name != 'workflow_run'
+      || github.event.workflow_run.conclusion == 'success'
 
     steps:
       - name: Checkout repository
