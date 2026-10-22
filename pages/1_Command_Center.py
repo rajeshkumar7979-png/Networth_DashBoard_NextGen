@@ -94,26 +94,6 @@ def _apply_cash_patches(code: str) -> str:
     if old_books in code:
         code = code.replace(old_books, new_books, 1)
 
-    if "UPLOADED workbook" not in code:
-        code = code.replace(
-            "integrity_issues = []  # each: (severity, message)",
-            "integrity_issues = []  # each: (severity, message)\n"
-            "_bm = st.session_state.get(\"book_mode\") or \"\"\n"
-            "if st.session_state.get(\"cc_uploaded_bytes\") or _bm == \"upload\":\n"
-            "    st.caption(\n"
-            "        \"Book mode: UPLOADED workbook\"\n"
-            "        + (f\" ({st.session_state.get('cc_uploaded_name')})\" if st.session_state.get(\"cc_uploaded_name\") else \"\")\n"
-            "        + \". Not the public sample.\"\n"
-            "    )\n"
-            "elif str(_bm).startswith(\"private\"):\n"
-            "    st.caption(\n"
-            "        \"Book mode: PRIVATE durable book\"\n"
-            "        + (f\" · {st.session_state.get('book_path_display')}\" if st.session_state.get(\"book_path_display\") else \"\")\n"
-            "        + \". Survives reboot when secrets/env are set.\"\n"
-            "    )",
-            1,
-        )
-
     if "cash_pct = _pct" not in code:
         code = code.replace(
             "gold_pct = _pct(total_gold)\n",
@@ -138,6 +118,24 @@ def _apply_cash_patches(code: str) -> str:
             'st.session_state["cc_gold_pct"] = float(gold_pct)\n'
             'st.session_state["cc_cash_pct"] = float(cash_pct if \"cash_pct\" in dir() else 0)\n'
             'st.session_state["cc_total_cash"] = float(total_cash if \"total_cash\" in dir() else 0)',
+            1,
+        )
+
+    # Visual allocation bar (ui_strip) — what users actually see
+    if '{"label": "Gold", "value": total_gold},' in code and '{"label": "Cash"' not in code:
+        code = code.replace(
+            '{"label": "Gold", "value": total_gold},\n], total=total_networth)',
+            '{"label": "Gold", "value": total_gold},\n'
+            '    {"label": "Cash", "value": float(total_cash) if "total_cash" in dir() else 0},\n'
+            '], total=total_networth)',
+            1,
+        )
+
+    # Recon identity must include cash
+    if 'MF + Stocks + Gold + FD"' in code and 'FD + Cash"' not in code:
+        code = code.replace(
+            '"Portfolio total = MF + Stocks + Gold + FD", abs((total_mf + total_stocks + total_gold + total_fd) - total_networth) < 1, "by construction"',
+            '"Portfolio total = MF + Stocks + Gold + FD + Cash", abs((total_mf + total_stocks + total_gold + total_fd + float(total_cash if "total_cash" in dir() else 0)) - total_networth) < 1, "by construction"',
             1,
         )
     return code
