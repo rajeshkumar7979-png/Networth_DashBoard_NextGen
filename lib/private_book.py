@@ -5,22 +5,19 @@ Priority for the live book (highest first):
   2. Secrets / env materialized private file
   3. Committed sample data/Networth_Raw_Data.xlsx
 
-Streamlit secrets examples:
+Streamlit secrets (Cloud → Settings → Secrets):
 
   [book]
-  path = "/mount/private_Networth_Raw_Data.xlsx"
+  # Preferred: full Excel as base64 (survives every reboot)
+  xlsx_b64 = "UEsDBBQAAAAI..."
 
-  [book]
-  # Excel file base64-encoded (no newlines required). Survives Cloud reboot.
-  xlsx_b64 = "UEsDB..."
+  # Or a Cloud-reachable path / private URL
+  # path = "/mount/private_Networth_Raw_Data.xlsx"
+  # url  = "https://..."
 
-  [book]
-  url = "https://example.com/private/Networth_Raw_Data.xlsx"
+Env alternatives: NORTHLINE_BOOK_PATH, NORTHLINE_BOOK_B64, NORTHLINE_BOOK_URL.
 
-Env:
-  NORTHLINE_BOOK_PATH=/path/to/file.xlsx
-  NORTHLINE_BOOK_B64=...
-  NORTHLINE_BOOK_URL=...
+Never commit a real family workbook to the public repo.
 """
 from __future__ import annotations
 
@@ -29,15 +26,16 @@ import os
 from pathlib import Path
 from typing import Optional, Tuple
 
-from lib.config import DATA_DIR, EXCEL_PATH
-
+DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 PRIVATE_BOOK_PATH = DATA_DIR / ".private_book.xlsx"
 
 
 def _secrets_book():
     try:
         import streamlit as st
-        book = st.secrets.get("book") if hasattr(st, "secrets") else None
+        if not hasattr(st, "secrets"):
+            return None
+        book = st.secrets.get("book")
         if book is None:
             return None
         return book
@@ -50,7 +48,9 @@ def materialize_private_book() -> Tuple[Optional[Path], str]:
 
     Returns (path_or_None, source_label).
     source_label: path | b64 | url | none
+    Also writes st.session_state["book_private_status"] with a human reason.
     """
+    status = "no private book configured"
     book = _secrets_book()
 
     # 1) Explicit path (env first, then secrets)
@@ -62,7 +62,9 @@ def materialize_private_book() -> Tuple[Optional[Path], str]:
             continue
         p = Path(raw)
         if p.exists() and p.stat().st_size > 100:
+            _set_status(f"path ok · {p} · {p.stat().st_size} bytes")
             return p, "path"
+        status = f"path set but not readable on Cloud: {raw}"
 
     # 2) Base64 payload
     b64 = (os.environ.get("NORTHLINE_BOOK_B64") or "").strip()
@@ -72,40 +74,57 @@ def materialize_private_book() -> Tuple[Optional[Path], str]:
         try:
             if "," in b64 and b64.lower().startswith("data:"):
                 b64 = b64.split(",", 1)[1]
+            # strip whitespace/newlines that secrets UI sometimes injects
+            b64 = "".join(b64.split())
             data = base64.b64decode(b64, validate=False)
-            if len(data) > 100:
+            if len(data) > 500:
                 PRIVATE_BOOK_PATH.parent.mkdir(parents=True, exist_ok=True)
                 PRIVATE_BOOK_PATH.write_bytes(data)
+                _set_status(f"b64 ok · materialized {len(data)} bytes")
                 return PRIVATE_BOOK_PATH, "b64"
-        except Exception:
-            pass
+            status = f"xlsx_b64 present but decoded size too small ({len(data)} bytes)"
+        except Exception as exc:
+            status = f"xlsx_b64 present but decode failed: {type(exc).__name__}"
 
-    # 3) Remote URL (private link you control)
+    # 3) Remote URL
     url = (os.environ.get("NORTHLINE_BOOK_URL") or "").strip()
     if not url and book is not None and hasattr(book, "get"):
         url = str(book.get("url") or "").strip()
-    if url.startswith("http"):
+    if url:
         try:
             import urllib.request
-            req = urllib.request.Request(url, headers={"User-Agent": "NorthlineBook/1.0"})
-            with urllib.request.urlopen(req, timeout=60) as resp:
+            with urllib.request.urlopen(url, timeout=45) as resp:
                 data = resp.read()
-            if len(data) > 100:
+            if len(data) > 500:
                 PRIVATE_BOOK_PATH.parent.mkdir(parents=True, exist_ok=True)
                 PRIVATE_BOOK_PATH.write_bytes(data)
+                _set_status(f"url ok · fetched {len(data)} bytes")
                 return PRIVATE_BOOK_PATH, "url"
-        except Exception:
-            pass
+            status = f"url returned too little data ({len(data)} bytes)"
+        except Exception as exc:
+            status = f"url fetch failed: {type(exc).__name__}"
 
-    if PRIVATE_BOOK_PATH.exists() and PRIVATE_BOOK_PATH.stat().st_size > 100:
-        return PRIVATE_BOOK_PATH, "cached"
+    if book is None and not any(
+        (os.environ.get(k) or "").strip()
+        for k in ("NORTHLINE_BOOK_PATH", "NORTHLINE_BOOK_B64", "NORTHLINE_BOOK_URL")
+    ):
+        status = "no [book] section in secrets and no NORTHLINE_BOOK_* env"
 
+    _set_status(status)
     return None, "none"
 
 
-def resolve_book_path_with_private() -> Tuple[Path, str]:
-    """Path + mode label for UI: private | sample."""
-    private, src = materialize_private_book()
-    if private is not None:
-        return private, f"private:{src}"
-    return EXCEL_PATH, "sample"
+def _set_status(msg: str) -> None:
+    try:
+        import streamlit as st
+        st.session_state["book_private_status"] = msg
+    except Exception:
+        pass
+
+
+def private_book_status() -> str:
+    try:
+        import streamlit as st
+        return str(st.session_state.get("book_private_status") or "")
+    except Exception:
+        return ""
