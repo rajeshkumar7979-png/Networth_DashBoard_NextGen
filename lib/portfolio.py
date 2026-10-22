@@ -33,8 +33,9 @@ def _workbook_from_session_or_upload(uploaded_file=None):
         from lib.private_book import materialize_private_book
         private, src = materialize_private_book()
         if private is not None:
-            # sidecar = committed data/*.xlsx.b64 (preferred durable path)
-            st.session_state["book_mode"] = "committed" if src == "sidecar" else f"private:{src}"
+            st.session_state["book_mode"] = (
+                "committed" if src in ("sidecar", "committed") else f"private:{src}"
+            )
             st.session_state["book_path_display"] = f"{private} ({src})"
             return pd.ExcelFile(private)
     except Exception:
