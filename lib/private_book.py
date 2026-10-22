@@ -1,13 +1,13 @@
-"""Materialize durable workbook — committed sidecar first, then secrets/env.
+"""Materialize durable workbook from the repo — no secrets required.
 
 Priority:
-  1. Session upload (portfolio.py)
-  2. data/Networth_Raw_Data.xlsx.b64 committed in the repo (simple, survives reboot)
-  3. Secrets / env (optional override)
-  4. data/Networth_Raw_Data.xlsx plain file if present
+  1. Session upload (portfolio.py) — temporary
+  2. data/Networth_Raw_Data.xlsx committed in the repo (preferred)
+  3. data/Networth_Raw_Data.xlsx.b64 committed sidecar
+  4. Secrets / env (optional)
 
-To update the book: replace data/Networth_Raw_Data.xlsx.b64 (or the .xlsx)
-on GitHub and let Streamlit Cloud redeploy. No Streamlit secrets required.
+Workflow when investments or cash change:
+  Edit the Excel → upload/replace data/Networth_Raw_Data.xlsx on GitHub → Cloud redeploys.
 """
 from __future__ import annotations
 
@@ -18,6 +18,8 @@ from typing import Optional, Tuple
 
 DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 PRIVATE_BOOK_PATH = DATA_DIR / ".private_book.xlsx"
+COMMITTED_XLSX = DATA_DIR / "Networth_Raw_Data.xlsx"
+COMMITTED_B64 = DATA_DIR / "Networth_Raw_Data.xlsx.b64"
 
 
 def _secrets_book():
@@ -25,31 +27,31 @@ def _secrets_book():
         import streamlit as st
         if not hasattr(st, "secrets"):
             return None
-        book = st.secrets.get("book")
-        if book is None:
-            return None
-        return book
+        return st.secrets.get("book")
     except Exception:
         return None
 
 
 def materialize_private_book() -> Tuple[Optional[Path], str]:
-    """Ensure a durable workbook exists on disk.
+    """Return durable workbook path when available.
 
-    Returns (path_or_None, source_label).
-    source_label: sidecar | path | b64 | url | none
-    Writes st.session_state["book_private_status"] with a human reason.
+    source_label: committed | sidecar | path | b64 | url | none
     """
-    status = "no private book configured"
+    status = "using fallback sample"
     book = _secrets_book()
 
-    # 0) Committed sidecar data/Networth_Raw_Data.xlsx.b64 (simple durable path)
-    sidecar = DATA_DIR / "Networth_Raw_Data.xlsx.b64"
-    if sidecar.exists() and sidecar.stat().st_size > 500:
+    # 0) Committed plain Excel in data/ (the simple GitHub path you asked for)
+    # Prefer files that look complete (with Cash sheet typically >20 KB).
+    if COMMITTED_XLSX.exists() and COMMITTED_XLSX.stat().st_size > 20000:
+        _set_status(f"committed xlsx ok · {COMMITTED_XLSX.stat().st_size} bytes")
+        return COMMITTED_XLSX, "committed"
+
+    # 1) Committed sidecar .b64 (text-safe alternative)
+    if COMMITTED_B64.exists() and COMMITTED_B64.stat().st_size > 500:
         try:
-            b64 = "".join(sidecar.read_text(encoding="utf-8").split())
+            b64 = "".join(COMMITTED_B64.read_text(encoding="utf-8").split())
             data = base64.b64decode(b64, validate=False)
-            if len(data) > 500 and data[:2] == b"PK":  # xlsx zip magic
+            if len(data) > 500 and data[:2] == b"PK":
                 PRIVATE_BOOK_PATH.parent.mkdir(parents=True, exist_ok=True)
                 PRIVATE_BOOK_PATH.write_bytes(data)
                 _set_status(f"committed sidecar ok · {len(data)} bytes")
@@ -58,7 +60,7 @@ def materialize_private_book() -> Tuple[Optional[Path], str]:
         except Exception as exc:
             status = f"sidecar decode failed: {type(exc).__name__}"
 
-    # 1) Explicit path (env first, then secrets)
+    # 2) Explicit path (env / secrets)
     for raw in (
         (os.environ.get("NORTHLINE_BOOK_PATH") or "").strip(),
         (str(book.get("path") or "").strip() if book is not None and hasattr(book, "get") else ""),
@@ -71,7 +73,7 @@ def materialize_private_book() -> Tuple[Optional[Path], str]:
             return p, "path"
         status = f"path set but not readable on Cloud: {raw}"
 
-    # 2) Base64 payload from secrets/env
+    # 3) Secrets/env base64
     b64 = (os.environ.get("NORTHLINE_BOOK_B64") or "").strip()
     if not b64 and book is not None and hasattr(book, "get"):
         b64 = str(book.get("xlsx_b64") or book.get("content_b64") or "").strip()
@@ -84,13 +86,13 @@ def materialize_private_book() -> Tuple[Optional[Path], str]:
             if len(data) > 500:
                 PRIVATE_BOOK_PATH.parent.mkdir(parents=True, exist_ok=True)
                 PRIVATE_BOOK_PATH.write_bytes(data)
-                _set_status(f"b64 ok · materialized {len(data)} bytes")
+                _set_status(f"b64 ok · {len(data)} bytes")
                 return PRIVATE_BOOK_PATH, "b64"
-            status = f"xlsx_b64 present but decoded size too small ({len(data)} bytes)"
+            status = f"xlsx_b64 too small ({len(data)} bytes)"
         except Exception as exc:
-            status = f"xlsx_b64 present but decode failed: {type(exc).__name__}"
+            status = f"xlsx_b64 decode failed: {type(exc).__name__}"
 
-    # 3) Remote URL
+    # 4) URL
     url = (os.environ.get("NORTHLINE_BOOK_URL") or "").strip()
     if not url and book is not None and hasattr(book, "get"):
         url = str(book.get("url") or "").strip()
@@ -102,17 +104,15 @@ def materialize_private_book() -> Tuple[Optional[Path], str]:
             if len(data) > 500:
                 PRIVATE_BOOK_PATH.parent.mkdir(parents=True, exist_ok=True)
                 PRIVATE_BOOK_PATH.write_bytes(data)
-                _set_status(f"url ok · fetched {len(data)} bytes")
+                _set_status(f"url ok · {len(data)} bytes")
                 return PRIVATE_BOOK_PATH, "url"
-            status = f"url returned too little data ({len(data)} bytes)"
+            status = f"url too little data ({len(data)} bytes)"
         except Exception as exc:
             status = f"url fetch failed: {type(exc).__name__}"
 
-    if book is None and not any(
-        (os.environ.get(k) or "").strip()
-        for k in ("NORTHLINE_BOOK_PATH", "NORTHLINE_BOOK_B64", "NORTHLINE_BOOK_URL")
-    ):
-        status = "no sidecar and no [book] secrets"
+    # Small committed sample still present → report size so UI is honest
+    if COMMITTED_XLSX.exists():
+        status = f"committed xlsx is sample-sized ({COMMITTED_XLSX.stat().st_size} bytes) — replace with full book"
 
     _set_status(status)
     return None, "none"
