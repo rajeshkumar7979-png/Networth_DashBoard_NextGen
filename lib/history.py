@@ -22,6 +22,7 @@ PORTFOLIO_COLS = [
     "gold_invested_inr",
     "fd_current_inr",
     "fd_principal_inr",
+    "cash_current_inr",
     "total_assets_inr",
     "total_invested_inr",
     "note",
@@ -37,7 +38,7 @@ def _clean(df: pd.DataFrame) -> pd.DataFrame:
         return pd.DataFrame(columns=COLS)
     df = df.copy()
     df["date"] = df["date"].astype(str)
-    df = df[df["date"].str.match(r"^\d{4}-\d{2}-\d{2}$", na=False)]
+    df = df[df["date"].str.match(r"^\\d{4}-\\d{2}-\\d{2}$", na=False)]
     for c in COLS[1:]:
         if c in df.columns:
             df[c] = pd.to_numeric(df[c], errors="coerce")
@@ -67,9 +68,8 @@ def load_portfolio_history(path: Path | None = None) -> pd.DataFrame:
     if df is None or df.empty:
         return pd.DataFrame(columns=PORTFOLIO_COLS)
     df = df.copy()
-    # Drop accidental re-header rows and non-dates
     df["date"] = df["date"].astype(str).str.strip()
-    df = df[df["date"].str.match(r"^\d{4}-\d{2}-\d{2}$", na=False)]
+    df = df[df["date"].str.match(r"^\\d{4}-\\d{2}-\\d{2}$", na=False)]
     for col in list(df.columns):
         if col in ("date", "note", "stocks_mark"):
             continue
@@ -79,7 +79,6 @@ def load_portfolio_history(path: Path | None = None) -> pd.DataFrame:
 
 
 def row_data_quality(row: pd.Series) -> str:
-    """Label rows so NAV-parse gaps are not mistaken for real zero value."""
     priced = row.get("schemes_priced")
     missing = row.get("schemes_missing_nav")
     mf = row.get("mf_current_inr")
@@ -104,7 +103,6 @@ def row_data_quality(row: pd.Series) -> str:
 
 
 def portfolio_history_delta(df: pd.DataFrame | None = None) -> dict:
-    """Latest vs prior *trusted* totals (skips NAV_PARSE_GAP rows)."""
     hist = df if df is not None else load_portfolio_history()
     if hist is None or hist.empty:
         return {"ok": False, "reason": "No portfolio history rows yet."}
@@ -134,6 +132,7 @@ def portfolio_history_delta(df: pd.DataFrame | None = None) -> dict:
         "mf_current": float(latest["mf_current_inr"]) if pd.notna(latest.get("mf_current_inr")) else None,
         "stocks_current": float(latest["stocks_current_inr"]) if pd.notna(latest.get("stocks_current_inr")) else None,
         "fd_current": float(latest["fd_current_inr"]) if pd.notna(latest.get("fd_current_inr")) else None,
+        "cash_current": float(latest["cash_current_inr"]) if pd.notna(latest.get("cash_current_inr")) else None,
         "total_invested": float(latest["total_invested_inr"]) if pd.notna(latest.get("total_invested_inr")) else None,
         "scope": scope,
         "quality": row_data_quality(latest),
@@ -146,7 +145,6 @@ def portfolio_history_delta(df: pd.DataFrame | None = None) -> dict:
 
 
 def render_portfolio_history(st_module=None) -> pd.DataFrame:
-    """Show the committed daily book trend; never chart NAV-gap zeros as real value."""
     ui = st_module or st
     hist = load_portfolio_history()
     if hist.empty:
@@ -177,7 +175,8 @@ def render_portfolio_history(st_module=None) -> pd.DataFrame:
 
     chart_src = hist[hist["data_quality"] != "NAV_PARSE_GAP"].copy()
     chart_cols = [c for c in (
-        "total_assets_inr", "mf_current_inr", "stocks_current_inr", "gold_current_inr", "fd_current_inr",
+        "total_assets_inr", "mf_current_inr", "stocks_current_inr", "gold_current_inr",
+        "fd_current_inr", "cash_current_inr",
     ) if c in chart_src.columns and chart_src[c].notna().any()]
     if chart_cols and not chart_src.empty:
         plot = chart_src.set_index("date")[chart_cols].copy()
@@ -187,29 +186,33 @@ def render_portfolio_history(st_module=None) -> pd.DataFrame:
             "stocks_current_inr": "Equity stocks",
             "gold_current_inr": "Gold",
             "fd_current_inr": "FD",
+            "cash_current_inr": "Cash",
         })
         ui.line_chart(plot, height=260)
     else:
         ui.caption("No trusted rows to chart yet.")
 
-    # Day-over-day on trusted full-book rows only
     trusted = hist[hist["data_quality"].isin({"OK", "PARTIAL_NAV"})].copy()
     if len(trusted) >= 2 and "total_assets_inr" in trusted.columns:
         trusted = trusted.dropna(subset=["total_assets_inr"]).sort_values("date")
         if len(trusted) >= 2:
-            dod = trusted[["date", "total_assets_inr", "mf_current_inr", "stocks_current_inr", "gold_current_inr", "fd_current_inr"]].copy()
-            for col in ("total_assets_inr", "mf_current_inr", "stocks_current_inr", "gold_current_inr", "fd_current_inr"):
-                if col in dod.columns:
+            cols = [c for c in (
+                "date", "total_assets_inr", "mf_current_inr", "stocks_current_inr",
+                "gold_current_inr", "fd_current_inr", "cash_current_inr",
+            ) if c in trusted.columns]
+            dod = trusted[cols].copy()
+            for col in cols:
+                if col != "date":
                     dod[f"d_{col}"] = dod[col].diff()
             view = pd.DataFrame({
                 "Date": dod["date"],
                 "Total ₹": dod["total_assets_inr"].round(0),
                 "Δ Total": dod["d_total_assets_inr"].round(0),
                 "MF ₹": dod.get("mf_current_inr"),
-                "Δ MF": dod.get("d_mf_current_inr"),
                 "Stocks ₹": dod.get("stocks_current_inr"),
                 "Gold ₹": dod.get("gold_current_inr"),
                 "FD ₹": dod.get("fd_current_inr"),
+                "Cash ₹": dod.get("cash_current_inr"),
             })
             ui.caption("Day-over-day (trusted full-book rows only — NAV_PARSE_GAP excluded)")
             ui.dataframe(view.tail(10), hide_index=True, use_container_width=True)
@@ -220,7 +223,8 @@ def render_portfolio_history(st_module=None) -> pd.DataFrame:
     ui.caption(
         "Source: data/portfolio_history.csv committed by GitHub Actions daily job. "
         "MF = units × AMFI NAV. Equity stocks = Yahoo LTP or invested fallback. "
-        "Gold = SGB/gold ETF (gold_current_inr). FD = available or ROI-accrued principal (USD × USDINR). "
+        "Gold = SGB/gold ETF (gold_current_inr). Cash = savings face value (cash_current_inr). "
+        "FD = available or ROI-accrued principal (USD × USDINR). "
         "NAV_PARSE_GAP = parser wrote zeros that day — not a real crash; excluded from charts and Δ. "
         "Command Center remains live truth; history is the durable trend."
     )
