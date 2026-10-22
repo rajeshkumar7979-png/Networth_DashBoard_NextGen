@@ -44,9 +44,14 @@ def _workbook_from_session_or_upload(uploaded_file=None):
     path = resolve_book_path()
     try:
         try:
-            resolved = path.resolve()
-            sample = EXCEL_PATH.resolve()
-            st.session_state["book_mode"] = "sample" if resolved == sample else "private"
+            size = path.stat().st_size if path.exists() else 0
+            # Full book with Cash is typically >20 KB; small file is the old sample
+            if size > 20000:
+                st.session_state["book_mode"] = "committed"
+            else:
+                resolved = path.resolve()
+                sample = EXCEL_PATH.resolve()
+                st.session_state["book_mode"] = "sample" if resolved == sample else "private"
         except Exception:
             st.session_state["book_mode"] = "sample"
         st.session_state["book_path_display"] = str(path)
