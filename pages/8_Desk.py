@@ -35,26 +35,21 @@ with _controls_exp:
     st.markdown("### Controls")
     _mode = st.session_state.get("book_mode") or "unknown"
     _priv = st.session_state.get("book_private_status") or ""
-    if _mode == "sample" or not st.session_state.get("cc_uploaded_bytes"):
-        st.warning(
-            "**Why cash / real numbers disappear after reboot**\n\n"
-            "Streamlit Cloud wipes session memory on every reboot. "
-            "Upload only lives until the next reboot.\n\n"
-            "**Fix once and for all** — put your real Excel (the file that has the "
-            "`Cash in Hand` sheet) into Streamlit secrets:\n\n"
-            "1. Encode locally: `base64 -w0 Networth_Raw_Data.xlsx > book.b64`\n"
-            "2. Cloud → Settings → Secrets → add:\n\n"
-            "```\n[book]\nxlsx_b64 = \"PASTE_THE_ENTIRE_B64_HERE\"\n```\n\n"
-            "3. Save secrets → **Reboot** the app.\n\n"
-            f"Current private status: `{_priv or 'not checked yet'}`"
+    if _mode == "committed" or str(_mode).startswith("private"):
+        st.success(
+            f"Durable book active ({_mode}). "
+            f"{_priv or ''} "
+            "Edit `data/Networth_Raw_Data.xlsx` on GitHub when holdings change — no re-upload needed after reboot."
         )
-    elif str(_mode).startswith("private"):
-        st.success(f"PRIVATE durable book active · {_priv}")
+    elif _mode == "upload":
+        st.info("Using a session upload (temporary until reboot).")
+    else:
+        st.caption(f"Book mode: {_mode}. Prefer committing the Excel to data/Networth_Raw_Data.xlsx on GitHub.")
     st.file_uploader(
-        "Upload new Excel (temporary — lost on reboot)",
+        "Upload Excel (optional override — lost on reboot)",
         type=["xlsx", "xls"],
         key="cc_uploaded_file",
-        help="Kept in session only. For permanent book use secrets xlsx_b64.",
+        help="Optional. Permanent book = data/Networth_Raw_Data.xlsx on GitHub.",
     )
     _up = st.session_state.get("cc_uploaded_file")
     if _up is not None:
