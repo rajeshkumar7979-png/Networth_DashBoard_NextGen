@@ -201,6 +201,9 @@ def classify_external(evidence) -> str:
         return "filing"
     if evidence.provenance.source_type == SourceType.NEWS:
         return "news"
+    # Gateway Google News cache keys
+    if "gnews" in src or "google" in src or "news" in src:
+        return "news"
     return "other"
 
 
@@ -264,7 +267,18 @@ def gateway_cached_evidence(*, now=None, cache_dir=None) -> tuple:
 
 def delta_from_history(history_df):
     """snapshot_delta between the two latest history rows, or None when not
-    comparable (missing / single-row / legacy). Never invents."""
+    comparable (missing / single-row / legacy). Never invents.
+
+    Also accepts data/portfolio_history.csv rows (total_assets_inr schema).
+    Those lack class_invested_* so snapshot_delta marks available=False —
+    still useful for a honest totals-moved note without inventing drivers.
+    """
+    if history_df is None or getattr(history_df, "empty", True):
+        try:
+            from lib.history import load_portfolio_history
+            history_df = load_portfolio_history()
+        except Exception:
+            history_df = None
     if history_df is None or getattr(history_df, "empty", True):
         return None
     try:
@@ -275,6 +289,12 @@ def delta_from_history(history_df):
             return None
         prev = df.iloc[-2].to_dict()
         curr = df.iloc[-1].to_dict()
+        for row in (prev, curr):
+            if row.get("net_worth") is None and row.get("total_assets_inr") is not None:
+                try:
+                    row["net_worth"] = float(row["total_assets_inr"])
+                except (TypeError, ValueError):
+                    pass
         return snapshot_delta(prev, curr)
     except Exception:
         return None
@@ -495,68 +515,59 @@ class ResearchSynthesizer:
     The production default AI column for the research layer: composes the brief's
     structured conclusions into claims + a summary. Claims cite fact ids; the
     caller runs validate_claims so an unsupported claim is downgraded, never
-    trusted. A future real-AI synthesizer would implement the same protocol and
-    still sit behind the same validator.
+    trusted. No LLM is called.
     """
 
     name = "research-deterministic"
 
-    def synthesize(self, research, question=None):
-        if not research.conclusions and not research.changes:
-            return Interpretation(
-                model=self.name,
-                summary="Insufficient evidence: no research conclusions this run.",
-                claims=(),
-                confidence=None,
-            )
-        parts = []
-        n_drv = sum(1 for c in research.changes if c.kind == "pnl_driver")
-        if n_drv:
-            parts.append(f"{n_drv} P&L driver(s) from {len(research.changes)} change row(s)")
-        else:
-            parts.append(f"{len(research.changes)} portfolio change row(s)")
-        parts.append(f"{len(research.external)} external record(s) reviewed, "
-                     f"{research.mapped_count} mapped to held entities")
-        parts.append(f"{len(research.risks)} risk(s) at watch or above, "
-                     f"{len(research.gaps)} evidence gap(s)")
+    def synthesize(self, research: ResearchBrief, *, question=None) -> Interpretation:
+        claims = []
+        for c in research.conclusions:
+            claims.append(Claim(
+                id=c.id,
+                text=c.statement,
+                supported=c.strength != INSUFFICIENT,
+                fact_ids=c.fact_ids,
+                evidence_ids=c.evidence_ids,
+            ))
+        lines = []
+        if research.risks:
+            lines.append(f"{len(research.risks)} risk(s) at watch or above.")
+        if research.changes:
+            lines.append(f"{len(research.changes)} P&L driver(s) from change rows.")
+        mapped = [d for d in research.external if d.mapped]
+        if mapped:
+            lines.append(f"{len(mapped)} external record(s) mapped to held entities.")
+        if research.gaps:
+            lines.append(f"{len(research.gaps)} evidence gap(s).")
         if question:
-            parts.append(f"Prompt recorded: {question}")
-        claims = tuple(
-            Claim(text=f"[{c.topic}] {c.title}: {c.statement}", fact_ids=c.fact_ids, supported=True)
-            for c in research.conclusions
-        )
-        confidences = [c.confidence for c in research.conclusions if c.confidence is not None]
-        confidence = round(sum(confidences) / len(confidences), 3) if confidences else None
+            lines.insert(0, f"Prompt recorded: {question}")
+        summary = " ".join(lines) if lines else "No material findings this run."
         return Interpretation(
-            model=self.name,
-            summary=" ".join(parts),
-            claims=claims,
-            confidence=confidence,
+            provider=self.name,
+            summary=summary,
+            claims=tuple(claims),
+            question=question or research.question,
+            reason=f"{research.evidence_count} evidence · "
+                   f"{research.mapped_count} mapped to held entities",
         )
 
 
 def build_research_brief(*, facts, evidence=None, signals=None, drivers=None,
                          delta=None, portfolio_index=None, nav_evidence=None,
                          holdings_evidence=None, gateway_evidence=None,
-                         question=None, now=None, synthesizer=None) -> ResearchBrief:
-    """Assemble the evidence-based research brief.
+                         question=None, now=None) -> ResearchBrief:
+    """Assemble a ResearchBrief from portfolio truth + external verified evidence.
 
-    facts:                 ExposureFacts (see lib.intelligence.exposure)
-    evidence:              EvidenceBag from build_evidence_bag (news/coverage/drivers/history)
-    signals:               evaluate_signals output
-    drivers:               decompose_current output (cc_drivers)
-    delta:                 snapshot_delta output (from delta_from_history)
-    portfolio_index:       build_portfolio_index output (exact-match relevance)
-    nav/holdings/gateway_evidence: pre-built Evidence tuples; when None the
-                   committed caches + gateway cache dir are read (still no network).
-
-    Synthesizer failure never takes down the app: synthesis=None + reason.
+    Network-free. Missing inputs become gaps, never fabricated findings.
     """
-    now = now or getattr(facts, "as_of", None) or datetime.now()
-    bag = evidence if evidence is not None else EvidenceBag(tuple())
-    base_ev = tuple(getattr(bag, "items", ()) or ())
+    now = now or datetime.now()
+    base_ev = tuple(evidence.items) if evidence is not None else ()
+    all_evidence = list(base_ev)
 
-    ext = list(nav_evidence or ())
+    # External developments: NAV / holdings filings / gateway caches
+    ext = []
+    ext.extend(nav_evidence or ())
     if nav_evidence is None:
         from lib.intelligence.sources import load_mf_nav_evidence
         ext.extend(list_source_results((load_mf_nav_evidence(limit=2000, now=now),)))
@@ -597,8 +608,16 @@ def build_research_brief(*, facts, evidence=None, signals=None, drivers=None,
     changes = build_change_summary(drivers=drivers, delta=delta)
 
     gaps = []
-    if not any(e.provenance.source_type == SourceType.NEWS for e in base_ev):
+    _has_news_base = any(
+        getattr(getattr(e, "provenance", None), "source_type", None) == SourceType.NEWS
+        for e in base_ev
+    )
+    _has_news_ext = any(d.category in ("news", "macro") for d in ext_sorted)
+    if not _has_news_base and not _has_news_ext:
         gaps.append("No news evidence this run (news feed unavailable).")
+    elif not _has_news_base and _has_news_ext:
+        # Gateway/cache news present; not a feed outage.
+        pass
     cov = facts.coverage.coverage_pct
     if cov is None:
         gaps.append("No MF portfolio disclosures available — stock-level look-through blocked.")
@@ -610,14 +629,15 @@ def build_research_brief(*, facts, evidence=None, signals=None, drivers=None,
         gaps.append("USD/INR live rate missing — FCNR interest vs FX on principal "
                     "not split this run.")
     if delta is None:
-        gaps.append("No comparable prior snapshot (history.csv) available to "
-                    "measure what changed.")
+        gaps.append(
+            "No comparable prior snapshot for day-over-day change "
+            "(need 2+ rows in data/portfolio_history.csv or history.csv)."
+        )
     elif not delta.get("available"):
         gaps.append(delta.get("reason")
-                    or "Prior snapshot is legacy without a class breakdown.")
-    if not ext_sorted:
-        gaps.append("No external provider records available this run "
-                    "(AMFI NAV / holdings / gateway caches empty).")
+                    or "Prior snapshot is legacy without a class breakdown — "
+                       "totals can still be compared; per-class drivers need enriched rows.")
+
     unmapped_by_cat = {}
     for d in ext_sorted:
         if not d.mapped and d.category in ("filing", "macro"):
@@ -627,65 +647,44 @@ def build_research_brief(*, facts, evidence=None, signals=None, drivers=None,
 
     conclusions = derive_conclusions(
         facts=facts,
-        signals=signals,
+        signals=signals or (),
         changes=changes,
         external_developments=ext_sorted,
         gaps=gaps,
     )
+    risks = tuple(c for c in conclusions if c.topic == TOPIC_RISK)
+    research_needs = tuple(c for c in conclusions if c.topic == TOPIC_RESEARCH_NEED)
 
-    all_facts = tuple(facts.all_facts())
-
-    def _dedupe_evidence(items):
-        seen = set()
-        out = []
-        for e in items:
-            if e.id not in seen:
-                seen.add(e.id)
-                out.append(e)
-        return tuple(out)
-
-    all_evidence = _dedupe_evidence(base_ev + tuple(d.evidence for d in ext_sorted))
-    validation_briefing = Briefing(
-        as_of=now,
-        facts=all_facts,
-        evidence=all_evidence,
-        signals=tuple(signals or ()),
-    )
+    totals = {
+        "net_worth": getattr(getattr(facts, "totals", None), "net_worth", None),
+        "total_assets": getattr(getattr(facts, "totals", None), "total_assets", None),
+        "evidence_count": len(all_evidence) + len(ext),
+        "mapped_count": mapped_count,
+    }
 
     brief = ResearchBrief(
         as_of=now,
         question=question,
-        totals={
-            "total_assets": float(getattr(facts, "total_assets", 0.0) or 0.0),
-            "total_invested": float(getattr(facts, "total_invested", 0.0) or 0.0),
-            "total_pnl": float(getattr(facts, "total_pnl", 0.0) or 0.0),
-        },
+        totals=totals,
         changes=changes,
         external=ext_sorted,
-        risks=tuple(c for c in conclusions if c.topic == TOPIC_RISK),
-        research_needs=tuple(c for c in conclusions if c.topic == TOPIC_RESEARCH_NEED),
+        risks=risks,
+        research_needs=research_needs,
         gaps=tuple(gaps),
         conclusions=conclusions,
         synthesis=None,
         synthesis_reason=None,
-        evidence_count=len(all_evidence),
+        evidence_count=len(all_evidence) + len(ext),
         mapped_count=mapped_count,
         not_a_cashflow_label=NOT_A_CASHFLOW_LABEL,
     )
 
-    synth = None
-    reason = None
     try:
-        synth = (synthesizer or ResearchSynthesizer()).synthesize(brief, question=question)
+        synth = ResearchSynthesizer().synthesize(brief, question=question)
+        # Guard: drop unsupported claims
+        guarded = validate_claims(synth, facts=facts, evidence=EvidenceBag(items=tuple(all_evidence)))
+        brief = replace(brief, synthesis=guarded, synthesis_reason=synth.reason)
     except Exception as exc:
-        synth = None
-        reason = f"Research synthesizer unavailable: {type(exc).__name__}: {exc}"
-    if synth is not None:
-        unsupported = validate_claims(synth, validation_briefing)
-        if unsupported:
-            unsup = set(unsupported)
-            claims = tuple(c if c not in unsup else replace(c, supported=False)
-                           for c in synth.claims)
-            synth = replace(synth, claims=claims)
+        brief = replace(brief, synthesis=None, synthesis_reason=str(exc))
 
-    return replace(brief, synthesis=synth, synthesis_reason=reason)
+    return brief
