@@ -93,42 +93,33 @@ def format_identity_value(label, value, currency=None):
         except Exception:
             pass
 
-    # ROI / percent
-    if "roi" in label_l or "%" in label_l or "percent" in label_l or "pct" in label_l:
-        try:
-            return f"{float(value):.2f}%"
-        except Exception:
-            return str(value).strip() or "—"
+    if isinstance(value, str):
+        s = value.strip()
+        if not s or s.lower() in {"nan", "nat", "none", "n/a", "na"}:
+            return "—"
+        if "date" in label_l:
+            ts = pd.to_datetime(s, errors="coerce")
+            if pd.notna(ts):
+                return ts.strftime("%d %b %Y")
+        return s
 
-    moneyish = any(
-        k in label_l
-        for k in (
-            "principal",
-            "amount",
-            "value",
-            "invested",
-            "balance",
-            "maturity",
-            "booked",
-            "current",
-            "lien",
-            "inr",
-            "usd",
-            "cost",
-            "pnl",
-            "p&l",
-        )
-    )
-    if moneyish:
-        try:
-            n = float(value)
-        except Exception:
-            return str(value).strip() or "—"
-        if cur == "USD":
-            return f"{n:,.0f} USD"
-        return format_inr_indian(n, decimals=0)
+    if isinstance(value, bool):
+        return "yes" if value else "no"
 
-    text = str(value).strip()
-    if not text or text.lower() in {"nan", "none", "nat"}:
-        return "—"
-    return text
+    if isinstance(value, (int, float, np.integer, np.floating)):
+        n = float(value)
+        if "roi" in label_l or "percent" in label_l or label_l.endswith("%") or "% " in label_l:
+            return f"{n:.2f}%"
+        money_keys = ("principal", "amount", "value", "balance", "lien",
+                      "invested", "nav", "proceeds", "cost")
+        is_money = any(k in label_l for k in money_keys)
+        if is_money or abs(n) >= 1000:
+            if cur == "USD":
+                return f"{n:,.0f} USD"
+            return format_inr_indian(n, decimals=0)
+        if n.is_integer():
+            return str(int(n))
+        rendered = f"{n:.4f}".rstrip("0").rstrip(".")
+        return rendered
+
+    return str(value)

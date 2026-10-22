@@ -1,15 +1,12 @@
 """Command Center loader.
 
-1) Prefer local lib/cc_parts/part*.b64 (gzip+base64) if complete.
-2) Else fetch last known-good page from GitHub raw and apply cash patches.
-3) Surface any failure instead of a blank page.
+Bootstraps the full Command Center body from the last known-good GitHub
+revision, then applies cash (savings) into totals / allocation only —
+no early dumped table (cash detail lives on Desk with the other books).
 """
 from __future__ import annotations
 
-import base64
-import gzip
 import urllib.request
-from pathlib import Path
 
 import streamlit as st
 
@@ -20,30 +17,13 @@ _GOOD = (
 )
 
 
-def _load_local_parts() -> str | None:
-    parts_dir = Path(__file__).resolve().parents[1] / "lib" / "cc_parts"
-    parts = sorted(parts_dir.glob("part*.b64"))
-    if len(parts) < 4:
-        return None
-    chunks: list[str] = []
-    try:
-        for p in parts:
-            raw = gzip.decompress(base64.b64decode(p.read_text(encoding="utf-8").strip()))
-            chunks.append(raw.decode("utf-8"))
-    except Exception:
-        return None
-    code = "".join(chunks)
-    if "total_networth" not in code or len(code) < 50000:
-        return None
-    return code
-
-
 def _load_github_body() -> str:
     with urllib.request.urlopen(_GOOD, timeout=60) as resp:
         return resp.read().decode("utf-8", errors="replace")
 
 
 def _apply_cash_patches(code: str) -> str:
+    """Wire Cash in Hand into math and allocation — never dump a top table."""
     if "from lib.cash_book import" not in code:
         code = code.replace(
             "from lib.portfolio import load_excel as load_data\n",
@@ -65,7 +45,10 @@ def _apply_cash_patches(code: str) -> str:
     if old in code:
         code = code.replace(old, new, 1)
 
-    if "+ total_fd_invested)" in code and "total_cash" not in code[code.find("total_invested"):code.find("total_pnl") + 1]:
+    # Invested basis includes cash face value
+    inv_start = code.find("total_invested = ((")
+    inv_end = code.find("total_pnl", inv_start)
+    if inv_start > 0 and inv_end > inv_start and "total_cash" not in code[inv_start:inv_end]:
         code = code.replace(
             "+ total_fd_invested)",
             "+ total_fd_invested\n                  + float(total_cash if \"total_cash\" in dir() else 0))",
@@ -105,26 +88,11 @@ def _apply_cash_patches(code: str) -> str:
             1,
         )
 
-    # Visible cash block after totals
-    if "#### Cash in Hand" not in code and "total_pnl = total_networth - total_invested" in code:
-        code = code.replace(
-            "total_pnl = total_networth - total_invested",
-            "total_pnl = total_networth - total_invested\n\n"
-            "if \"cash_valid\" in dir() and cash_valid is not None and not getattr(cash_valid, \"empty\", True):\n"
-            "    st.markdown(\"#### Cash in Hand\")\n"
-            "    st.caption(\n"
-            "        f\"{len(cash_valid)} savings accounts · "
-            "{format_inr_compact(float(total_cash))} included in total assets\"\n"
-            "    )\n"
-            "    st.dataframe(cash_valid, use_container_width=True, hide_index=True)\n",
-            1,
-        )
-
-    # Allocation sleeve
-    if '("Gold", gold_pct)),' in code and '("Cash",' not in code:
+    # Allocation sleeve only (no top-of-page table)
+    if '("Gold", gold_pct)),' in code and '("Cash"' not in code:
         code = code.replace(
             '("Gold", gold_pct)),',
-            '("Gold", gold_pct), ("Cash", float(total_cash if "total_cash" in dir() else 0) * 100.0 / float(total_networth or 1))),',
+            '("Gold", gold_pct), ("Cash", (float(total_cash) * 100.0 / float(total_networth or 1.0)) if "total_cash" in dir() else 0.0)),',
             1,
         )
 
@@ -132,17 +100,9 @@ def _apply_cash_patches(code: str) -> str:
 
 
 try:
-    _code = _load_local_parts()
-    if not _code:
-        _code = _apply_cash_patches(_load_github_body())
-    else:
-        # local body already cash-patched when built
-        if "total_cash" not in _code:
-            _code = _apply_cash_patches(_code)
+    _code = _apply_cash_patches(_load_github_body())
     exec(compile(_code, "Command_Center_loaded.py", "exec"), globals())
 except Exception as _exc:
     st.error("Command Center failed to load.")
     st.exception(_exc)
-    st.info(
-        "Try Streamlit reboot. If this persists, open Desk → re-upload workbook → Command again."
-    )
+    st.info("Reboot the app, then Desk → re-upload workbook → open Command again.")
