@@ -8,15 +8,11 @@ import io
 import pandas as pd
 import streamlit as st
 
-from lib.config import resolve_book_path
+from lib.config import EXCEL_PATH, resolve_book_path
 
 
 def _workbook_from_session_or_upload(uploaded_file=None):
-    """Prefer live upload, then durable session bytes, then resolved book path.
-
-    Streamlit UploadedFile handles can go stale after multipage navigation;
-    Desk stores raw bytes under cc_uploaded_bytes so Command can always re-open.
-    """
+    """Prefer live upload, then session bytes, then durable private/sample path."""
     if uploaded_file is not None:
         try:
             data = uploaded_file.getvalue()
@@ -27,12 +23,31 @@ def _workbook_from_session_or_upload(uploaded_file=None):
                 return pd.ExcelFile(io.BytesIO(data))
         except Exception:
             pass
+
     raw = st.session_state.get("cc_uploaded_bytes")
     if isinstance(raw, (bytes, bytearray)) and raw:
         st.session_state["book_mode"] = "upload"
         return pd.ExcelFile(io.BytesIO(raw))
+
+    try:
+        from lib.private_book import materialize_private_book
+        private, src = materialize_private_book()
+        if private is not None:
+            st.session_state["book_mode"] = "private"
+            st.session_state["book_path_display"] = f"{private} ({src})"
+            return pd.ExcelFile(private)
+    except Exception:
+        pass
+
     path = resolve_book_path()
     try:
+        try:
+            resolved = path.resolve()
+            sample = EXCEL_PATH.resolve()
+            st.session_state["book_mode"] = "sample" if resolved == sample else "private"
+        except Exception:
+            st.session_state["book_mode"] = "sample"
+        st.session_state["book_path_display"] = str(path)
         return pd.ExcelFile(path)
     except Exception:
         st.error(f"Could not load book at {path}")
@@ -43,8 +58,7 @@ def load_excel(uploaded_file=None):
     """Return (fd, mf, stocks). Optional cash sheet is stashed in session.
 
     Cash is normalized later by Command Center via lib.cash_book using
-    st.session_state["cc_cash_raw"]. Returning three frames keeps older
-    Command Center unpacks working.
+    st.session_state["cc_cash_raw"].
     """
     xls = _workbook_from_session_or_upload(uploaded_file)
     sheet_map = {s.lower().strip(): s for s in xls.sheet_names}
