@@ -37,7 +37,13 @@ st.markdown(
 )
 ensure_published_book()
 _mode = st.session_state.get("book_mode") or "unknown"
-if _mode == "sample":
+if st.session_state.get("cc_uploaded_bytes") or _mode == "upload":
+    st.caption(
+        "Book mode: UPLOADED workbook"
+        + (f" ({st.session_state.get('cc_uploaded_name')})" if st.session_state.get("cc_uploaded_name") else "")
+        + ". Open Command Center to recompute."
+    )
+elif _mode == "sample":
     st.caption("Book mode: PUBLIC SAMPLE (Member A–D). Not the private family workbook.")
 elif _mode == "private":
     st.caption("Book mode: PRIVATE workbook path loaded.")
