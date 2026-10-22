@@ -19,20 +19,30 @@ EXCEL_PATH = DATA_DIR / "Networth_Raw_Data.xlsx"
 
 
 def resolve_book_path() -> Path:
-    """Private book first, then the committed public sample workbook.
+    """Private durable book first, then committed public sample.
 
-    Streamlit secrets:
+    Streamlit secrets (any one of):
         [book]
         path = "/mount/private_Networth_Raw_Data.xlsx"
-    Or env NORTHLINE_BOOK_PATH.
+        xlsx_b64 = "<base64 of xlsx>"
+        url = "https://..."
+
+    Env: NORTHLINE_BOOK_PATH, NORTHLINE_BOOK_B64, NORTHLINE_BOOK_URL.
     """
+    try:
+        from lib.private_book import materialize_private_book
+        private, _src = materialize_private_book()
+        if private is not None:
+            return private
+    except Exception:
+        pass
+
     candidates = []
     env_path = (os.environ.get("NORTHLINE_BOOK_PATH") or "").strip()
     if env_path:
         candidates.append(Path(env_path))
     try:
         import streamlit as st
-
         book = st.secrets.get("book") if hasattr(st, "secrets") else None
         if book is not None and hasattr(book, "get"):
             secret_path = str(book.get("path") or "").strip()
