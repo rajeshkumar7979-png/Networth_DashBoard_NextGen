@@ -40,7 +40,12 @@ def _workbook_from_session_or_upload(uploaded_file=None):
 
 
 def load_excel(uploaded_file=None):
-    """Return (fd, mf, stocks, cash). cash may be empty DataFrame."""
+    """Return (fd, mf, stocks). Optional cash sheet is stashed in session.
+
+    Cash is normalized later by Command Center via lib.cash_book using
+    st.session_state["cc_cash_raw"]. Returning three frames keeps older
+    Command Center unpacks working.
+    """
     xls = _workbook_from_session_or_upload(uploaded_file)
     sheet_map = {s.lower().strip(): s for s in xls.sheet_names}
 
@@ -73,4 +78,8 @@ def load_excel(uploaded_file=None):
         "bank balance",
         "cash_in_hand",
     )
-    return fd, mf, stocks, cash
+    try:
+        st.session_state["cc_cash_raw"] = cash
+    except Exception:
+        pass
+    return fd, mf, stocks
