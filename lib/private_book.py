@@ -1,23 +1,13 @@
-"""Materialize a durable private workbook from Streamlit secrets / env.
+"""Materialize durable workbook — committed sidecar first, then secrets/env.
 
-Priority for the live book (highest first):
-  1. Session upload bytes (cc_uploaded_bytes) — handled in portfolio.py
-  2. Secrets / env materialized private file
-  3. Committed sample data/Networth_Raw_Data.xlsx
+Priority:
+  1. Session upload (portfolio.py)
+  2. data/Networth_Raw_Data.xlsx.b64 committed in the repo (simple, survives reboot)
+  3. Secrets / env (optional override)
+  4. data/Networth_Raw_Data.xlsx plain file if present
 
-Streamlit secrets (Cloud → Settings → Secrets):
-
-  [book]
-  # Preferred: full Excel as base64 (survives every reboot)
-  xlsx_b64 = "UEsDBBQAAAAI..."
-
-  # Or a Cloud-reachable path / private URL
-  # path = "/mount/private_Networth_Raw_Data.xlsx"
-  # url  = "https://..."
-
-Env alternatives: NORTHLINE_BOOK_PATH, NORTHLINE_BOOK_B64, NORTHLINE_BOOK_URL.
-
-Never commit a real family workbook to the public repo.
+To update the book: replace data/Networth_Raw_Data.xlsx.b64 (or the .xlsx)
+on GitHub and let Streamlit Cloud redeploy. No Streamlit secrets required.
 """
 from __future__ import annotations
 
@@ -44,14 +34,29 @@ def _secrets_book():
 
 
 def materialize_private_book() -> Tuple[Optional[Path], str]:
-    """Ensure a durable private workbook exists on disk when configured.
+    """Ensure a durable workbook exists on disk.
 
     Returns (path_or_None, source_label).
-    source_label: path | b64 | url | none
-    Also writes st.session_state["book_private_status"] with a human reason.
+    source_label: sidecar | path | b64 | url | none
+    Writes st.session_state["book_private_status"] with a human reason.
     """
     status = "no private book configured"
     book = _secrets_book()
+
+    # 0) Committed sidecar data/Networth_Raw_Data.xlsx.b64 (simple durable path)
+    sidecar = DATA_DIR / "Networth_Raw_Data.xlsx.b64"
+    if sidecar.exists() and sidecar.stat().st_size > 500:
+        try:
+            b64 = "".join(sidecar.read_text(encoding="utf-8").split())
+            data = base64.b64decode(b64, validate=False)
+            if len(data) > 500 and data[:2] == b"PK":  # xlsx zip magic
+                PRIVATE_BOOK_PATH.parent.mkdir(parents=True, exist_ok=True)
+                PRIVATE_BOOK_PATH.write_bytes(data)
+                _set_status(f"committed sidecar ok · {len(data)} bytes")
+                return PRIVATE_BOOK_PATH, "sidecar"
+            status = f"sidecar present but invalid ({len(data)} bytes)"
+        except Exception as exc:
+            status = f"sidecar decode failed: {type(exc).__name__}"
 
     # 1) Explicit path (env first, then secrets)
     for raw in (
@@ -66,7 +71,7 @@ def materialize_private_book() -> Tuple[Optional[Path], str]:
             return p, "path"
         status = f"path set but not readable on Cloud: {raw}"
 
-    # 2) Base64 payload
+    # 2) Base64 payload from secrets/env
     b64 = (os.environ.get("NORTHLINE_BOOK_B64") or "").strip()
     if not b64 and book is not None and hasattr(book, "get"):
         b64 = str(book.get("xlsx_b64") or book.get("content_b64") or "").strip()
@@ -74,7 +79,6 @@ def materialize_private_book() -> Tuple[Optional[Path], str]:
         try:
             if "," in b64 and b64.lower().startswith("data:"):
                 b64 = b64.split(",", 1)[1]
-            # strip whitespace/newlines that secrets UI sometimes injects
             b64 = "".join(b64.split())
             data = base64.b64decode(b64, validate=False)
             if len(data) > 500:
@@ -108,7 +112,7 @@ def materialize_private_book() -> Tuple[Optional[Path], str]:
         (os.environ.get(k) or "").strip()
         for k in ("NORTHLINE_BOOK_PATH", "NORTHLINE_BOOK_B64", "NORTHLINE_BOOK_URL")
     ):
-        status = "no [book] section in secrets and no NORTHLINE_BOOK_* env"
+        status = "no sidecar and no [book] secrets"
 
     _set_status(status)
     return None, "none"
