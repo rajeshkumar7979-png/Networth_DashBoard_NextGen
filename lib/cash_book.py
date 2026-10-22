@@ -1,6 +1,8 @@
 """Cash in Hand / savings book helpers."""
 from __future__ import annotations
 
+from typing import Any, Dict, Optional, Tuple
+
 import pandas as pd
 
 from lib.formatters import safe_float
@@ -45,3 +47,18 @@ def cash_total(cash_df) -> float:
     if "Current Value" not in cash_df.columns:
         return 0.0
     return float(pd.to_numeric(cash_df["Current Value"], errors="coerce").fillna(0).sum())
+
+
+def sum_cash_current(sheets: Optional[Dict[str, Any]] = None) -> Tuple[float, int]:
+    """For the daily history job: sum Cash in Hand face value from workbook sheets."""
+    if not sheets:
+        return 0.0, 0
+    key = None
+    for name in ("cash in hand", "cash", "savings", "saving bank", "bank balance", "cash_in_hand"):
+        if name in sheets and isinstance(sheets[name], pd.DataFrame) and not sheets[name].empty:
+            key = name
+            break
+    if key is None:
+        return 0.0, 0
+    book = build_cash_book(sheets[key])
+    return float(cash_total(book)), int(len(book))
