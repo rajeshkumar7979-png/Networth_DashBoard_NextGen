@@ -11,8 +11,6 @@ st.set_page_config(
 )
 
 inject_css()
-# Do not take the sidebar out of flow and do not hide the mobile bar.
-# A collapsed rail plus a hidden bar is what left the page with no tabs.
 st.markdown(
     """
 <style>
@@ -43,10 +41,14 @@ if st.session_state.get("cc_uploaded_bytes") or _mode == "upload":
         + (f" ({st.session_state.get('cc_uploaded_name')})" if st.session_state.get("cc_uploaded_name") else "")
         + ". Open Command Center to recompute."
     )
+elif str(_mode).startswith("private"):
+    st.caption(
+        "Book mode: PRIVATE durable book"
+        + (f" · {st.session_state.get('book_path_display')}" if st.session_state.get("book_path_display") else "")
+        + ". Survives reboot when secrets/env are set."
+    )
 elif _mode == "sample":
     st.caption("Book mode: PUBLIC SAMPLE (Member A–D). Not the private family workbook.")
-elif _mode == "private":
-    st.caption("Book mode: PRIVATE workbook path loaded.")
 
 pg = st.navigation(
     {
