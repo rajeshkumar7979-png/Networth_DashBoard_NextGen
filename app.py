@@ -34,21 +34,34 @@ st.markdown(
     unsafe_allow_html=True,
 )
 ensure_published_book()
+try:
+    from lib.private_book import materialize_private_book
+    materialize_private_book()  # sets book_private_status even if none
+except Exception:
+    pass
 _mode = st.session_state.get("book_mode") or "unknown"
+_priv = st.session_state.get("book_private_status") or ""
 if st.session_state.get("cc_uploaded_bytes") or _mode == "upload":
     st.caption(
         "Book mode: UPLOADED workbook"
         + (f" ({st.session_state.get('cc_uploaded_name')})" if st.session_state.get("cc_uploaded_name") else "")
-        + ". Open Command Center to recompute."
+        + " · temporary until reboot. Set secrets for permanent book."
     )
 elif str(_mode).startswith("private"):
     st.caption(
         "Book mode: PRIVATE durable book"
         + (f" · {st.session_state.get('book_path_display')}" if st.session_state.get("book_path_display") else "")
-        + ". Survives reboot when secrets/env are set."
+        + " · survives reboot."
     )
 elif _mode == "sample":
-    st.caption("Book mode: PUBLIC SAMPLE (Member A–D). Not the private family workbook.")
+    st.warning(
+        "Book mode: PUBLIC SAMPLE — cash and real holdings are missing. "
+        "Upload once on Desk **or** set Streamlit secrets `[book] xlsx_b64 = \"...\"` "
+        "with your real Excel (the one that has the Cash in Hand sheet). "
+        + (f"Private status: {_priv}" if _priv else "Private status: not configured.")
+    )
+else:
+    st.caption(f"Book mode: {_mode}" + (f" · {_priv}" if _priv else ""))
 
 pg = st.navigation(
     {
