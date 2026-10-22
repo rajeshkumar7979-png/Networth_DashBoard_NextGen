@@ -34,9 +34,27 @@ st.markdown(
     unsafe_allow_html=True,
 )
 ensure_published_book()
+# Resolve durable book BEFORE the banner so reboot shows correct mode immediately.
 try:
     from lib.private_book import materialize_private_book
-    materialize_private_book()  # sets book_private_status even if none
+    from lib.config import EXCEL_PATH as _EXCEL
+    private, src = materialize_private_book()
+    if private is not None:
+        st.session_state["book_mode"] = (
+            "committed" if src in ("sidecar", "committed") else f"private:{src}"
+        )
+        st.session_state["book_path_display"] = f"{private} ({src})"
+    elif not st.session_state.get("book_mode"):
+        # Fallback: full committed xlsx on disk
+        try:
+            if _EXCEL.exists() and _EXCEL.stat().st_size > 20000:
+                st.session_state["book_mode"] = "committed"
+                st.session_state["book_path_display"] = str(_EXCEL)
+                st.session_state["book_private_status"] = (
+                    f"committed xlsx ok · {_EXCEL.stat().st_size} bytes"
+                )
+        except Exception:
+            pass
 except Exception:
     pass
 _mode = st.session_state.get("book_mode") or "unknown"
