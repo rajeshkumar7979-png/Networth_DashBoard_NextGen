@@ -41,27 +41,24 @@ except Exception:
     pass
 _mode = st.session_state.get("book_mode") or "unknown"
 _priv = st.session_state.get("book_private_status") or ""
+_path = st.session_state.get("book_path_display") or ""
 if st.session_state.get("cc_uploaded_bytes") or _mode == "upload":
     st.caption(
-        "Book mode: UPLOADED workbook"
+        "Book: UPLOADED"
         + (f" ({st.session_state.get('cc_uploaded_name')})" if st.session_state.get("cc_uploaded_name") else "")
-        + " · temporary until reboot. Set secrets for permanent book."
+        + " · session only (lost on reboot). Prefer data/Networth_Raw_Data.xlsx in GitHub for durability."
     )
-elif str(_mode).startswith("private"):
+elif _mode == "committed" or str(_mode).startswith("private"):
     st.caption(
-        "Book mode: PRIVATE durable book"
-        + (f" · {st.session_state.get('book_path_display')}" if st.session_state.get("book_path_display") else "")
-        + " · survives reboot."
-    )
-elif _mode == "sample":
-    st.warning(
-        "Book mode: PUBLIC SAMPLE — cash and real holdings are missing. "
-        "Upload once on Desk **or** set Streamlit secrets `[book] xlsx_b64 = \"...\"` "
-        "with your real Excel (the one that has the Cash in Hand sheet). "
-        + (f"Private status: {_priv}" if _priv else "Private status: not configured.")
+        f"Book: durable ({_mode}) · {_path}"
+        + (f" · {_priv}" if _priv else "")
+        + ". Survives reboot. Update via data/Networth_Raw_Data.xlsx on GitHub."
     )
 else:
-    st.caption(f"Book mode: {_mode}" + (f" · {_priv}" if _priv else ""))
+    st.caption(
+        f"Book: fallback sample · {_path}"
+        + ". Replace data/Networth_Raw_Data.xlsx on GitHub with the Cash-bearing workbook."
+    )
 
 pg = st.navigation(
     {
