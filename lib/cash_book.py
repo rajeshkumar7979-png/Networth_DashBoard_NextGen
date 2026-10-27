@@ -54,10 +54,14 @@ def sum_cash_current(sheets: Optional[Dict[str, Any]] = None) -> Tuple[float, in
     if not sheets:
         return 0.0, 0
     key = None
+    # Match sheet titles case-insensitively (Excel may be "Cash in Hand")
+    lowered = {str(k).strip().lower(): k for k in (sheets or {})}
     for name in ("cash in hand", "cash", "savings", "saving bank", "bank balance", "cash_in_hand"):
-        if name in sheets and isinstance(sheets[name], pd.DataFrame) and not sheets[name].empty:
-            key = name
-            break
+        if name in lowered:
+            raw = sheets[lowered[name]]
+            if isinstance(raw, pd.DataFrame) and not raw.empty:
+                key = lowered[name]
+                break
     if key is None:
         return 0.0, 0
     book = build_cash_book(sheets[key])
