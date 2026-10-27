@@ -1,6 +1,8 @@
 """Desk — operator controls and session transparency."""
 from __future__ import annotations
 
+from pathlib import Path
+
 import pandas as pd
 import streamlit as st
 
@@ -173,6 +175,29 @@ for _k, _label in (("mf", "MF"), ("stocks", "Stocks"), ("gold", "Gold"), ("fd", 
         file_name=f"northline_{_k}.csv",
         mime="text/csv",
         use_container_width=True,
+    )
+
+st.markdown(ui_section("Daily self-audit", "GitHub Actions · data/audit"), unsafe_allow_html=True)
+_audit_md = Path(__file__).resolve().parents[1] / "data" / "audit" / "latest.md"
+_audit_json = _audit_md.with_suffix(".json")
+if _audit_md.exists():
+    try:
+        _txt = _audit_md.read_text(encoding="utf-8")
+        st.markdown(_txt)
+    except Exception as _ae:
+        st.caption(f"Audit log unreadable: {_ae}")
+    if _audit_json.exists():
+        st.download_button(
+            "Download latest audit JSON",
+            data=_audit_json.read_bytes(),
+            file_name="northline_audit_latest.json",
+            mime="application/json",
+            use_container_width=True,
+        )
+else:
+    st.caption(
+        "No audit log yet. GitHub Action **Daily Self Audit** runs once daily (~05:15 UTC) "
+        "and writes data/audit/latest.md. You can also run it manually from the Actions tab."
     )
 
 st.caption(LIFETIME_PNL_CAPTION)
