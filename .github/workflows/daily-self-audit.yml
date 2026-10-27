@@ -1,0 +1,68 @@
+name: Daily Self Audit
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Once daily ~05:15 UTC (after holdings cron at 04:30)
+    - cron: "15 5 * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -r requirements.txt
+
+      - name: Run daily self-audit (detect + safe auto-fix)
+        id: audit
+        run: |
+          set +e
+          python scripts/daily_self_audit.py
+          code=$?
+          set -e
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          if [ -f data/audit/latest.md ]; then
+            echo "----- latest.md -----"
+            cat data/audit/latest.md
+          fi
+          # Do not fail the job on residual warnings — log is the product.
+          exit 0
+
+      - name: Commit audit log
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          mkdir -p data/audit
+          git add data/audit/latest.json data/audit/latest.md data/audit/audit_history.jsonl
+          if [ -f data/Networth_Raw_Data.xlsx ]; then
+            git add data/Networth_Raw_Data.xlsx || true
+          fi
+          if [ -f data/portfolio_history.csv ]; then
+            git add data/portfolio_history.csv || true
+          fi
+          if git diff --cached --quiet; then
+            echo "No audit artifacts to commit."
+            exit 0
+          fi
+          git commit -m "chore: daily self-audit log $(date -u +%Y-%m-%dT%H%MZ)"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
