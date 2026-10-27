@@ -31,7 +31,18 @@ jobs:
         run: python -m pip install --upgrade pip && python -m pip install -r requirements.txt
 
       - name: Rebuild public sample workbook from synthetic CSVs
-        run: python scripts/build_sample_workbook.py
+        run: |
+          # Preserve a committed full book (>20KB with Cash in Hand). Only build
+          # the public sample when the repo still has a tiny placeholder xlsx.
+          python - <<'PY'
+          from pathlib import Path
+          x = Path("data/Networth_Raw_Data.xlsx")
+          if x.exists() and x.stat().st_size > 20000:
+              print(f"Keeping committed book {x} ({x.stat().st_size} bytes)")
+          else:
+              import subprocess, sys
+              raise SystemExit(subprocess.call([sys.executable, "scripts/build_sample_workbook.py"]))
+          PY
 
       - name: Refresh complete MF holdings
         run: python scripts/update_holdings_cache.py
@@ -58,12 +69,16 @@ jobs:
           if not history.exists():
               raise SystemExit("ERROR: portfolio_history.csv was not written")
           if not xlsx.exists():
-              raise SystemExit("ERROR: sample workbook was not built")
-          blob = xlsx.read_bytes().upper()
-          for bad in (b"KHANDELWAL", b"SATYANARAYAN", b"KAVITA KHANDELWAL"):
-              if bad in blob:
-                  raise SystemExit(f"ERROR: personal name marker still in sample xlsx: {bad!r}")
-          print(f"Funds: {len(funds)}  History: {history}  Sample book: {xlsx}")
+              raise SystemExit("ERROR: workbook missing")
+          size = xlsx.stat().st_size
+          # Personal-name guard only for the public sample (small file).
+          # Committed family book may legitimately contain holder names.
+          if size <= 20000:
+              blob = xlsx.read_bytes().upper()
+              for bad in (b"KHANDELWAL", b"SATYANARAYAN", b"KAVITA KHANDELWAL"):
+                  if bad in blob:
+                      raise SystemExit(f"ERROR: personal name marker still in sample xlsx: {bad!r}")
+          print(f"Funds: {len(funds)}  History: {history}  Book: {xlsx} ({size} bytes)")
           PY
 
       - name: Commit updated holdings cache
