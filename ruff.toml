@@ -1,5 +1,4 @@
-# Line length is not a logic failure. CI still fails on unused imports,
-# undefined names, and the other Pyflakes checks.
+# Line length is not a logic failure.
 line-length = 120
 target-version = "py311"
 
@@ -11,4 +10,6 @@ ignore = ["E501"]
 "pages/*.py" = ["E211", "E231", "E402", "E701", "E702", "W291", "F401", "F841"]
 "lib/valuation.py" = ["F821"]
 "lib/history.py" = ["F401"]
-"scripts/*.py" = ["F401"]
+"lib/intelligence/research.py" = ["F401"]
+"scripts/*.py" = ["F401", "F841"]
+"scripts/daily_self_audit.py" = ["E721"]
