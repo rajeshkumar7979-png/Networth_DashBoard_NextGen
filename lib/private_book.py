@@ -2,8 +2,8 @@
 
 Priority:
   1. Session upload (portfolio.py) — temporary
-  2. data/Networth_Raw_Data.xlsx committed in the repo (preferred)
-  3. data/Networth_Raw_Data.xlsx.b64 committed sidecar
+  2. data/Networth_Raw_Data.xlsx committed in the repo (preferred if >20KB)
+  3. data/Networth_Raw_Data.xlsx.b64 or data/book_b64_parts/part_*.b64
   4. Secrets / env (optional)
 
 Workflow when investments or cash change:
@@ -40,23 +40,37 @@ def materialize_private_book() -> Tuple[Optional[Path], str]:
     status = "using fallback sample"
     book = _secrets_book()
 
-    # 0) Committed plain Excel in data/ (the simple GitHub path you asked for)
-    # Prefer files that look complete (with Cash sheet typically >20 KB).
+    # 0) Committed plain Excel in data/ (prefer complete book >20KB)
     if COMMITTED_XLSX.exists() and COMMITTED_XLSX.stat().st_size > 20000:
         _set_status(f"committed xlsx ok · {COMMITTED_XLSX.stat().st_size} bytes")
         return COMMITTED_XLSX, "committed"
 
-    # 1) Committed sidecar .b64 (text-safe alternative)
+    # 1) Sidecar .b64 or chunked data/book_b64_parts/part_*.b64
+    b64_text = ""
     if COMMITTED_B64.exists() and COMMITTED_B64.stat().st_size > 500:
         try:
-            b64 = "".join(COMMITTED_B64.read_text(encoding="utf-8").split())
-            data = base64.b64decode(b64, validate=False)
+            b64_text = "".join(COMMITTED_B64.read_text(encoding="utf-8").split())
+        except Exception as exc:
+            status = f"sidecar read failed: {type(exc).__name__}"
+    if not b64_text:
+        parts_dir = DATA_DIR / "book_b64_parts"
+        part_files = sorted(parts_dir.glob("part_*.b64")) if parts_dir.is_dir() else []
+        if part_files:
+            try:
+                b64_text = "".join(
+                    "".join(p.read_text(encoding="utf-8").split()) for p in part_files
+                )
+            except Exception as exc:
+                status = f"parts read failed: {type(exc).__name__}"
+    if b64_text:
+        try:
+            data = base64.b64decode(b64_text, validate=False)
             if len(data) > 500 and data[:2] == b"PK":
                 PRIVATE_BOOK_PATH.parent.mkdir(parents=True, exist_ok=True)
                 PRIVATE_BOOK_PATH.write_bytes(data)
-                _set_status(f"committed sidecar ok · {len(data)} bytes")
+                _set_status(f"committed sidecar/parts ok · {len(data)} bytes")
                 return PRIVATE_BOOK_PATH, "sidecar"
-            status = f"sidecar present but invalid ({len(data)} bytes)"
+            status = f"sidecar/parts present but invalid ({len(data)} bytes)"
         except Exception as exc:
             status = f"sidecar decode failed: {type(exc).__name__}"
 
@@ -110,9 +124,11 @@ def materialize_private_book() -> Tuple[Optional[Path], str]:
         except Exception as exc:
             status = f"url fetch failed: {type(exc).__name__}"
 
-    # Small committed sample still present → report size so UI is honest
     if COMMITTED_XLSX.exists():
-        status = f"committed xlsx is sample-sized ({COMMITTED_XLSX.stat().st_size} bytes) — replace with full book"
+        status = (
+            f"committed xlsx is sample-sized ({COMMITTED_XLSX.stat().st_size} bytes) "
+            "— replace with full book on GitHub"
+        )
 
     _set_status(status)
     return None, "none"
