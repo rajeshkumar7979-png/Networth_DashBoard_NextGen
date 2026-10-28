@@ -1,0 +1,43 @@
+name: Emergency Restore Critical Files
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Restore from known-good commit
+        run: |
+          set -e
+          GOOD=98ab23a9c9129519fd84c968d6df522b48e72074
+          git checkout "$GOOD" -- scripts/update_holdings_cache.py lib/intelligence/research.py scripts/daily_self_audit.py
+          python3 - <<'PY'
+          from pathlib import Path
+          r = Path("lib/intelligence/research.py")
+          t = r.read_text()
+          t = t.replace("    Briefing,\n", "")
+          r.write_text(t)
+          u = Path("scripts/update_holdings_cache.py")
+          t = u.read_text()
+          t = t.replace("            prev = cache.get(key) or {}\n", "")
+          u.write_text(t)
+          for p in [r, u, Path("scripts/daily_self_audit.py")]:
+              print(p, p.stat().st_size)
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/update_holdings_cache.py lib/intelligence/research.py scripts/daily_self_audit.py
+          if git diff --cached --quiet; then
+            echo "Nothing to restore"
+            exit 0
+          fi
+          git commit -m "RESTORE critical scripts from 98ab23a + ruff F401/F841 fix"
+          git push origin HEAD:main
