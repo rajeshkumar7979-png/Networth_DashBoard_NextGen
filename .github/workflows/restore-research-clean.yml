@@ -1,0 +1,44 @@
+name: Restore Research Clean
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Restore research.py without null bytes
+        run: |
+          set -e
+          GOOD=98ab23a9c9129519fd84c968d6df522b48e72074
+          git checkout "$GOOD" -- lib/intelligence/research.py
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("lib/intelligence/research.py")
+          t = p.read_text(encoding="utf-8")
+          t = t.replace("    Briefing,\n", "")
+          t = t.replace(
+              "    cov = facts.coverage.coverage_pct\n",
+              "    coverage = getattr(facts, \"coverage\", None)\n"
+              "    cov = getattr(coverage, \"coverage_pct\", None) if coverage is not None else None\n",
+          )
+          t = t.replace("\x00", "")
+          p.write_text(t, encoding="utf-8", newline="\n")
+          raw = p.read_bytes()
+          assert raw.count(b"\x00") == 0, "nulls remain"
+          assert len(raw) > 20000
+          compile(t, "research.py", "exec")
+          print("OK", len(raw), "nulls", raw.count(b"\x00"))
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add lib/intelligence/research.py
+          git commit -m "RESTORE research.py clean (no null bytes) from 98ab23a"
+          git push origin HEAD:main
