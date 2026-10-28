@@ -24,6 +24,12 @@ jobs:
           r = Path("lib/intelligence/research.py")
           t = r.read_text()
           t = t.replace("    Briefing,\n", "")
+          # Safe coverage access
+          t = t.replace(
+              "    cov = facts.coverage.coverage_pct\n",
+              "    coverage = getattr(facts, \"coverage\", None)\n"
+              "    cov = getattr(coverage, \"coverage_pct\", None) if coverage is not None else None\n",
+          )
           r.write_text(t)
           u = Path("scripts/update_holdings_cache.py")
           t = u.read_text()
@@ -39,5 +45,5 @@ jobs:
             echo "Nothing to restore"
             exit 0
           fi
-          git commit -m "RESTORE critical scripts from 98ab23a + ruff F401/F841 fix"
+          git commit -m "RESTORE critical scripts from 98ab23a + safe coverage access"
           git push origin HEAD:main
