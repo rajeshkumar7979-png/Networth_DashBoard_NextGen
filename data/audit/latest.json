@@ -1,6 +1,6 @@
 {
-  "run_at": "2026-10-27T10:38:28Z",
-  "date": "2026-10-27",
+  "run_at": "2026-10-28T11:23:06Z",
+  "date": "2026-10-28",
   "counts": {
     "critical": 0,
     "warning": 2,
@@ -12,69 +12,69 @@
       "severity": "info",
       "code": "BOOK_COMMITTED",
       "message": "Committed-size book present (36061 bytes)",
-      "at": "2026-10-27T10:38:28Z"
+      "at": "2026-10-28T11:23:06Z"
     },
     {
       "severity": "info",
       "code": "CASH_SHEET_OK",
       "message": "Cash sheet present",
-      "at": "2026-10-27T10:38:28Z"
+      "at": "2026-10-28T11:23:06Z"
     },
     {
       "severity": "warning",
       "code": "HAD_INDIAN_COMMAS",
       "message": "Found and fixed 3 non-plain numeric cell(s) in FD/book",
-      "at": "2026-10-27T10:38:28Z"
+      "at": "2026-10-28T11:23:06Z"
     },
     {
       "severity": "info",
       "code": "HISTORY_LAST",
-      "message": "Last history row date=2026-10-27 rows=7",
-      "at": "2026-10-27T10:38:28Z"
+      "message": "Last history row date=2026-10-28 rows=8",
+      "at": "2026-10-28T11:23:06Z"
     },
     {
       "severity": "info",
       "code": "HOLDINGS_COUNT",
       "message": "Holdings cache has 21 fund key(s)",
-      "at": "2026-10-27T10:38:28Z"
+      "at": "2026-10-28T11:23:06Z"
     },
     {
       "severity": "info",
       "code": "HOLDINGS_ASOF",
       "message": "Holdings as_of values: ['2026-09-30']",
-      "at": "2026-10-27T10:38:28Z"
+      "at": "2026-10-28T11:23:06Z"
     },
     {
       "severity": "info",
       "code": "AMFI_SAVED",
       "message": "AMFI cache saved_at=2026-08-20 08:02",
-      "at": "2026-10-27T10:38:28Z"
+      "at": "2026-10-28T11:23:06Z"
     },
     {
       "severity": "warning",
       "code": "AMFI_STALE",
-      "message": "AMFI disk cache is 68 day(s) old \u2014 Cloud may still live-fetch",
-      "at": "2026-10-27T10:38:28Z",
-      "age_days": 68
+      "message": "AMFI disk cache is 69 day(s) old \u2014 Cloud may still live-fetch",
+      "at": "2026-10-28T11:23:06Z",
+      "age_days": 69
     },
     {
       "severity": "info",
       "code": "WORKFLOW_BOOK_GUARD",
       "message": "Holdings workflow has committed-book size guard",
-      "at": "2026-10-27T10:38:28Z"
+      "at": "2026-10-28T11:23:06Z"
     },
     {
       "severity": "info",
       "code": "GUARD_OK",
       "message": "check_critical_files.py passed",
-      "at": "2026-10-27T10:38:28Z"
+      "at": "2026-10-28T11:23:06Z"
     }
   ],
   "fixes": [
     {
       "code": "NORMALIZE_INDIAN_COMMAS",
       "message": "Normalized 3 numeric cell(s) in workbook (Indian commas / quotes)",
-      "at": "2026-10-27T10:38:28Z",
+      "at": "2026-10-28T11:23:06Z",
       "fixed": true,
       "cells": 3
     }
