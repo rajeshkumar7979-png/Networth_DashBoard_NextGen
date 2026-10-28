@@ -1,8 +1,8 @@
 """Command Center loader.
 
-Prefers local lib/cc_parts/body_*.b64 when complete; otherwise loads the
-last known-good body from GitHub and applies cash patches (totals +
-allocation sleeve). No top-of-page cash dump.
+Prefers local lib/cc_parts/body_all.b64 or body_XX.b64 parts when complete
+and clean; otherwise loads the known-good full body from GitHub and applies
+cash patches. Rejects any payload containing null bytes.
 """
 from __future__ import annotations
 
@@ -20,27 +20,44 @@ _GOOD = (
 )
 
 
+def _clean(code: str | None) -> str | None:
+    if not code:
+        return None
+    if any(ord(c) == 0 for c in code):
+        return None
+    if "total_networth" not in code or len(code) < 50_000:
+        return None
+    return code
+
+
 def _load_local_body() -> str | None:
     parts_dir = Path(__file__).resolve().parents[1] / "lib" / "cc_parts"
     single = parts_dir / "body_all.b64"
-    parts = [single] if single.exists() else sorted(parts_dir.glob("body_*.b64"))
-    if not parts:
-        return None
+    numbered = sorted(parts_dir.glob("body_[0-9]*.b64"))
     try:
-        b64 = "".join(p.read_text(encoding="utf-8").strip() for p in parts)
-        if "PLACEHOLDER" in b64 or len(b64) < 1000:
+        if single.exists() and single.stat().st_size >= 5_000:
+            b64 = single.read_text(encoding="utf-8", errors="strict").strip()
+        elif numbered:
+            b64 = "".join(
+                p.read_text(encoding="utf-8", errors="strict").strip() for p in numbered
+            )
+        else:
             return None
-        code = gzip.decompress(base64.b64decode(b64)).decode("utf-8")
-        if "total_networth" not in code or len(code) < 50000:
+        if "PLACEHOLDER" in b64 or len(b64) < 5_000:
             return None
-        return code
+        raw = base64.b64decode(b64, validate=False)
+        code = gzip.decompress(raw).decode("utf-8")
+        return _clean(code)
     except Exception:
         return None
 
 
 def _load_github_body() -> str:
     with urllib.request.urlopen(_GOOD, timeout=60) as resp:
-        return resp.read().decode("utf-8", errors="replace")
+        data = resp.read()
+    if b"\x00" in data:
+        data = data.replace(b"\x00", b"")
+    return data.decode("utf-8", errors="strict")
 
 
 def _apply_cash_patches(code: str) -> str:
@@ -65,45 +82,11 @@ def _apply_cash_patches(code: str) -> str:
     if old in code:
         code = code.replace(old, new, 1)
 
-    inv_start = code.find("total_invested = ((")
-    inv_end = code.find("total_pnl", inv_start)
-    if inv_start > 0 and inv_end > inv_start and "total_cash" not in code[inv_start:inv_end]:
+    if "gold_pct = (total_gold / total_networth * 100)" in code and "cash_pct =" not in code:
         code = code.replace(
-            "+ total_fd_invested)",
-            "+ total_fd_invested\n                  + float(total_cash if \"total_cash\" in dir() else 0))",
-            1,
-        )
-
-    old_books = (
-        'st.session_state["cc_books"] = {\n'
-        '        "mf": mf_valid if "mf_valid" in dir() else None,\n'
-        '        "stocks": stocks_valid if "stocks_valid" in dir() else None,\n'
-        '        "gold": gold_valid if "gold_valid" in dir() else None,\n'
-        '        "fd": fd_valid if "fd_valid" in dir() else None,\n'
-        "    }"
-    )
-    new_books = (
-        'st.session_state["cc_books"] = {\n'
-        '        "mf": mf_valid if "mf_valid" in dir() else None,\n'
-        '        "stocks": stocks_valid if "stocks_valid" in dir() else None,\n'
-        '        "gold": gold_valid if "gold_valid" in dir() else None,\n'
-        '        "fd": fd_valid if "fd_valid" in dir() else None,\n'
-        '        "cash": cash_valid if "cash_valid" in dir() else None,\n'
-        "    }"
-    )
-    if old_books in code:
-        code = code.replace(old_books, new_books, 1)
-
-    if "cash_pct = _pct" not in code:
-        code = code.replace(
-            "gold_pct = _pct(total_gold)\n",
-            "gold_pct = _pct(total_gold)\ncash_pct = _pct(float(total_cash) if \"total_cash\" in dir() else 0.0)\n",
-            1,
-        )
-    if "+ cash_pct" not in code:
-        code = code.replace(
-            "alloc_sum = equity_pct + liquid_mf_pct + inr_fd_pct + fcnr_pct + gold_pct",
-            "alloc_sum = equity_pct + liquid_mf_pct + inr_fd_pct + fcnr_pct + gold_pct + cash_pct",
+            "gold_pct = (total_gold / total_networth * 100) if total_networth else 0",
+            "gold_pct = (total_gold / total_networth * 100) if total_networth else 0\n"
+            "cash_pct = (total_cash / total_networth * 100) if total_networth else 0",
             1,
         )
     if '("Gold", gold_pct)),' in code and '("Cash", cash_pct)' not in code:
@@ -112,16 +95,6 @@ def _apply_cash_patches(code: str) -> str:
             '("Gold", gold_pct), ("Cash", cash_pct)),',
             1,
         )
-    if 'st.session_state["cc_gold_pct"] = float(gold_pct)' in code and "cc_cash_pct" not in code:
-        code = code.replace(
-            'st.session_state["cc_gold_pct"] = float(gold_pct)',
-            'st.session_state["cc_gold_pct"] = float(gold_pct)\n'
-            'st.session_state["cc_cash_pct"] = float(cash_pct if \"cash_pct\" in dir() else 0)\n'
-            'st.session_state["cc_total_cash"] = float(total_cash if \"total_cash\" in dir() else 0)',
-            1,
-        )
-
-    # Visual allocation bar (ui_strip) — what users actually see
     if '{"label": "Gold", "value": total_gold},' in code and '{"label": "Cash"' not in code:
         code = code.replace(
             '{"label": "Gold", "value": total_gold},\n], total=total_networth)',
@@ -130,8 +103,6 @@ def _apply_cash_patches(code: str) -> str:
             '], total=total_networth)',
             1,
         )
-
-    # Recon identity must include cash
     if 'MF + Stocks + Gold + FD"' in code and 'FD + Cash"' not in code:
         code = code.replace(
             '"Portfolio total = MF + Stocks + Gold + FD", abs((total_mf + total_stocks + total_gold + total_fd) - total_networth) < 1, "by construction"',
@@ -147,8 +118,14 @@ try:
         _code = _apply_cash_patches(_load_github_body())
     elif "total_cash" not in _code:
         _code = _apply_cash_patches(_code)
+    _code = _clean(_code)
+    if _code is None:
+        raise RuntimeError("Command Center body invalid (null bytes or too small)")
     exec(compile(_code, "Command_Center_loaded.py", "exec"), globals())
 except Exception as _exc:
     st.error("Command Center failed to load.")
     st.exception(_exc)
-    st.info("Reboot the app, then Desk → re-upload workbook → open Command again.")
+    st.info(
+        "Reboot the app. Loader will fall back to the pinned GitHub body if "
+        "local lib/cc_parts payload is corrupt."
+    )
