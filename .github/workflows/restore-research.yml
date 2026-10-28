@@ -1,0 +1,33 @@
+name: Restore Research Module
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Rebuild research.py from data/research_b64_parts
+        run: |
+          python3 << 'PY'
+          import base64
+          from pathlib import Path
+          parts = sorted(Path("data/research_b64_parts").glob("part_*.b64"))
+          assert parts, "missing parts"
+          b64 = "".join(p.read_text().strip() for p in parts)
+          data = base64.b64decode(b64)
+          assert data[:1] == b"#" or b"from" in data[:50]
+          Path("lib/intelligence/research.py").write_bytes(data)
+          print("restored", len(data))
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add lib/intelligence/research.py
+          git commit -m "RESTORE lib/intelligence/research.py from embedded parts"
+          git push origin HEAD:main
