@@ -79,8 +79,8 @@
   "119091": {
     "scheme_code": "119091",
     "isin": "INF179KB1HP9",
-    "as_of": "2026-09-30",
-    "count": 141,
+    "as_of": "2026-10-31",
+    "count": 149,
     "source": "openfin-cdn"
   },
   "120621": {
@@ -135,8 +135,8 @@
   "143269": {
     "scheme_code": "143269",
     "isin": "INF879O01068",
-    "as_of": "2026-09-30",
-    "count": 41,
+    "as_of": "2026-10-31",
+    "count": 44,
     "source": "openfin-cdn"
   },
   "143341": {
