@@ -51,8 +51,8 @@
   "102000": {
     "scheme_code": "102000",
     "isin": "INF179K01BE2",
-    "as_of": "2026-09-30",
-    "count": 48,
+    "as_of": "2026-10-31",
+    "count": 47,
     "source": "openfin-cdn"
   },
   "115833": {
@@ -107,21 +107,21 @@
   "119835": {
     "scheme_code": "119835",
     "isin": "INF200K01RA0",
-    "as_of": "2026-09-30",
-    "count": 99,
+    "as_of": "2026-10-31",
+    "count": 95,
     "source": "openfin-cdn"
   },
   "119132": {
     "scheme_code": "119132",
     "isin": "INF179K01VX0",
-    "as_of": "2026-09-30",
+    "as_of": "2026-10-31",
     "count": 2,
     "source": "openfin-cdn"
   },
   "118989": {
     "scheme_code": "118989",
     "isin": "INF179K01XQ0",
-    "as_of": "2026-09-30",
+    "as_of": "2026-10-31",
     "count": 80,
     "source": "openfin-cdn"
   },
