@@ -3,7 +3,11 @@ name: Refresh MF Holdings
 on:
   workflow_dispatch:
   schedule:
+    # Daily baseline (UTC 04:30 ≈ 10:00 IST)
     - cron: "30 4 * * *"
+    # Extra pulls after month-end while AMCs publish (5th–20th, twice daily)
+    - cron: "0 6 5-20 * *"
+    - cron: "0 14 5-20 * *"
 
 permissions:
   contents: write
@@ -71,9 +75,8 @@ jobs:
           if not xlsx.exists():
               raise SystemExit("ERROR: workbook missing")
           size = xlsx.stat().st_size
-          # Personal-name guard only for the public sample (small file).
-          # Committed family book may legitimately contain holder names.
-          if size <= 20000:
+          # Personal-name guard only for the public sample (small book)
+          if size < 20000:
               blob = xlsx.read_bytes().upper()
               for bad in (b"KHANDELWAL", b"SATYANARAYAN", b"KAVITA KHANDELWAL"):
                   if bad in blob:
