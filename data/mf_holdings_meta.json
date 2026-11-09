@@ -9,43 +9,43 @@
   "133036": {
     "scheme_code": "133036",
     "isin": "INF174K01E92",
-    "as_of": "2026-09-30",
-    "count": 111,
+    "as_of": "2026-10-31",
+    "count": 118,
     "source": "openfin-cdn"
   },
   "133801": {
     "scheme_code": "133801",
     "isin": "INF178L01AL9",
-    "as_of": "2026-09-30",
-    "count": 49,
+    "as_of": "2026-10-31",
+    "count": 51,
     "source": "openfin-cdn"
   },
   "120465": {
     "scheme_code": "120465",
     "isin": "INF846K01DP8",
-    "as_of": "2026-09-30",
-    "count": 49,
+    "as_of": "2026-10-31",
+    "count": 50,
     "source": "openfin-cdn"
   },
   "120323": {
     "scheme_code": "120323",
     "isin": "INF109K012K1",
-    "as_of": "2026-09-30",
-    "count": 71,
+    "as_of": "2026-10-31",
+    "count": 70,
     "source": "openfin-cdn"
   },
   "143903": {
     "scheme_code": "143903",
     "isin": "INF109KC1FX1",
-    "as_of": "2026-09-30",
+    "as_of": "2026-10-31",
     "count": 5,
     "source": "openfin-cdn"
   },
   "119250": {
     "scheme_code": "119250",
     "isin": "INF740K01PR3",
-    "as_of": "2026-09-30",
-    "count": 42,
+    "as_of": "2026-10-31",
+    "count": 43,
     "source": "openfin-cdn"
   },
   "102000": {
@@ -58,14 +58,14 @@
   "115833": {
     "scheme_code": "115833",
     "isin": "INF109K01TK8",
-    "as_of": "2026-09-30",
+    "as_of": "2026-10-31",
     "count": 7,
     "source": "openfin-cdn"
   },
   "146381": {
     "scheme_code": "146381",
     "isin": "INF740KA1MG9",
-    "as_of": "2026-09-30",
+    "as_of": "2026-10-31",
     "count": 51,
     "source": "openfin-cdn"
   },
@@ -86,22 +86,22 @@
   "120621": {
     "scheme_code": "120621",
     "isin": "INF109K018M4",
-    "as_of": "2026-09-30",
-    "count": 81,
+    "as_of": "2026-10-31",
+    "count": 84,
     "source": "openfin-cdn"
   },
   "147919": {
     "scheme_code": "147919",
     "isin": "INF00XX01747",
-    "as_of": "2026-09-30",
-    "count": 87,
+    "as_of": "2026-10-31",
+    "count": 86,
     "source": "openfin-cdn"
   },
   "122639": {
     "scheme_code": "122639",
     "isin": "INF879O01027",
-    "as_of": "2026-09-30",
-    "count": 101,
+    "as_of": "2026-10-31",
+    "count": 108,
     "source": "openfin-cdn"
   },
   "119835": {
@@ -128,8 +128,8 @@
   "145137": {
     "scheme_code": "145137",
     "isin": "INF205K013T3",
-    "as_of": "2026-09-30",
-    "count": 76,
+    "as_of": "2026-10-31",
+    "count": 75,
     "source": "openfin-cdn"
   },
   "143269": {
