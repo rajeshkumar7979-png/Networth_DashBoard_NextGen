@@ -1,0 +1,178 @@
+name: Patch Holdings Ingest Reliability
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Patch mf_holdings ingest + daily audit
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          p = Path("lib/mf_holdings.py")
+          src = p.read_text(encoding="utf-8")
+          old = '''def ingest_scheme_holdings(session: requests.Session, scheme_code: str) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+              errors: List[str] = []
+              try:
+                  holdings, meta = fetch_cdn_holdings(session, scheme_code)
+                  meta["validation"] = validate_holdings(holdings)
+                  meta["fallback_used"] = False
+                  return holdings, meta
+              except Exception as exc:
+                  errors.append(f"cdn: {exc}")
+              try:
+                  holdings, meta = fetch_fund_disclosures(session, scheme_code)
+                  meta["validation"] = validate_holdings(holdings)
+                  meta["fallback_used"] = True
+                  meta["primary_error"] = errors[-1]
+                  return holdings, meta
+              except Exception as exc:
+                  errors.append(f"fund-disclosures: {exc}")
+              try:
+                  holdings, meta = fetch_mfdata_fallback(session, scheme_code)
+                  meta["validation"] = validate_holdings(holdings)
+                  meta["fallback_used"] = True
+                  meta["primary_error"] = errors[-1]
+                  return holdings, meta
+              except Exception as exc:
+                  errors.append(f"mfdata: {exc}")
+              raise RuntimeError(" | ".join(errors))
+          '''
+          # normalize indent of old in file (4 spaces)
+          old = old.replace("              ", "    ")
+          new = '''def _as_of_key(meta: Dict[str, Any]) -> str:
+              """Sortable as_of string; empty sorts last."""
+              for k in ("as_of", "portfolio_date", "filing_date"):
+                  v = meta.get(k)
+                  if v:
+                      s = str(v).strip()[:10]
+                      if len(s) >= 7:
+                          return s
+              return ""
+
+
+          def ingest_scheme_holdings(session: requests.Session, scheme_code: str) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+              """Fetch holdings from all sources; keep the newest non-empty as_of."""
+              errors: List[str] = []
+              candidates: List[Tuple[List[Dict[str, Any]], Dict[str, Any], str]] = []
+
+              for label, fn in (
+                  ("openfin-cdn", fetch_cdn_holdings),
+                  ("fund-disclosures", fetch_fund_disclosures),
+                  ("mfdata", fetch_mfdata_fallback),
+              ):
+                  try:
+                      holdings, meta = fn(session, scheme_code)
+                      if not holdings:
+                          errors.append(f"{label}: empty holdings")
+                          continue
+                      meta = dict(meta or {})
+                      meta["validation"] = validate_holdings(holdings)
+                      meta["source"] = meta.get("source") or label
+                      candidates.append((holdings, meta, label))
+                  except Exception as exc:
+                      errors.append(f"{label}: {exc}")
+
+              if not candidates:
+                  raise RuntimeError(" | ".join(errors) if errors else "no holdings sources succeeded")
+
+              def rank(item: Tuple[List[Dict[str, Any]], Dict[str, Any], str]) -> Tuple[str, int]:
+                  holdings, meta, _label = item
+                  return (_as_of_key(meta), len(holdings))
+
+              holdings, meta, winner = max(candidates, key=rank)
+              meta["fallback_used"] = winner != "openfin-cdn"
+              meta["sources_tried"] = [c[2] for c in candidates]
+              meta["sources_errors"] = errors
+              if len(candidates) > 1:
+                  meta["source_rank_as_of"] = {c[2]: _as_of_key(c[1]) for c in candidates}
+              return holdings, meta
+          '''
+          new = new.replace("              ", "    ")
+          if old not in src:
+              if "sources_tried" in src:
+                  print("ingest already patched")
+              else:
+                  raise SystemExit("ingest old block not found")
+          else:
+              src = src.replace(old, new, 1)
+              p.write_text(src, encoding="utf-8")
+              compile(src, "mf_holdings.py", "exec")
+              print("ingest patched")
+
+          # Audit HOLDINGS_STALE
+          ap = Path("scripts/daily_self_audit.py")
+          asrc = ap.read_text(encoding="utf-8")
+          if "HOLDINGS_STALE" in asrc:
+              print("audit already has HOLDINGS_STALE")
+          else:
+              marker = 'audit.issue("info", "HOLDINGS_ASOF"'
+              if marker not in asrc:
+                  raise SystemExit("HOLDINGS_ASOF marker missing")
+              # leave existing info line; append vintage block after meta_p block
+              inject = '''
+    # Holdings vintage severity (>40d warning, >60d critical)
+    try:
+        cache = json.loads(cache_p.read_text(encoding="utf-8")) if cache_p.exists() else {}
+        today = datetime.now(timezone.utc).date()
+        by_asof = {}
+        stale_funds = []
+        for k, v in (cache.items() if isinstance(cache, dict) else []):
+            if not isinstance(v, dict):
+                continue
+            as_of = str(v.get("as_of") or "")[:10]
+            if not as_of:
+                continue
+            by_asof[as_of] = by_asof.get(as_of, 0) + 1
+            try:
+                d = datetime.strptime(as_of, "%Y-%m-%d").date()
+                age = (today - d).days
+            except ValueError:
+                age = 999
+            if age > 40:
+                stale_funds.append((age, str(v.get("fund_name") or k)[:40], as_of))
+        if by_asof:
+            summary = ", ".join(f"{k}:{v}" for k, v in sorted(by_asof.items()))
+            audit.issue("info", "HOLDINGS_ASOF_DIST", f"Holdings as_of distribution: {summary}")
+        if stale_funds:
+            stale_funds.sort(reverse=True)
+            sample = "; ".join(f"{n} ({a}, {age}d)" for age, n, a in stale_funds[:5])
+            sev = "critical" if any(a > 60 for a, _, _ in stale_funds) else "warning"
+            audit.issue(sev, "HOLDINGS_STALE", f"{len(stale_funds)} fund(s) as_of >40d. {sample}", stale_count=len(stale_funds))
+        elif by_asof:
+            audit.issue("info", "HOLDINGS_FRESH", "All cached fund holdings within 40 days of as_of")
+    except Exception as exc:
+        audit.issue("warning", "HOLDINGS_VINTAGE_FAIL", str(exc))
+'''
+              # insert before AMFI check
+              needle = "    if amfi_p.exists():"
+              if needle not in asrc:
+                  raise SystemExit("amfi_p block missing")
+              asrc = asrc.replace(needle, inject + "\n" + needle, 1)
+              ap.write_text(asrc, encoding="utf-8")
+              compile(asrc, "daily_self_audit.py", "exec")
+              print("audit patched")
+          PY
+      - name: Commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add lib/mf_holdings.py scripts/daily_self_audit.py
+          if git diff --cached --quiet; then
+            echo "nothing to commit"
+            exit 0
+          fi
+          git commit -m "fix: multi-source holdings newest as_of + HOLDINGS_STALE audit"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push origin HEAD:main
