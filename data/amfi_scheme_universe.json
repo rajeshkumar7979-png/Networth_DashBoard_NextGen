@@ -1,5 +1,5 @@
 {
-  "fetched_at": "2026-11-10T20:40:05+00:00",
+  "fetched_at": "2026-11-11T12:04:18+00:00",
   "rows": [
     {
       "scheme_code": "135762",
@@ -81926,8 +81926,8 @@
       "isin_primary": "INF179KC1BO4",
       "isin_secondary": "",
       "scheme_name": "HDFC Developed World Overseas Equity Passive FOF",
-      "nav": 20.811,
-      "nav_date": "06-Nov-2026",
+      "nav": 21.078,
+      "nav_date": "09-Nov-2026",
       "amc": "HDFC Mutual Fund",
       "category": "Open Ended Schemes(Other Scheme - FoF Overseas)"
     },
@@ -81936,8 +81936,8 @@
       "isin_primary": "INF179KC1BP1",
       "isin_secondary": "",
       "scheme_name": "HDFC Developed World Overseas Equity Passive FOF",
-      "nav": 20.33,
-      "nav_date": "06-Nov-2026",
+      "nav": 20.59,
+      "nav_date": "09-Nov-2026",
       "amc": "HDFC Mutual Fund",
       "category": "Open Ended Schemes(Other Scheme - FoF Overseas)"
     },
@@ -95256,8 +95256,8 @@
       "isin_primary": "INF846K01Y39",
       "isin_secondary": "",
       "scheme_name": "Axis Greater China Equity Fund of Fund - Direct Plan - Growth Option",
-      "nav": 11.06,
-      "nav_date": "06-Nov-2026",
+      "nav": 11.2,
+      "nav_date": "09-Nov-2026",
       "amc": "Axis Mutual Fund",
       "category": "Open Ended Schemes(Overseas Fund of Funds - Fund of Funds investing overseas)"
     },
@@ -95266,8 +95266,8 @@
       "isin_primary": "INF846K01Y47",
       "isin_secondary": "INF846K01Y54",
       "scheme_name": "Axis Greater China Equity Fund of Fund - Direct Plan - IDCW Option",
-      "nav": 11.05,
-      "nav_date": "06-Nov-2026",
+      "nav": 11.2,
+      "nav_date": "09-Nov-2026",
       "amc": "Axis Mutual Fund",
       "category": "Open Ended Schemes(Overseas Fund of Funds - Fund of Funds investing overseas)"
     },
@@ -95276,8 +95276,8 @@
       "isin_primary": "INF846K01Y62",
       "isin_secondary": "",
       "scheme_name": "Axis Greater China Equity Fund of Fund - Regular Plan - Growth Option",
-      "nav": 10.39,
-      "nav_date": "06-Nov-2026",
+      "nav": 10.52,
+      "nav_date": "09-Nov-2026",
       "amc": "Axis Mutual Fund",
       "category": "Open Ended Schemes(Overseas Fund of Funds - Fund of Funds investing overseas)"
     },
@@ -95286,8 +95286,8 @@
       "isin_primary": "INF846K01Y70",
       "isin_secondary": "INF846K01Y88",
       "scheme_name": "Axis Greater China Equity Fund of Fund - Regular Plan - IDCW Option",
-      "nav": 10.39,
-      "nav_date": "06-Nov-2026",
+      "nav": 10.52,
+      "nav_date": "09-Nov-2026",
       "amc": "Axis Mutual Fund",
       "category": "Open Ended Schemes(Overseas Fund of Funds - Fund of Funds investing overseas)"
     },
