@@ -1,6 +1,6 @@
 {
-  "run_at": "2026-11-11T12:45:06Z",
-  "date": "2026-11-11",
+  "run_at": "2026-11-12T13:48:25Z",
+  "date": "2026-11-12",
   "counts": {
     "critical": 0,
     "warning": 2,
@@ -12,50 +12,50 @@
       "severity": "warning",
       "code": "NO_CASH_SHEET",
       "message": "No Cash sheet in ['FD', 'MF', 'Stocks']",
-      "at": "2026-11-11T12:45:06Z"
+      "at": "2026-11-12T13:48:25Z"
     },
     {
       "severity": "info",
       "code": "HISTORY_LAST",
-      "message": "Last history row date=2026-11-11 rows=22",
-      "at": "2026-11-11T12:45:06Z"
+      "message": "Last history row date=2026-11-12 rows=23",
+      "at": "2026-11-12T13:48:25Z"
     },
     {
       "severity": "info",
       "code": "HOLDINGS_COUNT",
       "message": "Holdings cache has 21 fund key(s)",
-      "at": "2026-11-11T12:45:06Z"
+      "at": "2026-11-12T13:48:25Z"
     },
     {
       "severity": "info",
       "code": "HOLDINGS_ASOF",
       "message": "Holdings as_of values: ['2026-09-30', '2026-10-31']",
-      "at": "2026-11-11T12:45:06Z"
+      "at": "2026-11-12T13:48:25Z"
     },
     {
       "severity": "info",
       "code": "AMFI_SAVED",
       "message": "AMFI cache saved_at=2026-08-20 08:02",
-      "at": "2026-11-11T12:45:06Z"
+      "at": "2026-11-12T13:48:25Z"
     },
     {
       "severity": "warning",
       "code": "AMFI_STALE",
-      "message": "AMFI disk cache is 83 day(s) old \u2014 Cloud may still live-fetch",
-      "at": "2026-11-11T12:45:06Z",
-      "age_days": 83
+      "message": "AMFI disk cache is 84 day(s) old \u2014 Cloud may still live-fetch",
+      "at": "2026-11-12T13:48:25Z",
+      "age_days": 84
     },
     {
       "severity": "info",
       "code": "WORKFLOW_BOOK_GUARD",
       "message": "Holdings workflow has committed-book size guard",
-      "at": "2026-11-11T12:45:06Z"
+      "at": "2026-11-12T13:48:25Z"
     },
     {
       "severity": "info",
       "code": "GUARD_OK",
       "message": "check_critical_files.py passed",
-      "at": "2026-11-11T12:45:06Z"
+      "at": "2026-11-12T13:48:25Z"
     }
   ],
   "fixes": [],
