@@ -1,5 +1,5 @@
 {
-  "fetched_at": "2026-11-13T12:31:17+00:00",
+  "fetched_at": "2026-11-13T13:56:57+00:00",
   "rows": [
     {
       "scheme_code": "135762",
@@ -28596,8 +28596,8 @@
       "isin_primary": "INF740KA1PP3",
       "isin_secondary": "",
       "scheme_name": "DSP Value Fund - Direct Plan - Growth",
-      "nav": 25.419,
-      "nav_date": "09-Nov-2026",
+      "nav": 25.672,
+      "nav_date": "12-Nov-2026",
       "amc": "DSP Mutual Fund",
       "category": "Open Ended Schemes(Equity Scheme - Value Fund)"
     },
@@ -28606,8 +28606,8 @@
       "isin_primary": "INF740KA1PQ1",
       "isin_secondary": "INF740KA1PR9",
       "scheme_name": "DSP Value Fund - Direct Plan - IDCW",
-      "nav": 19.253,
-      "nav_date": "09-Nov-2026",
+      "nav": 19.445,
+      "nav_date": "12-Nov-2026",
       "amc": "DSP Mutual Fund",
       "category": "Open Ended Schemes(Equity Scheme - Value Fund)"
     },
@@ -28616,8 +28616,8 @@
       "isin_primary": "INF740KA1PM0",
       "isin_secondary": "",
       "scheme_name": "DSP Value Fund - Regular Plan - Growth",
-      "nav": 24.272,
-      "nav_date": "09-Nov-2026",
+      "nav": 24.513,
+      "nav_date": "12-Nov-2026",
       "amc": "DSP Mutual Fund",
       "category": "Open Ended Schemes(Equity Scheme - Value Fund)"
     },
@@ -28626,8 +28626,8 @@
       "isin_primary": "INF740KA1PN8",
       "isin_secondary": "INF740KA1PO6",
       "scheme_name": "DSP Value Fund - Regular Plan - IDCW",
-      "nav": 16.965,
-      "nav_date": "09-Nov-2026",
+      "nav": 17.133,
+      "nav_date": "12-Nov-2026",
       "amc": "DSP Mutual Fund",
       "category": "Open Ended Schemes(Equity Scheme - Value Fund)"
     },
@@ -81666,8 +81666,8 @@
       "isin_primary": "INF740KA1QP1",
       "isin_secondary": "",
       "scheme_name": "DSP Global Innovation Overseas Equity Omni FoF - Direct Plan - Growth",
-      "nav": 21.7551,
-      "nav_date": "11-Nov-2026",
+      "nav": 21.6138,
+      "nav_date": "12-Nov-2026",
       "amc": "DSP Mutual Fund",
       "category": "Open Ended Schemes(Other Scheme - FoF Overseas)"
     },
@@ -81676,8 +81676,8 @@
       "isin_primary": "INF740KA1QQ9",
       "isin_secondary": "INF740KA1QR7",
       "scheme_name": "DSP Global Innovation Overseas Equity Omni FoF - Direct Plan - IDCW",
-      "nav": 21.7551,
-      "nav_date": "11-Nov-2026",
+      "nav": 21.6138,
+      "nav_date": "12-Nov-2026",
       "amc": "DSP Mutual Fund",
       "category": "Open Ended Schemes(Other Scheme - FoF Overseas)"
     },
@@ -81686,8 +81686,8 @@
       "isin_primary": "INF740KA1QM8",
       "isin_secondary": "",
       "scheme_name": "DSP Global Innovation Overseas Equity Omni FoF - Regular Plan - Growth",
-      "nav": 20.8418,
-      "nav_date": "11-Nov-2026",
+      "nav": 20.7059,
+      "nav_date": "12-Nov-2026",
       "amc": "DSP Mutual Fund",
       "category": "Open Ended Schemes(Other Scheme - FoF Overseas)"
     },
@@ -81696,8 +81696,8 @@
       "isin_primary": "INF740KA1QN6",
       "isin_secondary": "INF740KA1QO4",
       "scheme_name": "DSP Global Innovation Overseas Equity Omni FoF - Regular Plan - IDCW",
-      "nav": 20.8418,
-      "nav_date": "11-Nov-2026",
+      "nav": 20.7059,
+      "nav_date": "12-Nov-2026",
       "amc": "DSP Mutual Fund",
       "category": "Open Ended Schemes(Other Scheme - FoF Overseas)"
     },
@@ -82026,8 +82026,8 @@
       "isin_primary": "INF179KC1BO4",
       "isin_secondary": "",
       "scheme_name": "HDFC Developed World Overseas Equity Passive FOF",
-      "nav": 21.38,
-      "nav_date": "11-Nov-2026",
+      "nav": 21.351,
+      "nav_date": "12-Nov-2026",
       "amc": "HDFC Mutual Fund",
       "category": "Open Ended Schemes(Other Scheme - FoF Overseas)"
     },
@@ -82036,8 +82036,8 @@
       "isin_primary": "INF179KC1BP1",
       "isin_secondary": "",
       "scheme_name": "HDFC Developed World Overseas Equity Passive FOF",
-      "nav": 20.884,
-      "nav_date": "11-Nov-2026",
+      "nav": 20.856,
+      "nav_date": "12-Nov-2026",
       "amc": "HDFC Mutual Fund",
       "category": "Open Ended Schemes(Other Scheme - FoF Overseas)"
     },
