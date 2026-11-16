@@ -1,0 +1,60 @@
+name: Recover Production Fix v2
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Restore modules from last known-good commit
+        run: |
+          set -e
+          git checkout c261bdc3258cbbd52a05feb451076fee9b5acb52 -- \
+            lib/intelligence/research.py \
+            lib/mf_holdings.py \
+            scripts/daily_self_audit.py
+          echo "Restored sizes:"
+          wc -c lib/intelligence/research.py lib/mf_holdings.py scripts/daily_self_audit.py
+
+      - name: Apply production patches
+        run: |
+          set -e
+          python3 scripts/apply_prod_fix.py
+          echo "After patch sizes:"
+          wc -c lib/intelligence/research.py lib/mf_holdings.py scripts/daily_self_audit.py
+          # refuse to commit placeholders
+          for f in lib/intelligence/research.py lib/mf_holdings.py scripts/daily_self_audit.py; do
+            sz=$(wc -c < "$f")
+            if [ "$sz" -lt 1000 ]; then
+              echo "ERROR: $f still too small ($sz)"
+              exit 1
+            fi
+            if grep -q '^PLACEHOLDER$' "$f"; then
+              echo "ERROR: $f is PLACEHOLDER"
+              exit 1
+            fi
+          done
+
+      - name: Commit restored modules
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add lib/intelligence/research.py lib/mf_holdings.py scripts/daily_self_audit.py
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "RESTORE+FIX: research CI green, multi-source holdings, HOLDINGS_STALE audit"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push origin HEAD:main
