@@ -1,0 +1,46 @@
+name: Apply Phase1 Patch
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Rebuild patch from parts and apply
+        run: |
+          set -e
+          python3 <<'PY'
+          import base64
+          from pathlib import Path
+          parts = sorted(Path("data/phase1_parts").glob("patch_*.b64"))
+          if not parts:
+              raise SystemExit("no patch_*.b64 parts found")
+          b64 = "".join(p.read_text().strip() for p in parts)
+          patch_text = base64.b64decode(b64).decode("utf-8")
+          Path("data/phase1_parts/phase1_holdings.patch").write_text(patch_text)
+          print("patch bytes", len(patch_text), "from", len(parts), "parts")
+          PY
+          patch -p1 < data/phase1_parts/phase1_holdings.patch
+          python3 -c "compile(open('scripts/update_holdings_cache.py').read(),'x','exec')"
+          grep -q compare_to_prior scripts/update_holdings_cache.py
+          grep -q refresh_amfi_nav_cache scripts/update_holdings_cache.py
+          grep -q data_quality scripts/update_holdings_cache.py
+          echo "patched ok $(wc -c < scripts/update_holdings_cache.py) bytes"
+      - name: Commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/update_holdings_cache.py
+          if git diff --cached --quiet; then echo "no change"; exit 0; fi
+          git commit -m "Phase 1: AMC holdings diff, AMFI nav refresh, equity/FX quality flags"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push origin HEAD:main
