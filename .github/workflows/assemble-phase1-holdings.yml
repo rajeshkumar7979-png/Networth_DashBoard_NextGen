@@ -20,9 +20,11 @@ jobs:
           import base64
           from pathlib import Path
           parts_dir = Path("data/phase1_parts")
-          parts = sorted(parts_dir.glob("uh_*.b64"))
+          parts = sorted(parts_dir.glob("p_*.b64"))
+          if not parts:
+              parts = sorted(parts_dir.glob("uh_*.b64"))
           if len(parts) < 5:
-              raise SystemExit(f"need 5 parts, found {len(parts)}: {parts}")
+              raise SystemExit(f"need phase1 parts, found {len(parts)}: {[p.name for p in parts]}")
           b64 = "".join(p.read_text().strip() for p in parts)
           raw = base64.b64decode(b64)
           path = Path("scripts/update_holdings_cache.py")
