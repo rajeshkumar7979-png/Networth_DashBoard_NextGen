@@ -112,7 +112,7 @@ def discover_mf_rows(sheets: Dict[str, pd.DataFrame]) -> pd.DataFrame:
     return pd.DataFrame(rows).drop_duplicates(subset=["isin"], keep="first")
 
 
-def fetch_usd_inr() -> float:
+def fetch_usd_inr() -> Tuple[float, str]:
     try:
         r = requests.get(
             "https://api.frankfurter.app/latest",
@@ -122,10 +122,10 @@ def fetch_usd_inr() -> float:
         r.raise_for_status()
         rate = float(r.json()["rates"]["INR"])
         if rate > 50:
-            return rate
+            return rate, "frankfurter"
     except Exception as exc:
         print(f"USDINR fetch failed: {exc}")
-    return 95.0
+    return 95.0, "fallback_95"
 
 
 def _yahoo_ltp(symbol: str) -> Optional[float]:
@@ -154,11 +154,13 @@ def _yahoo_ltp(symbol: str) -> Optional[float]:
     return None
 
 
-def mark_stocks_current(sheets: Dict[str, pd.DataFrame]) -> Tuple[float, float, int, str, float, float, int]:
+def mark_stocks_current(sheets: Dict[str, pd.DataFrame]) -> Tuple[float, float, int, str, float, float, int, int, int]:
     stocks_current = stocks_invested = 0.0
     gold_current = gold_invested = 0.0
     stocks_rows = gold_rows = 0
     marks_used = set()
+    yahoo_hits = 0
+    yahoo_attempts = 0
     for name, df in sheets.items():
         if df is None or df.empty:
             continue
@@ -184,10 +186,12 @@ def mark_stocks_current(sheets: Dict[str, pd.DataFrame]) -> Tuple[float, float, 
             inv = float(r.get(inv_col) or 0) if inv_col else 0.0
             qty = float(r.get(qty_col) or 0) if qty_col else 0.0
             is_gold = any(k in ticker for k in ("GOLD", "SGB", "GBEES")) or "-GB" in ticker
+            yahoo_attempts += 1
             ltp = _yahoo_ltp(ticker)
             if ltp is not None and qty > 0:
                 value = ltp * qty
                 marks_used.add("yahoo_ltp")
+                yahoo_hits += 1
             else:
                 value = inv
                 marks_used.add("invested_fallback")
@@ -203,6 +207,7 @@ def mark_stocks_current(sheets: Dict[str, pd.DataFrame]) -> Tuple[float, float, 
     return (
         float(stocks_current), float(stocks_invested), stocks_rows, mark,
         float(gold_current), float(gold_invested), gold_rows,
+        int(yahoo_hits), int(yahoo_attempts),
     )
 
 
@@ -294,6 +299,8 @@ def write_portfolio_history_row(portfolio, isin_index, sheets):
         "stocks_invested_inr": round(stocks_invested, 2),
         "stocks_rows": stocks_rows,
         "stocks_mark": stocks_mark,
+        "stocks_yahoo_hits": yahoo_hits,
+        "stocks_yahoo_attempts": yahoo_attempts,
         "gold_current_inr": round(gold_current, 2),
         "gold_invested_inr": round(gold_invested, 2),
         "gold_rows": gold_rows,
@@ -302,13 +309,18 @@ def write_portfolio_history_row(portfolio, isin_index, sheets):
         "fd_rows": fd_rows,
         "cash_current_inr": round(cash_current, 2),
         "usd_inr": round(usd_inr, 4),
+        "fx_source": fx_source,
+        "book_mode": book_mode,
+        "data_quality": data_quality,
         "total_assets_inr": round(total_current, 2),
         "total_invested_inr": round(total_invested, 2),
         "note": (
-            "Full book snapshot. MF = units x AMFI NAV. "
-            f"Equity stocks = {stocks_mark}. "
+            f"book_mode={book_mode}. data_quality={data_quality}. "
+            "MF = units x AMFI NAV. "
+            f"Equity stocks = {stocks_mark} (yahoo {yahoo_hits}/{yahoo_attempts}). "
             f"Gold (SGB/ETF) = invested or mark. "
-            f"FD = available or ROI-accrued principal in INR (USD FCNR x USDINR {usd_inr:.2f}). "
+            f"FD = available or ROI-accrued principal in INR "
+            f"(USD FCNR x USDINR {usd_inr:.2f} via {fx_source}). "
             f"Cash = bank balances from Cash in Hand sheet ({cash_current:,.0f}). "
             "Not liabilities. Gold FoF inside MF still counted under MF."
         ),
@@ -328,6 +340,174 @@ def write_portfolio_history_row(portfolio, isin_index, sheets):
     )
 
 
+def _prior_snapshot_path(scheme_code: str, current_as_of: str) -> Optional[Path]:
+    """Newest archived snapshot for scheme with as_of strictly before current."""
+    folder = SNAPSHOT_DIR / str(scheme_code)
+    if not folder.exists():
+        return None
+    current = str(current_as_of or "")[:10]
+    candidates = []
+    for path in folder.glob("*.json"):
+        stamp = path.stem[:10]
+        if len(stamp) >= 10 and stamp < current:
+            candidates.append((stamp, path))
+    if not candidates:
+        return None
+    candidates.sort()
+    return candidates[-1][1]
+
+
+def archive_scheme_snapshot(scheme_code: str, as_of: str, holdings: list, meta_extra: dict | None = None) -> Path:
+    as_of_s = str(as_of or "unknown")[:10]
+    folder = SNAPSHOT_DIR / str(scheme_code)
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / f"{as_of_s}.json"
+    payload = {
+        "scheme_code": str(scheme_code),
+        "as_of": as_of_s,
+        "archived_at": datetime.now(timezone.utc).isoformat(),
+        "holdings": holdings,
+    }
+    if meta_extra:
+        payload.update({k: v for k, v in meta_extra.items() if k not in payload})
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    return path
+
+
+def compare_to_prior(scheme_code: str, as_of: str, holdings: list) -> dict:
+    """Diff current holdings vs last archived prior as_of. Safe if no prior."""
+    prior_path = _prior_snapshot_path(scheme_code, as_of)
+    if prior_path is None:
+        return {
+            "comparison_status": "NO_PRIOR",
+            "prior_as_of": None,
+            "added_count": 0,
+            "exited_count": 0,
+            "changed_count": 0,
+        }
+    try:
+        prior = json.loads(prior_path.read_text(encoding="utf-8"))
+        prior_rows = prior.get("holdings") or []
+        prior_as_of = str(prior.get("as_of") or prior_path.stem)[:10]
+    except Exception:
+        return {
+            "comparison_status": "NOT_COMPARABLE",
+            "prior_as_of": None,
+            "added_count": 0,
+            "exited_count": 0,
+            "changed_count": 0,
+        }
+    diff = diff_snapshots(prior_rows, holdings)
+    status = diff.get("status") or "VALID"
+    added = diff.get("added") or []
+    exited = diff.get("exited") or []
+    changed = diff.get("changed") or []
+    if status == "NO_PRIOR":
+        cmp_status = "NO_PRIOR"
+    elif status == "NOT_COMPARABLE":
+        cmp_status = "NOT_COMPARABLE"
+    elif not added and not exited and not changed:
+        # No material ISIN/name/qty/weight moves vs prior archive
+        if prior_as_of == str(as_of)[:10]:
+            cmp_status = "SAME_PERIOD"
+        else:
+            # Filing month advanced but portfolio composition stable
+            cmp_status = "NEW_PERIOD"
+    else:
+        # Material adds/exits/weight or qty moves
+        cmp_status = "CHANGED" if prior_as_of == str(as_of)[:10] else "NEW_PERIOD"
+    return {
+        "comparison_status": cmp_status,
+        "prior_as_of": prior_as_of,
+        "added_count": len(added),
+        "exited_count": len(exited),
+        "changed_count": len(changed),
+        "diff_limitation": diff.get("limitation"),
+    }
+
+
+def refresh_amfi_nav_cache(amfi_rows: list) -> None:
+    """Rewrite data/amfi_nav_cache.json from a live NAVAll parse so Cloud is not stuck on Aug cache."""
+    from lib.config import AMFI_CACHE_PATH
+
+    nav, code, name = {}, {}, {}
+    for row in amfi_rows or []:
+        if not isinstance(row, dict):
+            continue
+        scheme_code = str(row.get("scheme_code") or "").strip()
+        scheme_name = str(row.get("scheme_name") or "").strip()
+        nav_v = row.get("nav")
+        for key in ("isin_primary", "isin_secondary"):
+            isin = str(row.get(key) or "").strip().upper()
+            if not isin or isin in {"-", "NA", "N/A"}:
+                continue
+            if nav_v is not None:
+                try:
+                    nav[isin] = float(nav_v)
+                except (TypeError, ValueError):
+                    pass
+            if scheme_code:
+                code[isin] = scheme_code
+            if scheme_name:
+                name[isin] = scheme_name
+    payload = {
+        "saved_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M"),
+        "nav": nav,
+        "code": code,
+        "name": name,
+        "source": "AMFI NAVAll via holdings job",
+        "row_count": len(amfi_rows or []),
+    }
+    AMFI_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    tmp = AMFI_CACHE_PATH.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    tmp.replace(AMFI_CACHE_PATH)
+    print(f"AMFI nav cache refreshed: {len(nav)} ISINs -> {AMFI_CACHE_PATH}")
+
+
+def write_holdings_change_summary(meta: dict) -> None:
+    """Compact summary of AMC filing changes for UI / audit."""
+    out = ROOT / "data" / "holdings_change_summary.json"
+    by_status = {}
+    changed_funds = []
+    for code, v in (meta or {}).items():
+        if not isinstance(v, dict):
+            continue
+        st = str(v.get("comparison_status") or "UNKNOWN")
+        by_status[st] = by_status.get(st, 0) + 1
+        if st in {"NEW_PERIOD", "CHANGED"} or (
+            int(v.get("added_count") or 0)
+            + int(v.get("exited_count") or 0)
+            + int(v.get("changed_count") or 0)
+        ) > 0:
+            changed_funds.append({
+                "scheme_code": code,
+                "fund_name": v.get("fund_name") or v.get("amfi_scheme_name"),
+                "as_of": v.get("as_of"),
+                "prior_as_of": v.get("prior_as_of"),
+                "status": st,
+                "added": v.get("added_count"),
+                "exited": v.get("exited_count"),
+                "changed": v.get("changed_count"),
+            })
+    payload = {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "by_status": by_status,
+        "changed_fund_count": len(changed_funds),
+        "changed_funds": changed_funds[:50],
+        "note": (
+            "comparison_status is vs the previous archived as_of under data/mf_snapshots. "
+            "Weight moves are not proof of trades."
+        ),
+    }
+    out.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(
+        f"Holdings change summary: {by_status} "
+        f"changed_funds={len(changed_funds)} -> {out}"
+    )
+
+
+
 def main() -> int:
     print("=== MF holdings refresh ===")
     sheets = load_book_sheets()
@@ -337,6 +517,10 @@ def main() -> int:
     amfi_rows = fetch_amfi_universe(session, force=True)
     isin_index = build_isin_index(amfi_rows)
     print(f"AMFI universe rows: {len(amfi_rows)}")
+    try:
+        refresh_amfi_nav_cache(amfi_rows)
+    except Exception as exc:
+        print(f"AMFI nav cache refresh failed (non-fatal): {exc}")
     write_portfolio_history_row(portfolio, isin_index, sheets)
 
     cache = load_json(HOLDINGS_CACHE, {})
@@ -365,6 +549,14 @@ def main() -> int:
             as_of = (info or {}).get("as_of") or (info or {}).get("portfolio_date")
             key = str(code)
             if holdings:
+                # Compare to prior archived as_of BEFORE overwriting same-month file
+                cmp = compare_to_prior(key, str(as_of or ""), holdings)
+                archive_scheme_snapshot(
+                    key,
+                    str(as_of or "unknown"),
+                    holdings,
+                    {"isin": isin, "source": (info or {}).get("source")},
+                )
                 cache[key] = {
                     "scheme_code": key,
                     "isin": isin,
@@ -373,16 +565,29 @@ def main() -> int:
                     "holdings": holdings,
                     "source": (info or {}).get("source"),
                     "retrieved_at": datetime.now(timezone.utc).isoformat(),
+                    "comparison_status": cmp.get("comparison_status"),
+                    "prior_as_of": cmp.get("prior_as_of"),
                 }
                 meta[key] = {
                     "scheme_code": key,
                     "isin": isin,
+                    "fund_name": fund_name or scheme.get("scheme_name"),
                     "as_of": as_of,
                     "count": len(holdings),
+                    "holding_count": len(holdings),
                     "source": (info or {}).get("source"),
+                    "comparison_status": cmp.get("comparison_status"),
+                    "prior_as_of": cmp.get("prior_as_of"),
+                    "added_count": cmp.get("added_count"),
+                    "exited_count": cmp.get("exited_count"),
+                    "changed_count": cmp.get("changed_count"),
                 }
                 success += 1
-                print(f"OK {code} {isin} rows={len(holdings)} as_of={as_of}")
+                print(
+                    f"OK {code} {isin} rows={len(holdings)} as_of={as_of} "
+                    f"status={cmp.get('comparison_status')} "
+                    f"+{cmp.get('added_count')}/-{cmp.get('exited_count')}/~{cmp.get('changed_count')}"
+                )
             else:
                 failed += 1
         except Exception as exc:
@@ -391,6 +596,10 @@ def main() -> int:
 
     save_json_atomic(HOLDINGS_CACHE, cache)
     save_json_atomic(HOLDINGS_META_CACHE, meta)
+    try:
+        write_holdings_change_summary(meta)
+    except Exception as exc:
+        print(f"holdings change summary failed (non-fatal): {exc}")
     print(f"Done success={success} failed={failed} unresolved={unresolved} cache_size={len(cache)}")
     return 0 if success > 0 or len(cache) > 0 else 1
 
