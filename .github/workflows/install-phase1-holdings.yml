@@ -1,1 +1,13 @@
-SEE_FILE
+name: Install Phase1 Holdings Script
+
+# Deprecated. Use "Fix History Unpack" then "Refresh MF Holdings".
+on:
+  workflow_dispatch:
+
+jobs:
+  noop:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "Deprecated. Use workflow: Fix History Unpack"
+          echo "Then: Refresh MF Holdings"
