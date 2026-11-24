@@ -10,12 +10,12 @@ Live app: https://northline-family-desk.streamlit.app/
 |------------|--------|
 | Daily MF holdings refresh (GitHub Actions) | Yes — archives each `as_of` under `data/mf_snapshots/` |
 | AMFI NAV (8-field + legacy 6-field) | Yes |
-| Durable history `data/portfolio_history.csv` | Yes — MF mark + Yahoo stock mark + FD (FX + ROI accrual) |
+| Durable history `data/portfolio_history.csv` | Yes — MF×AMFI NAV + stocks (Yahoo or **cost fallback**) + FD + cash; `data_quality` / `book_mode` flags |
 | Public sample book | Yes — `Member A/B/C/D` only on HEAD |
 | Private book path | Secrets/env — **must be Cloud-reachable** (see below) |
 | Upstox tape | Opt-in; **complete / partial / empty** |
-| MF period-over-period diff | Ready; waiting on new AMC `as_of` (still `2026-09-30`) |
-| Command Center recon | PASS on full FCNR + INR FD book (~₹2.5 Cr) |
+| MF period-over-period diff | Yes — snapshots under `data/mf_snapshots/`; meta `comparison_status` + `data/holdings_change_summary.json` |
+| Command Center recon | Works on full private book; **public HEAD uses sample Members A–D (~₹2.2 Cr, no Cash sheet)** |
 
 ## Secrets (Streamlit Cloud)
 
@@ -52,25 +52,27 @@ File: `data/portfolio_history.csv` (committed daily).
 | `mf_current_inr` | Units × AMFI NAV |
 | `stocks_current_inr` | Yahoo LTP × qty when possible, else invested |
 | `fd_current_inr` | Available balance if set, else **principal × (1 + ROI × days/365)** capped at maturity amount; **USD × spot USDINR** |
-| `total_assets_inr` | MF + stocks + FD (gold is inside MF/stock marks when present; CC also shows gold separately) |
-| `data_quality` (UI) | `NAV_PARSE_GAP` days are audit-only, not performance |
+| `total_assets_inr` | MF + stocks + gold sleeve + FD + cash (cash = 0 if no Cash sheet / sample book) |
+| `book_mode` / `data_quality` | `sample` vs `committed*`; flags like `EQUITY_COST_ONLY`, `NO_CASH_SHEET`, `SAMPLE_BOOK` |
+| `stocks_mark` | `yahoo_ltp`, `invested_fallback`, or both |
 
-Command Center remains the live source of truth (~₹2.5 Cr). History is the durable trend (~₹2.3–2.5 Cr depending on accrual/marks).
+Public sample history is **not** the family book. Private deploy totals differ.
 
-## MF holdings change detection (Phase 3)
+## MF holdings change detection
 
-1. Daily job writes `data/mf_snapshots/{scheme}/{as_of}.json`.  
-2. Same `as_of` → `comparison_status = SAME_PERIOD` (not “never changes”).  
-3. New period → prior file kept; meta gets added / exited / changed counts.  
+1. Daily job writes `data/mf_snapshots/{scheme}/{as_of}.json`.
+2. Same `as_of` → `comparison_status = SAME_PERIOD` (not “never changes”).
+3. New period → prior file kept; meta gets added / exited / changed counts.
+4. Summary: `data/holdings_change_summary.json`.
 
-**Current evidence:** all 21 schemes `as_of = 2026-09-30`, `SAME_PERIOD`. October AMC filings are not in the CDN source yet. The pipeline is waiting, not broken.
+**Current evidence (see `data/mf_holdings_meta.json`):** most schemes on latest CDN month-end (e.g. 2026-10-31); liquid schemes may show mid-month. `comparison_status` is vs the previous archived `as_of` under `data/mf_snapshots/`. Weight moves are not proof of trades.
 
 ## Deploy check after every Cloud change
 
-1. GitHub `main` HEAD SHA  
-2. Streamlit Cloud → **Reboot**  
-3. Command Center total should stay near **₹2.5 Cr** with FCNR ~43%  
-4. Desk history latest trusted row near that ballpark  
+1. GitHub `main` HEAD SHA
+2. Streamlit Cloud → **Reboot**
+3. Confirm banner: sample vs private book
+4. Funds page: as_of + SAME_PERIOD / NEW_PERIOD / CHANGED
 
 ## Local / CI
 
@@ -84,7 +86,7 @@ python scripts/update_holdings_cache.py
 
 ## Hard rules
 
-- No real family book in the public tree.  
-- No invented NAVs, filings, or AI verdicts without evidence.  
-- Upstox **partial** is not a full verified board.  
-- This app does not place trades.  
+- No real family book in the public tree.
+- No invented NAVs, filings, or AI verdicts without evidence.
+- Upstox **partial** is not a full verified board.
+- This app does not place trades.
