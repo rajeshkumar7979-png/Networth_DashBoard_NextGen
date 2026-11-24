@@ -13,36 +13,32 @@ jobs:
       - uses: actions/checkout@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Patch write_portfolio_history_row unpack
+      - name: Surgical fix unpack + quality flags
         run: |
           set -e
           python3 <<'PY'
           from pathlib import Path
           p = Path("scripts/update_holdings_cache.py")
           src = p.read_text(encoding="utf-8")
-          old = '''    (
-        stocks_current, stocks_invested, stocks_rows, stocks_mark,
-        gold_current, gold_invested, gold_rows,
+          if "yahoo_hits, yahoo_attempts" in src and "usd_inr, fx_source = fetch_usd_inr()" in src and 'book_mode = "sample"' in src:
+              print("already fixed", p.stat().st_size)
+              raise SystemExit(0)
+
+          a = """        gold_current, gold_invested, gold_rows,
     ) = mark_stocks_current(sheets)
-    usd_inr = fetch_usd_inr()
-    fd_current, fd_principal, fd_rows = sum_fd_current(sheets, usd_inr=usd_inr)
-    cash_current, _cash_rows = sum_cash_current(sheets)
-    cash_current = float(cash_current or 0.0)
-
-    total_current = mf_current + stocks_current + gold_current + fd_current + cash_current
-    total_invested = mf_invested + stocks_invested + gold_invested + fd_principal + cash_current
-
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-'''
-          new = '''    (
-        stocks_current, stocks_invested, stocks_rows, stocks_mark,
-        gold_current, gold_invested, gold_rows,
+    usd_inr = fetch_usd_inr()"""
+          b = """        gold_current, gold_invested, gold_rows,
         yahoo_hits, yahoo_attempts,
     ) = mark_stocks_current(sheets)
-    usd_inr, fx_source = fetch_usd_inr()
-    fd_current, fd_principal, fd_rows = sum_fd_current(sheets, usd_inr=usd_inr)
-    cash_current, _cash_rows = sum_cash_current(sheets)
-    cash_current = float(cash_current or 0.0)
+    usd_inr, fx_source = fetch_usd_inr()"""
+          if a not in src:
+              raise SystemExit("unpack target not found")
+          src = src.replace(a, b, 1)
+
+          anchor = """    cash_current = float(cash_current or 0.0)
+
+    total_current = mf_current + stocks_current + gold_current + fd_current + cash_current"""
+          insert = """    cash_current = float(cash_current or 0.0)
 
     sheet_names = {str(k).strip().lower() for k in sheets.keys()}
     has_cash_sheet = any("cash" in n for n in sheet_names)
@@ -76,20 +72,17 @@ jobs:
             "Stock P&L in history is not mark-to-market."
         )
 
-    total_current = mf_current + stocks_current + gold_current + fd_current + cash_current
-    total_invested = mf_invested + stocks_invested + gold_invested + fd_principal + cash_current
+    total_current = mf_current + stocks_current + gold_current + fd_current + cash_current"""
+          if anchor not in src:
+              raise SystemExit("anchor for quality block not found")
+          src = src.replace(anchor, insert, 1)
 
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-'''
-          if old not in src:
-              if "yahoo_hits, yahoo_attempts" in src and "usd_inr, fx_source" in src:
-                  print("already fixed")
-                  raise SystemExit(0)
-              raise SystemExit("target block not found — abort")
-          src = src.replace(old, new, 1)
           compile(src, str(p), "exec")
           p.write_text(src, encoding="utf-8")
-          print("fixed", p.stat().st_size)
+          assert "yahoo_hits, yahoo_attempts" in src
+          assert "usd_inr, fx_source" in src
+          assert 'book_mode = "sample"' in src
+          print("fixed ok", p.stat().st_size)
           PY
       - name: Commit
         env:
