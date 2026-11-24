@@ -1,1 +1,100 @@
-PLACEHOLDER_WILL_REPLACE
+name: Refresh MF Holdings
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Daily baseline (UTC 04:30 ≈ 10:00 IST)
+    - cron: "30 4 * * *"
+    # Extra pulls after month-end while AMCs publish (5th–20th, twice daily)
+    - cron: "0 6 5-20 * *"
+    - cron: "0 14 5-20 * *"
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -r requirements.txt
+
+      - name: Rebuild public sample workbook from synthetic CSVs
+        run: |
+          # Preserve a committed full book (>20KB with Cash in Hand). Only build
+          # the public sample when the repo still has a tiny placeholder xlsx.
+          python - <<'PY'
+          from pathlib import Path
+          x = Path("data/Networth_Raw_Data.xlsx")
+          if x.exists() and x.stat().st_size > 20000:
+              print(f"Keeping committed book {x} ({x.stat().st_size} bytes)")
+          else:
+              import subprocess, sys
+              raise SystemExit(subprocess.call([sys.executable, "scripts/build_sample_workbook.py"]))
+          PY
+
+      - name: Refresh complete MF holdings
+        run: python scripts/update_holdings_cache.py
+
+      - name: Record build SHA for Cloud footer
+        run: |
+          git rev-parse HEAD > data/BUILD_SHA.txt
+          echo "BUILD_SHA=$(cat data/BUILD_SHA.txt)"
+
+      - name: Verify generated cache
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          cache = Path("data/mf_holdings_cache.json")
+          history = Path("data/portfolio_history.csv")
+          xlsx = Path("data/Networth_Raw_Data.xlsx")
+          if not cache.exists():
+              raise SystemExit("ERROR: holdings cache was not created")
+          data = json.loads(cache.read_text(encoding="utf-8"))
+          funds = [k for k in data if str(k).isdigit() and data[k]]
+          if not funds:
+              raise SystemExit("ERROR: holdings cache is empty")
+          if not history.exists():
+              raise SystemExit("ERROR: portfolio_history.csv was not written")
+          if not xlsx.exists():
+              raise SystemExit("ERROR: workbook missing")
+          size = xlsx.stat().st_size
+          # Personal-name guard only for the public sample (small book)
+          if size < 20000:
+              blob = xlsx.read_bytes().upper()
+              for bad in (b"KHANDELWAL", b"SATYANARAYAN", b"KAVITA KHANDELWAL"):
+                  if bad in blob:
+                      raise SystemExit(f"ERROR: personal name marker still in sample xlsx: {bad!r}")
+          print(f"Funds: {len(funds)}  History: {history}  Book: {xlsx} ({size} bytes)")
+          PY
+
+      - name: Commit updated holdings cache
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/mf_holdings_cache.json data/mf_holdings_meta.json data/amfi_scheme_universe.json data/amfi_nav_cache.json data/holdings_change_summary.json data/portfolio_history.csv data/mf_snapshots data/Networth_Raw_Data.xlsx data/BUILD_SHA.txt
+          if git diff --cached --quiet; then
+            echo "No holdings changes to commit."
+            exit 0
+          fi
+          git commit -m "chore: refresh complete MF holdings"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
