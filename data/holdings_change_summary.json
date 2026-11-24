@@ -1,0 +1,219 @@
+{
+  "generated_at": "2026-11-24T07:58:46.602398+00:00",
+  "by_status": {
+    "NEW_PERIOD": 21
+  },
+  "changed_funds": [
+    {
+      "scheme_code": "120465",
+      "fund_name": "Axis Large Cap Fund Direct Growth",
+      "as_of": "2026-10-31",
+      "prior_as_of": "2026-09-30",
+      "status": "NEW_PERIOD",
+      "added": 4,
+      "exited": 3,
+      "changed": 37
+    },
+    {
+      "scheme_code": "119250",
+      "fund_name": "DSP Large Cap Fund Growth",
+      "as_of": "2026-10-31",
+      "prior_as_of": "2026-09-30",
+      "status": "NEW_PERIOD",
+      "added": 1,
+      "exited": 0,
+      "changed": 26
+    },
+    {
+      "scheme_code": "146381",
+      "fund_name": "DSP NIFTY NEXT 50 INDEX FUND - DIRECT PLAN",
+      "as_of": "2026-10-31",
+      "prior_as_of": "2026-09-30",
+      "status": "NEW_PERIOD",
+      "added": 0,
+      "exited": 0,
+      "changed": 51
+    },
+    {
+      "scheme_code": "140228",
+      "fund_name": "EDELWEISS MID CAP FUND - DIRECT PLAN",
+      "as_of": "2026-10-31",
+      "prior_as_of": "2026-09-30",
+      "status": "NEW_PERIOD",
+      "added": 3,
+      "exited": 5,
+      "changed": 97
+    },
+    {
+      "scheme_code": "119132",
+      "fund_name": "HDFC Gold ETF Fund of Fund",
+      "as_of": "2026-10-31",
+      "prior_as_of": "2026-09-30",
+      "status": "NEW_PERIOD",
+      "added": 0,
+      "exited": 0,
+      "changed": 2
+    },
+    {
+      "scheme_code": "119091",
+      "fund_name": "HDFC LIQUID FUND - DIRECT PLAN",
+      "as_of": "2026-11-15",
+      "prior_as_of": "2026-09-30",
+      "status": "NEW_PERIOD",
+      "added": 82,
+      "exited": 65,
+      "changed": 46
+    },
+    {
+      "scheme_code": "102000",
+      "fund_name": "HDFC Large Cap Fund Growth - Regular",
+      "as_of": "2026-10-31",
+      "prior_as_of": "2026-09-30",
+      "status": "NEW_PERIOD",
+      "added": 1,
+      "exited": 2,
+      "changed": 26
+    },
+    {
+      "scheme_code": "118989",
+      "fund_name": "HDFC MID CAP FUND - DIRECT PLAN - GROWTH OPTION",
+      "as_of": "2026-10-31",
+      "prior_as_of": "2026-09-30",
+      "status": "NEW_PERIOD",
+      "added": 1,
+      "exited": 1,
+      "changed": 46
+    },
+    {
+      "scheme_code": "120621",
+      "fund_name": "ICICI PRUDENTIAL INFRASTRUCTURE FUND - DIRECT PLAN",
+      "as_of": "2026-10-31",
+      "prior_as_of": "2026-09-30",
+      "status": "NEW_PERIOD",
+      "added": 6,
+      "exited": 3,
+      "changed": 43
+    },
+    {
+      "scheme_code": "143903",
+      "fund_name": "ICICI Prudential BHARAT 22 FOF Direct Growth",
+      "as_of": "2026-10-31",
+      "prior_as_of": "2026-09-30",
+      "status": "NEW_PERIOD",
+      "added": 0,
+      "exited": 0,
+      "changed": 2
+    },
+    {
+      "scheme_code": "115833",
+      "fund_name": "ICICI Prudential Gold ETF FoF Growth",
+      "as_of": "2026-10-31",
+      "prior_as_of": "2026-09-30",
+      "status": "NEW_PERIOD",
+      "added": 0,
+      "exited": 0,
+      "changed": 3
+    },
+    {
+      "scheme_code": "120323",
+      "fund_name": "ICICI Prudential Value Discovery Fund Direct Growth",
+      "as_of": "2026-10-31",
+      "prior_as_of": "2026-09-30",
+      "status": "NEW_PERIOD",
+      "added": 5,
+      "exited": 6,
+      "changed": 36
+    },
+    {
+      "scheme_code": "145137",
+      "fund_name": "INVESCO INDIA SMALL CAP FUND - DIRECT GROWTH",
+      "as_of": "2026-10-31",
+      "prior_as_of": "2026-09-30",
+      "status": "NEW_PERIOD",
+      "added": 3,
+      "exited": 4,
+      "changed": 55
+    },
+    {
+      "scheme_code": "147919",
+      "fund_name": "ITI SMALL CAP FUND - DIRECT PLAN",
+      "as_of": "2026-10-31",
+      "prior_as_of": "2026-09-30",
+      "status": "NEW_PERIOD",
+      "added": 6,
+      "exited": 7,
+      "changed": 68
+    },
+    {
+      "scheme_code": "133036",
+      "fund_name": "Kotak Hybrid Equity Fund Growth",
+      "as_of": "2026-10-31",
+      "prior_as_of": "2026-09-30",
+      "status": "NEW_PERIOD",
+      "added": 15,
+      "exited": 8,
+      "changed": 37
+    },
+    {
+      "scheme_code": "133801",
+      "fund_name": "Kotak Infrastructure & Economic Reform Fund Direct Growth",
+      "as_of": "2026-10-31",
+      "prior_as_of": "2026-09-30",
+      "status": "NEW_PERIOD",
+      "added": 3,
+      "exited": 1,
+      "changed": 29
+    },
+    {
+      "scheme_code": "122639",
+      "fund_name": "PARAG PARIKH FLEXI CAP FUND - DIRECT PLAN",
+      "as_of": "2026-10-31",
+      "prior_as_of": "2026-09-30",
+      "status": "NEW_PERIOD",
+      "added": 12,
+      "exited": 5,
+      "changed": 38
+    },
+    {
+      "scheme_code": "143269",
+      "fund_name": "PARAG PARIKH LIQUID FUND-DIRECT PLAN-GROWTH",
+      "as_of": "2026-11-15",
+      "prior_as_of": "2026-09-30",
+      "status": "NEW_PERIOD",
+      "added": 22,
+      "exited": 23,
+      "changed": 17
+    },
+    {
+      "scheme_code": "120828",
+      "fund_name": "Quant Small Cap Fund Direct Plan Growth",
+      "as_of": "2026-10-31",
+      "prior_as_of": "2026-09-30",
+      "status": "NEW_PERIOD",
+      "added": 4,
+      "exited": 8,
+      "changed": 38
+    },
+    {
+      "scheme_code": "119835",
+      "fund_name": "SBI Contra Direct Plan Growth",
+      "as_of": "2026-10-31",
+      "prior_as_of": "2026-09-30",
+      "status": "NEW_PERIOD",
+      "added": 1,
+      "exited": 5,
+      "changed": 39
+    },
+    {
+      "scheme_code": "143341",
+      "fund_name": "UTI NIFTY NEXT 50 INDEX FUND - DIRECT GROWTH PLAN",
+      "as_of": "2026-10-31",
+      "prior_as_of": "2026-09-30",
+      "status": "NEW_PERIOD",
+      "added": 0,
+      "exited": 0,
+      "changed": 51
+    }
+  ],
+  "note": "NEW_PERIOD = new AMC filing month vs prior archive; CHANGED = same as_of with composition moves."
+}
