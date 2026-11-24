@@ -279,11 +279,44 @@ def write_portfolio_history_row(portfolio, isin_index, sheets):
     (
         stocks_current, stocks_invested, stocks_rows, stocks_mark,
         gold_current, gold_invested, gold_rows,
+        yahoo_hits, yahoo_attempts,
     ) = mark_stocks_current(sheets)
-    usd_inr = fetch_usd_inr()
+    usd_inr, fx_source = fetch_usd_inr()
     fd_current, fd_principal, fd_rows = sum_fd_current(sheets, usd_inr=usd_inr)
     cash_current, _cash_rows = sum_cash_current(sheets)
     cash_current = float(cash_current or 0.0)
+
+    sheet_names = {str(k).strip().lower() for k in sheets.keys()}
+    has_cash_sheet = any("cash" in n for n in sheet_names)
+    try:
+        book_bytes = RAW_XLSX.stat().st_size if RAW_XLSX.exists() else 0
+    except OSError:
+        book_bytes = 0
+    if book_bytes < 20000 and not has_cash_sheet:
+        book_mode = "sample"
+    elif has_cash_sheet:
+        book_mode = "committed_with_cash"
+    else:
+        book_mode = "committed"
+
+    quality_flags = []
+    if stocks_mark == "invested_fallback" or (yahoo_attempts > 0 and yahoo_hits == 0):
+        quality_flags.append("EQUITY_COST_ONLY")
+    if yahoo_attempts > 0 and 0 < yahoo_hits < yahoo_attempts:
+        quality_flags.append("EQUITY_PARTIAL_MARK")
+    if not has_cash_sheet:
+        quality_flags.append("NO_CASH_SHEET")
+    if str(fx_source).startswith("fallback"):
+        quality_flags.append("FX_FALLBACK")
+    if book_mode == "sample":
+        quality_flags.append("SAMPLE_BOOK")
+    data_quality = "+".join(quality_flags) if quality_flags else "OK"
+    if "EQUITY_COST_ONLY" in quality_flags:
+        print(
+            f"WARNING: equity mark is cost-only "
+            f"(yahoo_hits={yahoo_hits}/{yahoo_attempts}). "
+            "Stock P&L in history is not mark-to-market."
+        )
 
     total_current = mf_current + stocks_current + gold_current + fd_current + cash_current
     total_invested = mf_invested + stocks_invested + gold_invested + fd_principal + cash_current
@@ -407,14 +440,11 @@ def compare_to_prior(scheme_code: str, as_of: str, holdings: list) -> dict:
     elif status == "NOT_COMPARABLE":
         cmp_status = "NOT_COMPARABLE"
     elif not added and not exited and not changed:
-        # No material ISIN/name/qty/weight moves vs prior archive
         if prior_as_of == str(as_of)[:10]:
             cmp_status = "SAME_PERIOD"
         else:
-            # Filing month advanced but portfolio composition stable
             cmp_status = "NEW_PERIOD"
     else:
-        # Material adds/exits/weight or qty moves
         cmp_status = "CHANGED" if prior_as_of == str(as_of)[:10] else "NEW_PERIOD"
     return {
         "comparison_status": cmp_status,
@@ -493,115 +523,90 @@ def write_holdings_change_summary(meta: dict) -> None:
     payload = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "by_status": by_status,
-        "changed_fund_count": len(changed_funds),
-        "changed_funds": changed_funds[:50],
-        "note": (
-            "comparison_status is vs the previous archived as_of under data/mf_snapshots. "
-            "Weight moves are not proof of trades."
-        ),
+        "changed_funds": sorted(changed_funds, key=lambda x: str(x.get("fund_name") or "")),
+        "note": "NEW_PERIOD = new AMC filing month vs prior archive; CHANGED = same as_of with composition moves.",
     }
     out.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(
-        f"Holdings change summary: {by_status} "
-        f"changed_funds={len(changed_funds)} -> {out}"
-    )
-
+    print(f"Holdings change summary: {by_status} -> {out}")
 
 
 def main() -> int:
-    print("=== MF holdings refresh ===")
     sheets = load_book_sheets()
     portfolio = discover_mf_rows(sheets)
-    print(f"Unique portfolio ISINs found: {len(portfolio)}")
-    session = requests.Session()
-    amfi_rows = fetch_amfi_universe(session, force=True)
-    isin_index = build_isin_index(amfi_rows)
-    print(f"AMFI universe rows: {len(amfi_rows)}")
+    print(f"MF rows discovered: {len(portfolio)}")
+
+    amfi_rows = fetch_amfi_universe()
+    print(f"AMFI universe rows: {len(amfi_rows or [])}")
     try:
         refresh_amfi_nav_cache(amfi_rows)
     except Exception as exc:
-        print(f"AMFI nav cache refresh failed (non-fatal): {exc}")
-    write_portfolio_history_row(portfolio, isin_index, sheets)
+        print(f"AMFI nav cache refresh skipped: {exc}")
 
-    cache = load_json(HOLDINGS_CACHE, {})
-    meta = load_json(HOLDINGS_META_CACHE, {})
-    if not isinstance(cache, dict):
-        cache = {}
-    if not isinstance(meta, dict):
-        meta = {}
+    isin_index = build_isin_index(amfi_rows)
+    cache = load_json(HOLDINGS_CACHE) or {}
+    meta = load_json(HOLDINGS_META_CACHE) or {}
 
-    success = failed = unresolved = 0
     for _, row in portfolio.iterrows():
-        isin = str(row["isin"])
+        isin = str(row["isin"]).upper()
         fund_name = str(row.get("fund_name") or "")
         scheme = choose_scheme(isin, fund_name, isin_index)
-        code = scheme.get("scheme_code") or scheme.get("code")
-        if not code:
-            unresolved += 1
-            print(f"UNRESOLVED {isin} {fund_name}")
+        scheme_code = str(scheme.get("scheme_code") or "").strip()
+        if not scheme_code:
+            print(f"No AMFI scheme for {isin} {fund_name[:40]}")
             continue
-        try:
-            holdings, info = ingest_scheme_holdings(session, str(code))
-            if not holdings:
-                failed += 1
-                print(f"EMPTY {code} {isin}")
-                continue
-            as_of = (info or {}).get("as_of") or (info or {}).get("portfolio_date")
-            key = str(code)
-            if holdings:
-                # Compare to prior archived as_of BEFORE overwriting same-month file
-                cmp = compare_to_prior(key, str(as_of or ""), holdings)
+
+        result = ingest_scheme_holdings(scheme_code, fund_name=fund_name, amfi_row=scheme)
+        holdings = (result or {}).get("holdings") or []
+        as_of = (result or {}).get("as_of") or ""
+        source = (result or {}).get("source") or ""
+
+        if holdings:
+            cache[scheme_code] = holdings
+            prior_cmp = compare_to_prior(scheme_code, as_of, holdings)
+            try:
                 archive_scheme_snapshot(
-                    key,
-                    str(as_of or "unknown"),
+                    scheme_code,
+                    as_of,
                     holdings,
-                    {"isin": isin, "source": (info or {}).get("source")},
+                    meta_extra={
+                        "fund_name": fund_name,
+                        "source": source,
+                        **{k: v for k, v in prior_cmp.items() if k != "diff_limitation"},
+                    },
                 )
-                cache[key] = {
-                    "scheme_code": key,
-                    "isin": isin,
-                    "fund_name": fund_name or scheme.get("scheme_name"),
-                    "as_of": as_of,
-                    "holdings": holdings,
-                    "source": (info or {}).get("source"),
-                    "retrieved_at": datetime.now(timezone.utc).isoformat(),
-                    "comparison_status": cmp.get("comparison_status"),
-                    "prior_as_of": cmp.get("prior_as_of"),
-                }
-                meta[key] = {
-                    "scheme_code": key,
-                    "isin": isin,
-                    "fund_name": fund_name or scheme.get("scheme_name"),
-                    "as_of": as_of,
-                    "count": len(holdings),
-                    "holding_count": len(holdings),
-                    "source": (info or {}).get("source"),
-                    "comparison_status": cmp.get("comparison_status"),
-                    "prior_as_of": cmp.get("prior_as_of"),
-                    "added_count": cmp.get("added_count"),
-                    "exited_count": cmp.get("exited_count"),
-                    "changed_count": cmp.get("changed_count"),
-                }
-                success += 1
-                print(
-                    f"OK {code} {isin} rows={len(holdings)} as_of={as_of} "
-                    f"status={cmp.get('comparison_status')} "
-                    f"+{cmp.get('added_count')}/-{cmp.get('exited_count')}/~{cmp.get('changed_count')}"
-                )
-            else:
-                failed += 1
-        except Exception as exc:
-            failed += 1
-            print(f"FAIL {code} {isin}: {exc}")
+            except Exception as exc:
+                print(f"Archive failed for {scheme_code}: {exc}")
+            meta[scheme_code] = {
+                "as_of": as_of,
+                "source": source,
+                "fund_name": fund_name,
+                "amfi_scheme_name": scheme.get("scheme_name"),
+                "holding_count": len(holdings),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+                **prior_cmp,
+            }
+            print(
+                f"{scheme_code} {fund_name[:36]:36} as_of={as_of} "
+                f"n={len(holdings)} src={source} cmp={prior_cmp.get('comparison_status')}"
+            )
+        else:
+            print(f"Empty holdings for {scheme_code} {fund_name[:40]} — keeping prior cache")
 
     save_json_atomic(HOLDINGS_CACHE, cache)
     save_json_atomic(HOLDINGS_META_CACHE, meta)
     try:
         write_holdings_change_summary(meta)
     except Exception as exc:
-        print(f"holdings change summary failed (non-fatal): {exc}")
-    print(f"Done success={success} failed={failed} unresolved={unresolved} cache_size={len(cache)}")
-    return 0 if success > 0 or len(cache) > 0 else 1
+        print(f"Change summary skipped: {exc}")
+
+    try:
+        write_portfolio_history_row(portfolio, isin_index, sheets)
+    except Exception as exc:
+        print(f"History row failed: {exc}")
+        return 1
+
+    print("Holdings refresh complete.")
+    return 0
 
 
 if __name__ == "__main__":
