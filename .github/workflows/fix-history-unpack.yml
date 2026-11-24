@@ -1,0 +1,104 @@
+name: Fix History Unpack
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Patch write_portfolio_history_row unpack
+        run: |
+          set -e
+          python3 <<'PY'
+          from pathlib import Path
+          p = Path("scripts/update_holdings_cache.py")
+          src = p.read_text(encoding="utf-8")
+          old = '''    (
+        stocks_current, stocks_invested, stocks_rows, stocks_mark,
+        gold_current, gold_invested, gold_rows,
+    ) = mark_stocks_current(sheets)
+    usd_inr = fetch_usd_inr()
+    fd_current, fd_principal, fd_rows = sum_fd_current(sheets, usd_inr=usd_inr)
+    cash_current, _cash_rows = sum_cash_current(sheets)
+    cash_current = float(cash_current or 0.0)
+
+    total_current = mf_current + stocks_current + gold_current + fd_current + cash_current
+    total_invested = mf_invested + stocks_invested + gold_invested + fd_principal + cash_current
+
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+'''
+          new = '''    (
+        stocks_current, stocks_invested, stocks_rows, stocks_mark,
+        gold_current, gold_invested, gold_rows,
+        yahoo_hits, yahoo_attempts,
+    ) = mark_stocks_current(sheets)
+    usd_inr, fx_source = fetch_usd_inr()
+    fd_current, fd_principal, fd_rows = sum_fd_current(sheets, usd_inr=usd_inr)
+    cash_current, _cash_rows = sum_cash_current(sheets)
+    cash_current = float(cash_current or 0.0)
+
+    sheet_names = {str(k).strip().lower() for k in sheets.keys()}
+    has_cash_sheet = any("cash" in n for n in sheet_names)
+    try:
+        book_bytes = RAW_XLSX.stat().st_size if RAW_XLSX.exists() else 0
+    except OSError:
+        book_bytes = 0
+    if book_bytes < 20000 and not has_cash_sheet:
+        book_mode = "sample"
+    elif has_cash_sheet:
+        book_mode = "committed_with_cash"
+    else:
+        book_mode = "committed"
+
+    quality_flags = []
+    if stocks_mark == "invested_fallback" or (yahoo_attempts > 0 and yahoo_hits == 0):
+        quality_flags.append("EQUITY_COST_ONLY")
+    if yahoo_attempts > 0 and 0 < yahoo_hits < yahoo_attempts:
+        quality_flags.append("EQUITY_PARTIAL_MARK")
+    if not has_cash_sheet:
+        quality_flags.append("NO_CASH_SHEET")
+    if str(fx_source).startswith("fallback"):
+        quality_flags.append("FX_FALLBACK")
+    if book_mode == "sample":
+        quality_flags.append("SAMPLE_BOOK")
+    data_quality = "+".join(quality_flags) if quality_flags else "OK"
+    if "EQUITY_COST_ONLY" in quality_flags:
+        print(
+            f"WARNING: equity mark is cost-only "
+            f"(yahoo_hits={yahoo_hits}/{yahoo_attempts}). "
+            "Stock P&L in history is not mark-to-market."
+        )
+
+    total_current = mf_current + stocks_current + gold_current + fd_current + cash_current
+    total_invested = mf_invested + stocks_invested + gold_invested + fd_principal + cash_current
+
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+'''
+          if old not in src:
+              if "yahoo_hits, yahoo_attempts" in src and "usd_inr, fx_source" in src:
+                  print("already fixed")
+                  raise SystemExit(0)
+              raise SystemExit("target block not found — abort")
+          src = src.replace(old, new, 1)
+          compile(src, str(p), "exec")
+          p.write_text(src, encoding="utf-8")
+          print("fixed", p.stat().st_size)
+          PY
+      - name: Commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/update_holdings_cache.py
+          if git diff --cached --quiet; then echo "no change"; exit 0; fi
+          git commit -m "fix: unpack yahoo hits + fx_source + book_mode in history row"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push origin HEAD:main
