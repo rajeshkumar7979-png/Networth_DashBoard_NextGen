@@ -24,8 +24,8 @@ import requests
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from lib.mf_diff import diff_snapshots  # noqa: E402
 from lib.cash_book import sum_cash_current  # noqa: E402
+from lib.mf_diff import diff_snapshots  # noqa: E402
 from lib.mf_holdings import (  # noqa: E402
     HOLDINGS_CACHE,
     HOLDINGS_META_CACHE,
@@ -374,7 +374,6 @@ def write_portfolio_history_row(portfolio, isin_index, sheets):
 
 
 def _prior_snapshot_path(scheme_code: str, current_as_of: str) -> Optional[Path]:
-    """Newest archived snapshot for scheme with as_of strictly before current."""
     folder = SNAPSHOT_DIR / str(scheme_code)
     if not folder.exists():
         return None
@@ -408,7 +407,6 @@ def archive_scheme_snapshot(scheme_code: str, as_of: str, holdings: list, meta_e
 
 
 def compare_to_prior(scheme_code: str, as_of: str, holdings: list) -> dict:
-    """Diff current holdings vs last archived prior as_of. Safe if no prior."""
     prior_path = _prior_snapshot_path(scheme_code, as_of)
     if prior_path is None:
         return {
@@ -440,10 +438,7 @@ def compare_to_prior(scheme_code: str, as_of: str, holdings: list) -> dict:
     elif status == "NOT_COMPARABLE":
         cmp_status = "NOT_COMPARABLE"
     elif not added and not exited and not changed:
-        if prior_as_of == str(as_of)[:10]:
-            cmp_status = "SAME_PERIOD"
-        else:
-            cmp_status = "NEW_PERIOD"
+        cmp_status = "SAME_PERIOD" if prior_as_of == str(as_of)[:10] else "NEW_PERIOD"
     else:
         cmp_status = "CHANGED" if prior_as_of == str(as_of)[:10] else "NEW_PERIOD"
     return {
@@ -457,9 +452,7 @@ def compare_to_prior(scheme_code: str, as_of: str, holdings: list) -> dict:
 
 
 def refresh_amfi_nav_cache(amfi_rows: list) -> None:
-    """Rewrite data/amfi_nav_cache.json from a live NAVAll parse so Cloud is not stuck on Aug cache."""
     from lib.config import AMFI_CACHE_PATH
-
     nav, code, name = {}, {}, {}
     for row in amfi_rows or []:
         if not isinstance(row, dict):
@@ -496,7 +489,6 @@ def refresh_amfi_nav_cache(amfi_rows: list) -> None:
 
 
 def write_holdings_change_summary(meta: dict) -> None:
-    """Compact summary of AMC filing changes for UI / audit."""
     out = ROOT / "data" / "holdings_change_summary.json"
     by_status = {}
     changed_funds = []
@@ -531,66 +523,91 @@ def write_holdings_change_summary(meta: dict) -> None:
 
 
 def main() -> int:
+    print("=== MF holdings refresh ===")
     sheets = load_book_sheets()
     portfolio = discover_mf_rows(sheets)
-    print(f"MF rows discovered: {len(portfolio)}")
-
-    amfi_rows = fetch_amfi_universe()
-    print(f"AMFI universe rows: {len(amfi_rows or [])}")
+    print(f"Unique portfolio ISINs found: {len(portfolio)}")
+    session = requests.Session()
+    amfi_rows = fetch_amfi_universe(session, force=True)
+    isin_index = build_isin_index(amfi_rows)
+    print(f"AMFI universe rows: {len(amfi_rows)}")
     try:
         refresh_amfi_nav_cache(amfi_rows)
     except Exception as exc:
         print(f"AMFI nav cache refresh skipped: {exc}")
+    write_portfolio_history_row(portfolio, isin_index, sheets)
 
-    isin_index = build_isin_index(amfi_rows)
-    cache = load_json(HOLDINGS_CACHE) or {}
-    meta = load_json(HOLDINGS_META_CACHE) or {}
+    cache = load_json(HOLDINGS_CACHE, {})
+    meta = load_json(HOLDINGS_META_CACHE, {})
+    if not isinstance(cache, dict):
+        cache = {}
+    if not isinstance(meta, dict):
+        meta = {}
 
+    success = failed = unresolved = 0
     for _, row in portfolio.iterrows():
-        isin = str(row["isin"]).upper()
+        isin = str(row["isin"])
         fund_name = str(row.get("fund_name") or "")
         scheme = choose_scheme(isin, fund_name, isin_index)
-        scheme_code = str(scheme.get("scheme_code") or "").strip()
-        if not scheme_code:
-            print(f"No AMFI scheme for {isin} {fund_name[:40]}")
+        code = scheme.get("scheme_code") or scheme.get("code")
+        if not code:
+            unresolved += 1
+            print(f"UNRESOLVED {isin} {fund_name}")
             continue
-
-        result = ingest_scheme_holdings(scheme_code, fund_name=fund_name, amfi_row=scheme)
-        holdings = (result or {}).get("holdings") or []
-        as_of = (result or {}).get("as_of") or ""
-        source = (result or {}).get("source") or ""
-
-        if holdings:
-            cache[scheme_code] = holdings
-            prior_cmp = compare_to_prior(scheme_code, as_of, holdings)
-            try:
-                archive_scheme_snapshot(
-                    scheme_code,
-                    as_of,
-                    holdings,
-                    meta_extra={
-                        "fund_name": fund_name,
-                        "source": source,
-                        **{k: v for k, v in prior_cmp.items() if k != "diff_limitation"},
-                    },
+        try:
+            holdings, info = ingest_scheme_holdings(session, str(code))
+            if not holdings:
+                failed += 1
+                print(f"EMPTY {code} {isin}")
+                continue
+            as_of = (info or {}).get("as_of") or (info or {}).get("portfolio_date")
+            key = str(code)
+            if holdings:
+                cache[key] = {
+                    "scheme_code": key,
+                    "isin": isin,
+                    "fund_name": fund_name or scheme.get("scheme_name"),
+                    "as_of": as_of,
+                    "holdings": holdings,
+                    "source": (info or {}).get("source"),
+                    "retrieved_at": datetime.now(timezone.utc).isoformat(),
+                }
+                prior_cmp = compare_to_prior(key, str(as_of or ""), holdings)
+                try:
+                    archive_scheme_snapshot(
+                        key,
+                        str(as_of or ""),
+                        holdings,
+                        meta_extra={
+                            "fund_name": fund_name or scheme.get("scheme_name"),
+                            "source": (info or {}).get("source"),
+                            **{k: v for k, v in prior_cmp.items() if k != "diff_limitation"},
+                        },
+                    )
+                except Exception as archive_exc:
+                    print(f"Archive failed for {key}: {archive_exc}")
+                meta[key] = {
+                    "scheme_code": key,
+                    "isin": isin,
+                    "as_of": as_of,
+                    "count": len(holdings),
+                    "source": (info or {}).get("source"),
+                    "fund_name": fund_name or scheme.get("scheme_name"),
+                    "amfi_scheme_name": scheme.get("scheme_name"),
+                    "holding_count": len(holdings),
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                    **prior_cmp,
+                }
+                success += 1
+                print(
+                    f"OK {code} {isin} rows={len(holdings)} as_of={as_of} "
+                    f"cmp={prior_cmp.get('comparison_status')}"
                 )
-            except Exception as exc:
-                print(f"Archive failed for {scheme_code}: {exc}")
-            meta[scheme_code] = {
-                "as_of": as_of,
-                "source": source,
-                "fund_name": fund_name,
-                "amfi_scheme_name": scheme.get("scheme_name"),
-                "holding_count": len(holdings),
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-                **prior_cmp,
-            }
-            print(
-                f"{scheme_code} {fund_name[:36]:36} as_of={as_of} "
-                f"n={len(holdings)} src={source} cmp={prior_cmp.get('comparison_status')}"
-            )
-        else:
-            print(f"Empty holdings for {scheme_code} {fund_name[:40]} — keeping prior cache")
+            else:
+                failed += 1
+        except Exception as exc:
+            failed += 1
+            print(f"FAIL {code} {isin}: {exc}")
 
     save_json_atomic(HOLDINGS_CACHE, cache)
     save_json_atomic(HOLDINGS_META_CACHE, meta)
@@ -598,15 +615,8 @@ def main() -> int:
         write_holdings_change_summary(meta)
     except Exception as exc:
         print(f"Change summary skipped: {exc}")
-
-    try:
-        write_portfolio_history_row(portfolio, isin_index, sheets)
-    except Exception as exc:
-        print(f"History row failed: {exc}")
-        return 1
-
-    print("Holdings refresh complete.")
-    return 0
+    print(f"Done success={success} failed={failed} unresolved={unresolved} cache_size={len(cache)}")
+    return 0 if success > 0 or len(cache) > 0 else 1
 
 
 if __name__ == "__main__":
