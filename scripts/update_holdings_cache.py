@@ -6,7 +6,7 @@ Rules:
 - Never invent a filing date.
 - Archive each reporting period so a later month does not erase the prior one.
 - Write a daily full-book value row (MF units x AMFI NAV + stock marks +
-  FD available or ROI-accrued principal in INR). Stocks prefer Yahoo LTP, else invested.
+  FD available or ROI-accrued principal in INR). Stocks prefer Upstox LTP (UPSTOX_ACCESS_TOKEN), then Yahoo LTP, else invested.
   USD FCNR is converted with spot USDINR (Frankfurter, fallback 95).
   Cash from Cash in Hand sheet is included in total_assets_inr.
 """
@@ -139,7 +139,7 @@ def _yahoo_ltp(symbol: str) -> Optional[float]:
     for cand in candidates:
         try:
             url = f"https://query1.finance.yahoo.com/v8/finance/chart/{cand}"
-            r = requests.get(url, params={"interval": "1d", "range": "5d"}, timeout=15)
+            r = requests.get(url, params={"interval": "1d", "range": "5d"}, timeout=15, headers={"User-Agent": "Mozilla/5.0 (compatible; NorthlineFamilyDesk/1.0)"})
             if r.status_code != 200:
                 continue
             result = (r.json().get("chart") or {}).get("result") or []
@@ -155,60 +155,9 @@ def _yahoo_ltp(symbol: str) -> Optional[float]:
 
 
 def mark_stocks_current(sheets: Dict[str, pd.DataFrame]) -> Tuple[float, float, int, str, float, float, int, int, int]:
-    stocks_current = stocks_invested = 0.0
-    gold_current = gold_invested = 0.0
-    stocks_rows = gold_rows = 0
-    marks_used = set()
-    yahoo_hits = 0
-    yahoo_attempts = 0
-    for name, df in sheets.items():
-        if df is None or df.empty:
-            continue
-        if "stock" not in name.lower() and "equity" not in name.lower():
-            continue
-        ticker_col = None
-        qty_col = None
-        inv_col = None
-        for col in df.columns:
-            n = _norm_col(col)
-            if n in {"ticker / symbol", "ticker", "symbol"}:
-                ticker_col = col
-            if n in {"quantity", "qty", "units"}:
-                qty_col = col
-            if n in {"invested amount", "invested", "cost"}:
-                inv_col = col
-        if not ticker_col:
-            continue
-        for _, r in df.iterrows():
-            ticker = str(r.get(ticker_col) or "").strip().upper()
-            if not ticker or ticker in {"NAN", "NONE"}:
-                continue
-            inv = float(r.get(inv_col) or 0) if inv_col else 0.0
-            qty = float(r.get(qty_col) or 0) if qty_col else 0.0
-            is_gold = any(k in ticker for k in ("GOLD", "SGB", "GBEES")) or "-GB" in ticker
-            yahoo_attempts += 1
-            ltp = _yahoo_ltp(ticker)
-            if ltp is not None and qty > 0:
-                value = ltp * qty
-                marks_used.add("yahoo_ltp")
-                yahoo_hits += 1
-            else:
-                value = inv
-                marks_used.add("invested_fallback")
-            if is_gold:
-                gold_current += value
-                gold_invested += inv
-                gold_rows += 1
-            else:
-                stocks_current += value
-                stocks_invested += inv
-                stocks_rows += 1
-    mark = "+".join(sorted(marks_used)) if marks_used else "none"
-    return (
-        float(stocks_current), float(stocks_invested), stocks_rows, mark,
-        float(gold_current), float(gold_invested), gold_rows,
-        int(yahoo_hits), int(yahoo_attempts),
-    )
+    from lib.mark_equity import mark_stocks_current as _impl
+    return _impl(sheets)
+
 
 
 def sum_fd_current(sheets: Dict[str, pd.DataFrame], usd_inr: float = 95.0) -> Tuple[float, float, int]:
@@ -314,7 +263,7 @@ def write_portfolio_history_row(portfolio, isin_index, sheets):
     if "EQUITY_COST_ONLY" in quality_flags:
         print(
             f"WARNING: equity mark is cost-only "
-            f"(yahoo_hits={yahoo_hits}/{yahoo_attempts}). "
+            f"(live_hits={yahoo_hits}/{yahoo_attempts}). "
             "Stock P&L in history is not mark-to-market."
         )
 
@@ -350,7 +299,7 @@ def write_portfolio_history_row(portfolio, isin_index, sheets):
         "note": (
             f"book_mode={book_mode}. data_quality={data_quality}. "
             "MF = units x AMFI NAV. "
-            f"Equity stocks = {stocks_mark} (yahoo {yahoo_hits}/{yahoo_attempts}). "
+            f"Equity stocks = {stocks_mark} (live LTP {yahoo_hits}/{yahoo_attempts}). "
             f"Gold (SGB/ETF) = invested or mark. "
             f"FD = available or ROI-accrued principal in INR "
             f"(USD FCNR x USDINR {usd_inr:.2f} via {fx_source}). "
