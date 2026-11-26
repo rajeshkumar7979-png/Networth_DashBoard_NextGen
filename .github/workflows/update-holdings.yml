@@ -3,9 +3,7 @@ name: Refresh MF Holdings
 on:
   workflow_dispatch:
   schedule:
-    # Daily baseline (UTC 04:30 ≈ 10:00 IST)
     - cron: "30 4 * * *"
-    # Extra pulls after month-end while AMCs publish (5th–20th, twice daily)
     - cron: "0 6 5-20 * *"
     - cron: "0 14 5-20 * *"
 
@@ -36,8 +34,6 @@ jobs:
 
       - name: Rebuild public sample workbook from synthetic CSVs
         run: |
-          # Preserve a committed full book (>20KB with Cash in Hand). Only build
-          # the public sample when the repo still has a tiny placeholder xlsx.
           python - <<'PY'
           from pathlib import Path
           x = Path("data/Networth_Raw_Data.xlsx")
@@ -47,6 +43,9 @@ jobs:
               import subprocess, sys
               raise SystemExit(subprocess.call([sys.executable, "scripts/build_sample_workbook.py"]))
           PY
+
+      - name: Wire live equity marks (Upstox then Yahoo)
+        run: python scripts/wire_marks.py
 
       - name: Refresh complete MF holdings
         env:
@@ -83,7 +82,6 @@ jobs:
           if not xlsx.exists():
               raise SystemExit("ERROR: workbook missing")
           size = xlsx.stat().st_size
-          # Personal-name guard only for the public sample (small book)
           if size < 20000:
               blob = xlsx.read_bytes().upper()
               for bad in (b"KHANDELWAL", b"SATYANARAYAN", b"KAVITA KHANDELWAL"):
@@ -98,7 +96,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/mf_holdings_cache.json data/mf_holdings_meta.json data/amfi_scheme_universe.json data/amfi_nav_cache.json data/holdings_change_summary.json data/portfolio_history.csv data/mf_snapshots data/Networth_Raw_Data.xlsx data/BUILD_SHA.txt
+          git add data/mf_holdings_cache.json data/mf_holdings_meta.json data/amfi_scheme_universe.json data/amfi_nav_cache.json data/holdings_change_summary.json data/portfolio_history.csv data/mf_snapshots data/Networth_Raw_Data.xlsx data/BUILD_SHA.txt scripts/update_holdings_cache.py || true
           if git diff --cached --quiet; then
             echo "No holdings changes to commit."
             exit 0
