@@ -10,18 +10,21 @@ if marker in src:
     raise SystemExit(0)
 start = src.index("def mark_stocks_current(")
 end = src.index("\ndef sum_fd_current(")
-wrapper = (
-    "def mark_stocks_current(sheets: Dict[str, pd.DataFrame]) "
-    "-> Tuple[float, float, int, str, float, float, int, int, int]:\n"
-    "    from lib.mark_equity import mark_stocks_current as _impl\n"
-    "    return _impl(sheets)\n\n\n"
-)
+lines = [
+    "def mark_stocks_current(sheets: Dict[str, pd.DataFrame]) -> Tuple[float, float, int, str, float, float, int, int, int]:",
+    "    from lib.mark_equity import mark_stocks_current as _impl",
+    "    return _impl(sheets)",
+    "",
+    "",
+]
+wrapper = "\n".join(lines) + "\n"
 src = src[:start] + wrapper + src[end:]
-src = src.replace(
-    'r = requests.get(url, params={"interval": "1d", "range": "5d"}, timeout=15)',
+old_get = 'r = requests.get(url, params={"interval": "1d", "range": "5d"}, timeout=15)'
+new_get = (
     'r = requests.get(url, params={"interval": "1d", "range": "5d"}, timeout=15, '
-    'headers={"User-Agent": "Mozilla/5.0 (compatible; NorthlineFamilyDesk/1.0)"})',
+    'headers={"User-Agent": "Mozilla/5.0 (compatible; NorthlineFamilyDesk/1.0)"})'
 )
+src = src.replace(old_get, new_get)
 src = src.replace(
     "Stocks prefer Yahoo LTP, else invested.",
     "Stocks prefer Upstox LTP (UPSTOX_ACCESS_TOKEN), then Yahoo LTP, else invested.",
